@@ -1,0 +1,6 @@
+/target/
+
+/src/parser.rs
+/src/lexer/mod.rs
+/src/diag/mod.rs
+/src/token.rs
