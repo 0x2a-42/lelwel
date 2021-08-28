@@ -88,7 +88,7 @@ fn main() {
         .max_term_width(80)
         .version(crate_version!())
         .about(
-            "Generates a recursive descent parser in rust using an LL(1) grammar. \
+            "Generates recursive descent parsers for Rust using LL(1) grammars. \
              Conflicts are resolved with semantic predicates. \
              Semantic actions are used for ad hoc syntax-directed translation.",
         )
