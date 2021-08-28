@@ -1,6 +1,6 @@
 # lelwel
 [![Crates.io](https://img.shields.io/crates/v/lelwel)](https://crates.io/crates/lelwel)
-[![MIT/Apache 2.0](https://img.shields.io/badge/license-MIT%2FApache-blue.svg)](./LICENSE)
+[![MIT/Apache 2.0](https://img.shields.io/badge/license-MIT%2FApache-blue.svg)](./LICENSE-MIT)
 [![Crates.io](https://img.shields.io/crates/d/lelwel)](https://crates.io/crates/lelwel)
 
 [Lelwel](https://en.wikipedia.org/wiki/Lelwel_hartebeest) generates recursive descent parsers for Rust using LL(1) grammars.
