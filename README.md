@@ -4,7 +4,7 @@
 [![Crates.io](https://img.shields.io/crates/d/lelwel)](https://crates.io/crates/lelwel)
 [![Rust](https://img.shields.io/github/workflow/status/0x2a-42/lelwel/Tests)](https://github.com/0x2a-42/lelwel/actions)
 
-[Lelwel](https://en.wikipedia.org/wiki/Lelwel_hartebeest) generates recursive descent parsers for Rust using LL(1) grammars.
+[Lelwel](https://en.wikipedia.org/wiki/Lelwel_hartebeest) generates recursive descent parsers for Rust using [LL(1) grammars](https://en.wikipedia.org/wiki/LL_grammar).
 Conflicts are resolved with semantic predicates.
 Semantic actions are used for ad hoc syntax-directed translation.
 A special `error` rule can be used to recover from syntax errors.
