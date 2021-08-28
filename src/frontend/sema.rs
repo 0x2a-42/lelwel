@@ -212,6 +212,12 @@ impl<'a, 'b> GeneralValidator {
                     diag.error(Code::LowercaseToken(*name), element.range());
                 }
             }
+            ElementKind::Action { name, .. }
+            | ElementKind::Predicate { name, .. } => {
+                if !bindings.contains_key(&Binding::Term(*name)) {
+                    diag.error(Code::UndefinedElement(*name), element.range());
+                }
+            }
             _ => {}
         }
     }
