@@ -115,7 +115,7 @@ value#7 { Ok(Value::Null) }
 object#0 { let mut members = BTreeMap::new(); }
 object#1 { members.insert(member.0, member.1); }
 object#2 { members.insert(member.0, member.1); }
-object#3 { diag.error(e, error_range); }
+object#3 { diag.error(error_code, error_range); }
 object#4 { Ok(Value::Object(members)) }
 
 member#1 { Ok((String.0, value)) }
@@ -123,7 +123,7 @@ member#1 { Ok((String.0, value)) }
 array#0 { let mut values = vec![]; }
 array#1 { values.push(value); }
 array#2 { values.push(value); }
-array#3 { diag.error(e, error_range); }
+array#3 { diag.error(error_code, error_range); }
 array#4 { Ok(Value::Array(values)) }
 ```
 
