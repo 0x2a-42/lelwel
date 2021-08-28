@@ -93,9 +93,7 @@ impl<'a> Server<'a> {
         let module = self.asts.get(filename)?.root()?;
         match LookupNode::find(module, pos)? {
             Node::Element(element) => hover_element(element),
-            Node::Regex(
-                regex
-                @
+            Node::Regex(regex) => match regex {
                 Regex {
                     kind:
                         RegexKind::Id { elem, .. }
@@ -103,35 +101,35 @@ impl<'a> Server<'a> {
                         | RegexKind::Predicate { elem, .. }
                         | RegexKind::Action { elem, .. },
                     ..
-                },
-            ) => {
-                let doc = if let Some(element) = elem.get() {
-                    if !element.attr.doc().is_empty() {
-                        format!("---\n{}", element.attr.doc())
+                } => {
+                    let doc = if let Some(element) = elem.get() {
+                        if !element.attr.doc().is_empty() {
+                            format!("---\n{}", element.attr.doc())
+                        } else {
+                            "".to_string()
+                        }
                     } else {
                         "".to_string()
-                    }
-                } else {
-                    "".to_string()
-                };
-                Some((
+                    };
+                    Some((
+                        format!(
+                            "**First:** {:?}  \n**Follow:** {:?}\n{}",
+                            regex.first(),
+                            regex.follow(),
+                            doc,
+                        ),
+                        regex.range(),
+                    ))
+                }
+                _ => Some((
                     format!(
-                        "**First:** {:?}  \n**Follow:** {:?}\n{}",
+                        "**First:** {:?}  \n**Follow:** {:?}\n",
                         regex.first(),
-                        regex.follow(),
-                        doc,
+                        regex.follow()
                     ),
                     regex.range(),
-                ))
-            }
-            Node::Regex(regex) => Some((
-                format!(
-                    "**First:** {:?}  \n**Follow:** {:?}\n",
-                    regex.first(),
-                    regex.follow()
-                ),
-                regex.range(),
-            )),
+                )),
+            },
         }
     }
 }
