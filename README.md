@@ -7,6 +7,7 @@
 [Lelwel](https://en.wikipedia.org/wiki/Lelwel_hartebeest) generates recursive descent parsers for Rust using [LL(1) grammars](https://en.wikipedia.org/wiki/LL_grammar).
 Conflicts are resolved with semantic predicates.
 Semantic actions are used for ad hoc syntax-directed translation.
+Unlike in other parser generators (e.g. bison or javacc), actions and predicates are not defined inline, which makes it easier to read the grammar.
 A special `error` rule can be used to recover from syntax errors.
 
 Lelwel is written as a library, which is used by the CLI tool `llw` and the language server `lelwel-ls`.
