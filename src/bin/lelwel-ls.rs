@@ -197,18 +197,28 @@ fn to_lsp_related(range: &token::Range, url: &Url, msg: &str) -> DiagnosticRelat
 fn generate_diagnostics(url: Url, diag: diag::Diag) -> Notification {
     let mut diagnostics = vec![];
     for e in diag.error_iter() {
+        let related = e.related()
+            .iter()
+            .map(|(r, m)| to_lsp_related(r, &url, &m))
+            .collect::<Vec<_>>();
+        for r in related.iter() {
+            diagnostics.push(Diagnostic::new(
+                Range::from(r.location.range),
+                Some(DiagnosticSeverity::Hint),
+                None,
+                None,
+                r.message.clone(),
+                None,
+                None,
+            ));
+        }
         diagnostics.push(Diagnostic::new(
             Range::from(e.range()),
             Some(DiagnosticSeverity::Error),
             None,
             None,
-            format!("{}", e.code()),
-            Some(
-                e.related()
-                    .iter()
-                    .map(|(r, m)| to_lsp_related(r, &url, &m))
-                    .collect(),
-            ),
+            e.code().to_string(),
+            Some(related),
             None,
         ));
     }
@@ -218,7 +228,7 @@ fn generate_diagnostics(url: Url, diag: diag::Diag) -> Notification {
             Some(DiagnosticSeverity::Warning),
             None,
             None,
-            format!("{}", e.code()),
+            e.code().to_string(),
             None,
             None,
         ));
