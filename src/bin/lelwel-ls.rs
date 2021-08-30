@@ -203,7 +203,7 @@ fn generate_diagnostics(url: Url, diag: diag::Diag) -> Notification {
             .collect::<Vec<_>>();
         for r in related.iter() {
             diagnostics.push(Diagnostic::new(
-                Range::from(r.location.range),
+                r.location.range,
                 Some(DiagnosticSeverity::Hint),
                 None,
                 None,
