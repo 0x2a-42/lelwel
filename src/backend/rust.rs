@@ -145,8 +145,8 @@ impl RustOutput {
             file.write_all(
                 b"use super::*;\
                 \n\
-                \nimpl<const LOG: bool> Lexer<LOG> {\
-                \n    pub fn state_start(&mut self) -> Transition<LOG> {\
+                \nimpl Lexer {\
+                \n    pub fn state_start(&mut self) -> Transition {\
                 \n        match self.consume() {\
                 \n            // TODO\
                 \n            None => self.emit(TokenKind::EOF),\
