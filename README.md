@@ -7,8 +7,8 @@
 [Lelwel](https://en.wikipedia.org/wiki/Lelwel_hartebeest) generates recursive descent parsers for Rust using [LL(1) grammars](https://en.wikipedia.org/wiki/LL_grammar).
 Conflicts are resolved with semantic predicates.
 Semantic actions are used for ad hoc syntax-directed translation.
-Unlike in other parser generators (e.g. bison or javacc), actions and predicates are not defined inline, which makes it easier to read the grammar.
-A special `error` rule can be used to recover from syntax errors.
+Error handlers are used to recover from syntax errors.
+Unlike in other parser generators (e.g. bison or javacc), actions, predicates, and error handlers are not defined inline, which makes it easier to read the grammar.
 
 Lelwel is written as a library, which is used by the CLI tool `llw` and the language server `lelwel-ls`.
 There are plugins for [Neovim](https://github.com/0x2a-42/nvim-lelwel) and Visual Studio Code that use the language server.
@@ -84,13 +84,13 @@ value{Value}:
 | 'null' #7
 ;
 object{Value}:
-  '{' (member #1 (',' member #2)* | error #3)? '}' #4
+  '{' [member #1 (',' member #2)* | !1] '}' #3
 ;
 member{(String, Value)}:
   String ':' value #1
 ;
 array{Value}:
-  '[' (value #1 (',' value #2)* | error #3)? ']' #4
+  '[' [value #1 (',' value #2)* | !1] ']' #3
 ;
 
 limit 1000;
@@ -116,16 +116,16 @@ value#7 { Ok(Value::Null) }
 object#0 { let mut members = BTreeMap::new(); }
 object#1 { members.insert(member.0, member.1); }
 object#2 { members.insert(member.0, member.1); }
-object#3 { diag.error(error_code, error_range); }
-object#4 { Ok(Value::Object(members)) }
+object#3 { Ok(Value::Object(members)) }
+object!1 { diag.error(error_code, error_range); }
 
 member#1 { Ok((String.0, value)) }
 
 array#0 { let mut values = vec![]; }
 array#1 { values.push(value); }
 array#2 { values.push(value); }
-array#3 { diag.error(error_code, error_range); }
-array#4 { Ok(Value::Array(values)) }
+array#3 { Ok(Value::Array(values)) }
+array!1 { diag.error(error_code, error_range); }
 ```
 
 ## Installation
