@@ -15,13 +15,13 @@ pub enum Code {
     ExpectedPredicate(u64),
     UndefinedAction,
     UndefinedPredicate,
+    UndefinedErrorHandler,
     UnusedElement,
     MissingStart,
-    ErrorPosition,
     PredPosition,
     LL1Conflict,
     ConsumeTokens,
-    ErrorSema,
+    ErrorSyntax,
     ErrorCount,
     PredefToken,
 }
@@ -94,14 +94,14 @@ impl std::fmt::Display for Code {
             Code::UndefinedPredicate => {
                 write!(f, "Undefined predicate")
             }
+            Code::UndefinedErrorHandler => {
+                write!(f, "Undefined error handler")
+            }
             Code::UnusedElement => {
                 write!(f, "Unused element")
             }
             Code::MissingStart => {
                 write!(f, "Missing start rule")
-            }
-            Code::ErrorPosition => {
-                write!(f, "Error handler must start with 'error'")
             }
             Code::PredPosition => {
                 write!(f, "Predicate must be first term in alternative branch")
@@ -112,11 +112,8 @@ impl std::fmt::Display for Code {
             Code::ConsumeTokens => {
                 write!(f, "No tokens consumed")
             }
-            Code::ErrorSema => {
-                write!(
-                    f,
-                    "Error handler can only be followed by single semantic action"
-                )
+            Code::ErrorSyntax => {
+                write!(f, "Error handler must be alone in alternative branch")
             }
             Code::ErrorCount => {
                 write!(f, "Error handler can only occur once in alternative")

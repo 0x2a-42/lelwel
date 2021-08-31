@@ -484,14 +484,8 @@ impl RustOutput {
                 output.write_all("match input.current().kind {\n".indent(level).as_bytes())?;
                 for op in ops {
                     // check if this is the error rule, if so ignore it here
-                    if let Some(error) = error.get() {
-                        match &op.kind {
-                            RegexKind::Error { .. } => continue,
-                            RegexKind::Concat { ops, .. } if std::ptr::eq(ops[0], error) => {
-                                continue
-                            }
-                            _ => {}
-                        }
+                    if let RegexKind::ErrorHandler { .. } = &op.kind {
+                        continue;
                     }
                     output.write_all(
                         format!(
@@ -520,11 +514,6 @@ impl RustOutput {
                     .as_bytes(),
                 )?;
                 if let Some(error) = error.get() {
-                    let sema = if let RegexKind::Error { sema } = &error.kind {
-                        sema
-                    } else {
-                        unreachable!()
-                    };
                     output.write_all(
                         format!(
                             "}})().or_else(|error_code| {{\
@@ -541,9 +530,7 @@ impl RustOutput {
                         .indent(level - 1)
                         .as_bytes(),
                     )?;
-                    if let Some(sema) = sema.get() {
-                        Self::output_regex(sema, output, common_args, level + 3)?;
-                    }
+                    Self::output_regex(error, output, common_args, level + 3)?;
                     output.write_all(
                         "                return Ok(())\
                        \n            }\n"
@@ -715,6 +702,31 @@ impl RustOutput {
                         .as_bytes(),
                 )?;
             }
+            RegexKind::ErrorHandler { val, elem } => {
+                let code = match elem.get() {
+                    Some(Element {
+                        kind: ElementKind::ErrorHandler { code, .. },
+                        ..
+                    }) => {
+                        let code = code.as_string();
+                        if code.contains('\n') {
+                            code
+                        } else {
+                            "    ".to_string() + code.trim()
+                        }
+                    }
+                    _ => format!(
+                        "    todo!(\"error handler {} at {}\");\n",
+                        val,
+                        regex.range().start
+                    ),
+                };
+                output.write_all(
+                    format!("    // error handler {}\n{}\n", val, code)
+                        .indent(level - 1)
+                        .as_bytes(),
+                )?;
+            }
             _ => {}
         }
         Ok(())
@@ -807,7 +819,7 @@ impl RustOutput {
 
     fn output_error(module: &Module, output: &mut File) -> std::io::Result<()> {
         if let Some(Element {
-            kind: ElementKind::Error { code },
+            kind: ElementKind::ErrorCode { code },
             ..
         }) = module.error.get()
         {
@@ -828,7 +840,7 @@ impl RustOutput {
             128
         };
         if let Some(Element {
-            kind: ElementKind::Error { code },
+            kind: ElementKind::ErrorCode { code },
             ..
         }) = module.error.get()
         {
@@ -966,7 +978,7 @@ impl RustOutput {
         };
         let error_type = match module.error.get() {
             Some(Element {
-                kind: ElementKind::Error { code },
+                kind: ElementKind::ErrorCode { code },
                 ..
             }) => code.as_str().trim(),
             _ => "Vec<TokenKind>",

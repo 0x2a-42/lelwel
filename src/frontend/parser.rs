@@ -28,16 +28,18 @@ pub enum TokenKind {
     Equal,
     LPar,
     RPar,
+    LBrak,
+    RBrak,
     Or,
     Star,
     Plus,
-    Quest,
     Id(Symbol),
     Str(Symbol),
     Code(Symbol),
     Int(u16),
     Predicate(u64),
     Action(u64),
+    ErrorHandler(u64),
     _Comment(Symbol),
 }
 
@@ -56,16 +58,18 @@ macro_rules! pattern_Semi { () => { TokenKind::Semi } }
 macro_rules! pattern_Equal { () => { TokenKind::Equal } }
 macro_rules! pattern_LPar { () => { TokenKind::LPar } }
 macro_rules! pattern_RPar { () => { TokenKind::RPar } }
+macro_rules! pattern_LBrak { () => { TokenKind::LBrak } }
+macro_rules! pattern_RBrak { () => { TokenKind::RBrak } }
 macro_rules! pattern_Or { () => { TokenKind::Or } }
 macro_rules! pattern_Star { () => { TokenKind::Star } }
 macro_rules! pattern_Plus { () => { TokenKind::Plus } }
-macro_rules! pattern_Quest { () => { TokenKind::Quest } }
 macro_rules! pattern_Id { () => { TokenKind::Id(_) } }
 macro_rules! pattern_Str { () => { TokenKind::Str(_) } }
 macro_rules! pattern_Code { () => { TokenKind::Code(_) } }
 macro_rules! pattern_Int { () => { TokenKind::Int(_) } }
 macro_rules! pattern_Predicate { () => { TokenKind::Predicate(_) } }
 macro_rules! pattern_Action { () => { TokenKind::Action(_) } }
+macro_rules! pattern_ErrorHandler { () => { TokenKind::ErrorHandler(_) } }
 macro_rules! pattern__Comment { () => { TokenKind::_Comment(_) } }
 
 macro_rules! default_EOF { () => { TokenKind::EOF } }
@@ -82,16 +86,18 @@ macro_rules! default_Semi { () => { TokenKind::Semi } }
 macro_rules! default_Equal { () => { TokenKind::Equal } }
 macro_rules! default_LPar { () => { TokenKind::LPar } }
 macro_rules! default_RPar { () => { TokenKind::RPar } }
+macro_rules! default_LBrak { () => { TokenKind::LBrak } }
+macro_rules! default_RBrak { () => { TokenKind::RBrak } }
 macro_rules! default_Or { () => { TokenKind::Or } }
 macro_rules! default_Star { () => { TokenKind::Star } }
 macro_rules! default_Plus { () => { TokenKind::Plus } }
-macro_rules! default_Quest { () => { TokenKind::Quest } }
 macro_rules! default_Id { () => { TokenKind::Id(Symbol::default()) } }
 macro_rules! default_Str { () => { TokenKind::Str(Symbol::default()) } }
 macro_rules! default_Code { () => { TokenKind::Code(Symbol::default()) } }
 macro_rules! default_Int { () => { TokenKind::Int(u16::default()) } }
 macro_rules! default_Predicate { () => { TokenKind::Predicate(u64::default()) } }
 macro_rules! default_Action { () => { TokenKind::Action(u64::default()) } }
+macro_rules! default_ErrorHandler { () => { TokenKind::ErrorHandler(u64::default()) } }
 
 macro_rules! err { [$($tk:expr),*] => { Err(Code::from(vec![$($tk),*])) } }
 
@@ -248,6 +254,28 @@ macro_rules! consume_RPar {
         }
     }
 }
+macro_rules! consume_LBrak {
+    ($input:ident) => {
+        if let TokenKind::LBrak = $input.current().kind {
+            let range = $input.current().range;
+            $input.advance();
+            range
+        } else {
+            return err![default_LBrak!()]
+        }
+    }
+}
+macro_rules! consume_RBrak {
+    ($input:ident) => {
+        if let TokenKind::RBrak = $input.current().kind {
+            let range = $input.current().range;
+            $input.advance();
+            range
+        } else {
+            return err![default_RBrak!()]
+        }
+    }
+}
 macro_rules! consume_Or {
     ($input:ident) => {
         if let TokenKind::Or = $input.current().kind {
@@ -278,17 +306,6 @@ macro_rules! consume_Plus {
             range
         } else {
             return err![default_Plus!()]
-        }
-    }
-}
-macro_rules! consume_Quest {
-    ($input:ident) => {
-        if let TokenKind::Quest = $input.current().kind {
-            let range = $input.current().range;
-            $input.advance();
-            range
-        } else {
-            return err![default_Quest!()]
         }
     }
 }
@@ -358,6 +375,17 @@ macro_rules! consume_Action {
         }
     }
 }
+macro_rules! consume_ErrorHandler {
+    ($input:ident) => {
+        if let TokenKind::ErrorHandler(value) = $input.current().kind {
+            let range = $input.current().range;
+            $input.advance();
+            (value, range)
+        } else {
+            return err![default_ErrorHandler!()]
+        }
+    }
+}
 
 use std::fmt;
 impl fmt::Display for TokenKind {
@@ -378,16 +406,18 @@ impl fmt::Display for TokenKind {
             pattern_Equal!() => write!(f, "{}", r###"="###),
             pattern_LPar!() => write!(f, "{}", r###"("###),
             pattern_RPar!() => write!(f, "{}", r###")"###),
+            pattern_LBrak!() => write!(f, "{}", r###"["###),
+            pattern_RBrak!() => write!(f, "{}", r###"]"###),
             pattern_Or!() => write!(f, "{}", r###"|"###),
             pattern_Star!() => write!(f, "{}", r###"*"###),
             pattern_Plus!() => write!(f, "{}", r###"+"###),
-            pattern_Quest!() => write!(f, "{}", r###"?"###),
             pattern_Id!() => write!(f, "{}", r###"<identifier>"###),
             pattern_Str!() => write!(f, "{}", r###"<string literal>"###),
             pattern_Code!() => write!(f, "{}", r###"<code segment>"###),
             pattern_Int!() => write!(f, "{}", r###"<integer>"###),
             pattern_Predicate!() => write!(f, "{}", r###"<semantic predicate>"###),
             pattern_Action!() => write!(f, "{}", r###"<semantic action>"###),
+            pattern_ErrorHandler!() => write!(f, "{}", r###"<error handler>"###),
             pattern__Comment!() => write!(f, "{}", r###"_Comment"###),
         }
     }
@@ -478,7 +508,7 @@ impl<'a> Parser {
                                 let r#Error = consume_Error!(input);
                                 let r#Code = consume_Code!(input);
                                 // semantic action 7
-                                elements.push(Element::new_error(arena, Code.0, Code.1));
+                                elements.push(Element::new_error_code(arena, Code.0, Code.1));
                                 Ok(())
                             }
                             pattern_Limit!() => {
@@ -519,7 +549,7 @@ impl<'a> Parser {
                                 | pattern_Pars!()
                                 | pattern_Limit!()
                                 | pattern_Id!() => {
-                                    // semantic action 9
+                                    // error handler 1
                                     diag.error(error_code, error_range);
                                     elements.push(Element::new_invalid(arena, error_range));
                                     return Ok(())
@@ -546,7 +576,7 @@ impl<'a> Parser {
                 }
             }
         }
-        // semantic action 10
+        // semantic action 9
         Ok(Module::new(elements))
     }
     fn r#tokens<Input: TokenStream>(depth: u16, input: &mut Input, arena: &'a Bump, diag: &mut Diag, elements: &mut BVec<'a, &'a Element<'a>>) -> Result<(), Code> {
@@ -628,7 +658,7 @@ impl<'a> Parser {
             loop {
                 match input.current().kind {
                     pattern_Semi!() => {
-                        // semantic action 5
+                        // error handler 1
                         diag.error(error_code, error_range);
                         return Ok(())
                     }
@@ -642,17 +672,22 @@ impl<'a> Parser {
            }
         })?;
         let r#Semi = consume_Semi!(input);
-        // semantic action 6
+        // semantic action 5
         Ok(())
     }
     fn r#rule_or_action<Input: TokenStream>(depth: u16, input: &mut Input, arena: &'a Bump, diag: &mut Diag) -> Result<&'a Element<'a>, Code> {
         check_limit!(input, depth);
         // semantic action 0
+        enum ElemType {
+          Action,
+          Predicate,
+          ErrorHandler,
+        }
         let name;
         let range;
         let mut ret = Symbol::default();
         let mut pars = Symbol::default();
-        let is_act;
+        let elem_type;
         let num;
         let trivia = input.trivia();
         match input.current().kind {
@@ -712,39 +747,48 @@ impl<'a> Parser {
                 }
             }
             pattern_Predicate!()
-            | pattern_Action!() => {
+            | pattern_Action!()
+            | pattern_ErrorHandler!() => {
                 match input.current().kind {
                     pattern_Action!() => {
                         let r#Action = consume_Action!(input);
                         // semantic action 6
-                        is_act = true;
+                        elem_type = ElemType::Action;
                         num = Action.0;
                     }
                     pattern_Predicate!() => {
                         let r#Predicate = consume_Predicate!(input);
                         // semantic action 7
-                        is_act = false;
+                        elem_type = ElemType::Predicate;
                         num = Predicate.0;
+                    }
+                    pattern_ErrorHandler!() => {
+                        let r#ErrorHandler = consume_ErrorHandler!(input);
+                        // semantic action 8
+                        elem_type = ElemType::ErrorHandler;
+                        num = ErrorHandler.0;
                     }
                     _ => {
                         return err![default_Predicate!(),
-                                    default_Action!()]
+                                    default_Action!(),
+                                    default_ErrorHandler!()]
                     }
                 }
                 let r#Code = consume_Code!(input);
-                // semantic action 8
+                // semantic action 9
                 let range = Range::span(range, Code.1);
-                if is_act {
-                    Ok(Element::new_action(arena, name, num, Code.0, range, trivia))
-                } else {
-                    Ok(Element::new_predicate(arena, name, num, Code.0, range, trivia))
+                match elem_type {
+                    ElemType::Action => Ok(Element::new_action(arena, name, num, Code.0, range, trivia)),
+                    ElemType::Predicate => Ok(Element::new_predicate(arena, name, num, Code.0, range, trivia)),
+                    ElemType::ErrorHandler => Ok(Element::new_error_handler(arena, name, num, Code.0, range, trivia)),
                 }
             }
             _ => {
                 return err![default_Colon!(),
                             default_Code!(),
                             default_Predicate!(),
-                            default_Action!()]
+                            default_Action!(),
+                            default_ErrorHandler!()]
             }
         }
     }
@@ -763,10 +807,12 @@ impl<'a> Parser {
                     regexes.push(concat);
                 }
                 pattern_Semi!()
-                | pattern_RPar!() => break,
+                | pattern_RPar!()
+                | pattern_RBrak!() => break,
                 _ => {
                     return err![default_Semi!(),
                                 default_RPar!(),
+                                default_RBrak!(),
                                 default_Or!()]
                 }
             }
@@ -786,36 +832,41 @@ impl<'a> Parser {
         let mut is_first = true;
         loop {
             match input.current().kind {
-                pattern_Error!()
-                | pattern_LPar!()
+                pattern_LPar!()
+                | pattern_LBrak!()
                 | pattern_Id!()
                 | pattern_Str!()
                 | pattern_Predicate!()
-                | pattern_Action!() => {
+                | pattern_Action!()
+                | pattern_ErrorHandler!() => {
                     let r#postfix = Self::r#postfix(depth + 1, input, arena, diag)?;
                     // semantic action 1
                     regexes.push(postfix);
                 }
                 pattern_Semi!()
                 | pattern_RPar!()
+                | pattern_RBrak!()
                 | pattern_Or!() if !is_first => break,
                 _ if is_first => {
-                    return err![default_Error!(),
-                                default_LPar!(),
-                                default_Id!(),
-                                default_Str!(),
-                                default_Predicate!(),
-                                default_Action!()]
-                }
-                _ => {
-                    return err![default_Error!(),
-                                default_LPar!(),
+                    return err![default_LPar!(),
+                                default_LBrak!(),
                                 default_Id!(),
                                 default_Str!(),
                                 default_Predicate!(),
                                 default_Action!(),
+                                default_ErrorHandler!()]
+                }
+                _ => {
+                    return err![default_LPar!(),
+                                default_LBrak!(),
+                                default_Id!(),
+                                default_Str!(),
+                                default_Predicate!(),
+                                default_Action!(),
+                                default_ErrorHandler!(),
                                 default_Semi!(),
                                 default_RPar!(),
+                                default_RBrak!(),
                                 default_Or!()]
                 }
             }
@@ -836,12 +887,13 @@ impl<'a> Parser {
         let mut range = input.current().range;
         (|| {
             match input.current().kind {
-                pattern_Error!()
-                | pattern_LPar!()
+                pattern_LPar!()
+                | pattern_LBrak!()
                 | pattern_Id!()
                 | pattern_Str!()
                 | pattern_Predicate!()
-                | pattern_Action!() => {
+                | pattern_Action!()
+                | pattern_ErrorHandler!() => {
                     let r#atomic = Self::r#atomic(depth + 1, input, arena, diag)?;
                     // semantic action 1
                     regex = Some(atomic);
@@ -849,8 +901,7 @@ impl<'a> Parser {
                     loop {
                         match input.current().kind {
                             pattern_Star!()
-                            | pattern_Plus!()
-                            | pattern_Quest!() => {
+                            | pattern_Plus!() => {
                                 match input.current().kind {
                                     pattern_Star!() => {
                                         let r#Star = consume_Star!(input);
@@ -864,53 +915,50 @@ impl<'a> Parser {
                                         range = Range::span(range, Plus);
                                         regex = Some(Regex::new_plus(arena, regex.unwrap(), range));
                                     }
-                                    pattern_Quest!() => {
-                                        let r#Quest = consume_Quest!(input);
-                                        // semantic action 4
-                                        range = Range::span(range, Quest);
-                                        regex = Some(Regex::new_option(arena, regex.unwrap(), range));
-                                    }
                                     _ => {
                                         return err![default_Star!(),
-                                                    default_Plus!(),
-                                                    default_Quest!()]
+                                                    default_Plus!()]
                                     }
                                 }
                             }
-                            pattern_Error!()
-                            | pattern_Semi!()
+                            pattern_Semi!()
                             | pattern_LPar!()
                             | pattern_RPar!()
+                            | pattern_LBrak!()
+                            | pattern_RBrak!()
                             | pattern_Or!()
                             | pattern_Id!()
                             | pattern_Str!()
                             | pattern_Predicate!()
-                            | pattern_Action!() => break,
+                            | pattern_Action!()
+                            | pattern_ErrorHandler!() => break,
                             _ => {
-                                return err![default_Error!(),
-                                            default_Semi!(),
+                                return err![default_Semi!(),
                                             default_LPar!(),
                                             default_RPar!(),
+                                            default_LBrak!(),
+                                            default_RBrak!(),
                                             default_Or!(),
                                             default_Star!(),
                                             default_Plus!(),
-                                            default_Quest!(),
                                             default_Id!(),
                                             default_Str!(),
                                             default_Predicate!(),
-                                            default_Action!()]
+                                            default_Action!(),
+                                            default_ErrorHandler!()]
                             }
                         }
                     }
                     Ok(())
                 }
                 _ => {
-                    return err![default_Error!(),
-                                default_LPar!(),
+                    return err![default_LPar!(),
+                                default_LBrak!(),
                                 default_Id!(),
                                 default_Str!(),
                                 default_Predicate!(),
-                                default_Action!()]
+                                default_Action!(),
+                                default_ErrorHandler!()]
                 }
             }
         })().or_else(|error_code| {
@@ -921,29 +969,33 @@ impl<'a> Parser {
             let error_range = input.current().range;
             loop {
                 match input.current().kind {
-                    pattern_Error!()
-                    | pattern_Semi!()
+                    pattern_Semi!()
                     | pattern_LPar!()
                     | pattern_RPar!()
+                    | pattern_LBrak!()
+                    | pattern_RBrak!()
                     | pattern_Or!()
                     | pattern_Id!()
                     | pattern_Str!()
                     | pattern_Predicate!()
-                    | pattern_Action!() => {
-                        // semantic action 5
+                    | pattern_Action!()
+                    | pattern_ErrorHandler!() => {
+                        // error handler 1
                         diag.error(error_code, error_range);
                         return Ok(())
                     }
                     pattern_EOF!() => {
-                        return err![default_Error!(),
-                                    default_Semi!(),
+                        return err![default_Semi!(),
                                     default_LPar!(),
                                     default_RPar!(),
+                                    default_LBrak!(),
+                                    default_RBrak!(),
                                     default_Or!(),
                                     default_Id!(),
                                     default_Str!(),
                                     default_Predicate!(),
-                                    default_Action!()]
+                                    default_Action!(),
+                                    default_ErrorHandler!()]
                     }
                     _ => {
                         input.advance();
@@ -951,7 +1003,7 @@ impl<'a> Parser {
                }
            }
         })?;
-        // semantic action 6
+        // semantic action 4
         Ok(regex.unwrap_or_else(|| Regex::new_invalid(arena, range)))
     }
     fn r#atomic<Input: TokenStream>(depth: u16, input: &mut Input, arena: &'a Bump, diag: &mut Diag) -> Result<&'a Regex<'a>, Code> {
@@ -977,10 +1029,10 @@ impl<'a> Parser {
                 // semantic action 4
                 Ok(Regex::new_action(arena, Action.0, Action.1))
             }
-            pattern_Error!() => {
-                let r#Error = consume_Error!(input);
+            pattern_ErrorHandler!() => {
+                let r#ErrorHandler = consume_ErrorHandler!(input);
                 // semantic action 5
-                Ok(Regex::new_error(arena, Error))
+                Ok(Regex::new_error_handler(arena, ErrorHandler.0, ErrorHandler.1))
             }
             pattern_LPar!() => {
                 let r#LPar = consume_LPar!(input);
@@ -990,13 +1042,22 @@ impl<'a> Parser {
                 let range = Range::span(LPar, RPar);
                 Ok(Regex::new_paren(arena, regex, range))
             }
+            pattern_LBrak!() => {
+                let r#LBrak = consume_LBrak!(input);
+                let r#regex = Self::r#regex(depth + 1, input, arena, diag)?;
+                let r#RBrak = consume_RBrak!(input);
+                // semantic action 7
+                let range = Range::span(LBrak, RBrak);
+                Ok(Regex::new_option(arena, regex, range))
+            }
             _ => {
-                return err![default_Error!(),
-                            default_LPar!(),
+                return err![default_LPar!(),
+                            default_LBrak!(),
                             default_Id!(),
                             default_Str!(),
                             default_Predicate!(),
-                            default_Action!()]
+                            default_Action!(),
+                            default_ErrorHandler!()]
             }
         }
     }

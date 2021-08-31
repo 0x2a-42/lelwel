@@ -127,13 +127,18 @@ pub enum ElementKind<'a> {
         num: u64,
         code: Symbol,
     },
+    ErrorHandler {
+        name: Symbol,
+        num: u64,
+        code: Symbol,
+    },
     Preamble {
         code: Symbol,
     },
     Parameters {
         code: Symbol,
     },
-    Error {
+    ErrorCode {
         code: Symbol,
     },
     Language {
@@ -226,6 +231,19 @@ impl<'a> Element<'a> {
             attr: ElementAttr::new_with_doc(range, doc),
         })
     }
+    pub fn new_error_handler(
+        arena: &'a Bump,
+        name: Symbol,
+        num: u64,
+        code: Symbol,
+        range: Range,
+        doc: Option<Token>,
+    ) -> &'a Element<'a> {
+        arena.alloc(Element {
+            kind: ElementKind::ErrorHandler { name, num, code },
+            attr: ElementAttr::new_with_doc(range, doc),
+        })
+    }
     pub fn new_preamble(arena: &'a Bump, code: Symbol, range: Range) -> &'a Element<'a> {
         arena.alloc(Element {
             kind: ElementKind::Preamble { code },
@@ -238,9 +256,9 @@ impl<'a> Element<'a> {
             attr: ElementAttr::new(range),
         })
     }
-    pub fn new_error(arena: &'a Bump, code: Symbol, range: Range) -> &'a Element<'a> {
+    pub fn new_error_code(arena: &'a Bump, code: Symbol, range: Range) -> &'a Element<'a> {
         arena.alloc(Element {
-            kind: ElementKind::Error { code },
+            kind: ElementKind::ErrorCode { code },
             attr: ElementAttr::new(range),
         })
     }
@@ -313,8 +331,9 @@ pub enum RegexKind<'a> {
         val: u64,
         elem: Ref<'a, Element<'a>>,
     },
-    Error {
-        sema: Ref<'a, Regex<'a>>,
+    ErrorHandler {
+        val: u64,
+        elem: Ref<'a, Element<'a>>,
     },
     Invalid,
 }
@@ -399,10 +418,11 @@ impl<'a> Regex<'a> {
             attr: RegexAttr::new_in(arena, range),
         })
     }
-    pub fn new_error(arena: &'a Bump, range: Range) -> &'a Regex<'a> {
+    pub fn new_error_handler(arena: &'a Bump, val: u64, range: Range) -> &'a Regex<'a> {
         arena.alloc(Regex {
-            kind: RegexKind::Error {
-                sema: Ref::new(None),
+            kind: RegexKind::ErrorHandler {
+                val,
+                elem: Ref::new(None),
             },
             attr: RegexAttr::new_in(arena, range),
         })

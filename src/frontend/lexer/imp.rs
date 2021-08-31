@@ -9,15 +9,17 @@ impl Lexer {
             Some(c) if c.is_whitespace() => self.state_ws(c),
             Some('\'') => self.state_str(),
             Some('{') => self.state_code(),
-            Some('!') => self.state_pred(),
+            Some('?') => self.state_pred(),
             Some('#') => self.state_sema(),
+            Some('!') => self.state_error(),
             Some('/') => self.state_slash(),
             Some('*') => self.emit(TokenKind::Star),
             Some('+') => self.emit(TokenKind::Plus),
             Some('|') => self.emit(TokenKind::Or),
-            Some('?') => self.emit(TokenKind::Quest),
             Some('(') => self.emit(TokenKind::LPar),
             Some(')') => self.emit(TokenKind::RPar),
+            Some('[') => self.emit(TokenKind::LBrak),
+            Some(']') => self.emit(TokenKind::RBrak),
             Some('=') => self.emit(TokenKind::Equal),
             Some(':') => self.emit(TokenKind::Colon),
             Some(';') => self.emit(TokenKind::Semi),
@@ -125,6 +127,17 @@ impl Lexer {
         if self.accept_plus(|c| c.is_ascii_digit()) {
             if let Ok(val) = self.get(1, 0).parse() {
                 self.emit(TokenKind::Action(val))
+            } else {
+                self.emit_invalid()
+            }
+        } else {
+            self.emit_invalid()
+        }
+    }
+    fn state_error(&mut self) -> Transition {
+        if self.accept_plus(|c| c.is_ascii_digit()) {
+            if let Ok(val) = self.get(1, 0).parse() {
+                self.emit(TokenKind::ErrorHandler(val))
             } else {
                 self.emit_invalid()
             }

@@ -26,6 +26,7 @@ pub enum Binding {
     Token(Symbol),
     Action(Symbol, u64),
     Predicate(Symbol, u64),
+    ErrorHandler(Symbol, u64),
 }
 
 impl std::fmt::Display for Binding {
@@ -34,7 +35,8 @@ impl std::fmt::Display for Binding {
             Self::Term(name) => write!(f, "element '{}'", name),
             Self::Token(name) => write!(f, "token string '{}'", name),
             Self::Action(name, num) => write!(f, "semantic action '{}#{}'", name, num),
-            Self::Predicate(name, num) => write!(f, "semantic predicate '{}!{}'", name, num),
+            Self::Predicate(name, num) => write!(f, "semantic predicate '{}?{}'", name, num),
+            Self::ErrorHandler(name, num) => write!(f, "error handler '{}!{}'", name, num),
         }
     }
 }
@@ -120,6 +122,9 @@ impl<'a, 'b> GeneralValidator {
                 ElementKind::Predicate { name, num, .. } => {
                     Self::bind(Binding::Predicate(name, num), element, &mut bindings, diag);
                 }
+                ElementKind::ErrorHandler { name, num, .. } => {
+                    Self::bind(Binding::ErrorHandler(name, num), element, &mut bindings, diag);
+                }
                 ElementKind::Preamble { .. } => {
                     Self::bind(
                         Binding::Term(Symbol::PREAMBLE),
@@ -136,7 +141,7 @@ impl<'a, 'b> GeneralValidator {
                         diag,
                     );
                 }
-                ElementKind::Error { .. } => {
+                ElementKind::ErrorCode { .. } => {
                     Self::bind(Binding::Term(Symbol::ERROR), element, &mut bindings, diag);
                 }
                 ElementKind::Limit { .. } => {
@@ -175,7 +180,6 @@ impl<'a, 'b> GeneralValidator {
                     &mut anum,
                     &mut pnum,
                     None,
-                    None,
                     false,
                     bindings,
                 );
@@ -199,7 +203,7 @@ impl<'a, 'b> GeneralValidator {
                 let mut anum = 1;
                 let mut pnum = 1;
                 Self::check_regex(
-                    regex, diag, *name, &mut anum, &mut pnum, None, None, false, bindings,
+                    regex, diag, *name, &mut anum, &mut pnum, None, false, bindings,
                 );
             }
             ElementKind::Token { name, .. } => {
@@ -228,24 +232,17 @@ impl<'a, 'b> GeneralValidator {
         anum: &mut u64,
         pnum: &mut u64,
         alt: Option<&'b Regex<'b>>,
-        error: Option<&'b Regex<'b>>,
         in_loop: bool,
         bindings: &HashMap<Binding, &'b Element<'b>>,
     ) {
         match &regex.kind {
             RegexKind::Id { name, elem, .. } => {
-                if error.is_some() {
-                    diag.error(Code::ErrorSema, regex.range());
-                }
                 match bindings.get(&Binding::Term(*name)) {
                     Some(e) => elem.set(e),
                     None => diag.error(Code::UndefinedElement(*name), regex.range()),
                 }
             }
             RegexKind::Str { val, elem } => {
-                if error.is_some() {
-                    diag.error(Code::ErrorSema, regex.range());
-                }
                 match bindings.get(&Binding::Token(*val)) {
                     Some(e) => elem.set(e),
                     None => diag.error(Code::UndefinedElement(*val), regex.range()),
@@ -254,12 +251,11 @@ impl<'a, 'b> GeneralValidator {
             RegexKind::Concat { ops } => {
                 let mut alt = alt;
                 let mut in_loop = in_loop;
-                let mut error = None;
                 for op in ops {
-                    if let RegexKind::Error { .. } = op.kind {
-                        error = Some(*op);
+                    if let RegexKind::ErrorHandler { .. } = op.kind {
+                        diag.error(Code::ErrorSyntax, regex.range());
                     }
-                    Self::check_regex(op, diag, name, anum, pnum, alt, error, in_loop, bindings);
+                    Self::check_regex(op, diag, name, anum, pnum, alt, in_loop, bindings);
                     alt = None;
                     in_loop = false;
                 }
@@ -273,17 +269,16 @@ impl<'a, 'b> GeneralValidator {
                         anum,
                         pnum,
                         Some(regex),
-                        None,
                         false,
                         bindings,
                     );
                 }
             }
             RegexKind::Star { op } | RegexKind::Plus { op } | RegexKind::Option { op } => {
-                Self::check_regex(op, diag, name, anum, pnum, None, None, true, bindings);
+                Self::check_regex(op, diag, name, anum, pnum, None, true, bindings);
             }
             RegexKind::Paren { op } => {
-                Self::check_regex(op, diag, name, anum, pnum, None, None, in_loop, bindings);
+                Self::check_regex(op, diag, name, anum, pnum, None, in_loop, bindings);
             }
             RegexKind::Predicate { val, elem } => {
                 if alt.is_none() && !in_loop {
@@ -300,16 +295,6 @@ impl<'a, 'b> GeneralValidator {
                 }
             }
             RegexKind::Action { val, elem } => {
-                if let Some(Regex {
-                    kind: RegexKind::Error { sema },
-                    ..
-                }) = error
-                {
-                    if sema.get().is_some() {
-                        diag.error(Code::ErrorSema, regex.range());
-                    }
-                    sema.set(regex);
-                }
                 match bindings.get(&Binding::Action(name, *val)) {
                     Some(e) => elem.set(e),
                     None => diag.warning(Code::UndefinedAction, regex.range()),
@@ -320,7 +305,11 @@ impl<'a, 'b> GeneralValidator {
                     *anum += 1;
                 }
             }
-            RegexKind::Error { .. } => {
+            RegexKind::ErrorHandler { val, elem } => {
+                match bindings.get(&Binding::ErrorHandler(name, *val)) {
+                    Some(e) => elem.set(e),
+                    None => diag.warning(Code::UndefinedErrorHandler, regex.range()),
+                }
                 if let Some(Regex {
                     kind: RegexKind::Or { error, .. },
                     ..
@@ -330,8 +319,6 @@ impl<'a, 'b> GeneralValidator {
                         diag.error(Code::ErrorCount, regex.range());
                     }
                     error.set(regex);
-                } else {
-                    diag.error(Code::ErrorPosition, regex.range());
                 }
             }
             _ => {}
@@ -421,7 +408,7 @@ impl<'a> LL1Validator {
                 }
                 _ => unreachable!(),
             },
-            RegexKind::Error { .. } => {}
+            RegexKind::ErrorHandler { .. } => {}
             _ => {
                 regex.first_mut().insert(Symbol::EMPTY);
             }

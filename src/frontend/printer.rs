@@ -111,13 +111,22 @@ impl DebugPrinter {
                     pos!(range)
                 );
             }
+            ElementKind::ErrorHandler { name, num, .. } => {
+                eprintln!(
+                    "error handler: {} {} {} {}",
+                    member!(name),
+                    member!(num),
+                    addr!(element),
+                    pos!(range)
+                );
+            }
             ElementKind::Preamble { .. } => {
                 eprintln!("preamble: {}", pos!(range));
             }
             ElementKind::Parameters { .. } => {
                 eprintln!("parameters: {}", pos!(range));
             }
-            ElementKind::Error { .. } => {
+            ElementKind::ErrorCode { .. } => {
                 eprintln!("error: {}", pos!(range));
             }
             ElementKind::Language { name } => {
@@ -218,11 +227,11 @@ impl DebugPrinter {
                     pos!(range)
                 );
             }
-            RegexKind::Error { sema } => {
+            RegexKind::ErrorHandler { val, elem } => {
                 eprintln!(
                     "error: {} {} {} {} {}",
-                    addr!(regex),
-                    ptr!(*sema),
+                    member!(val),
+                    ptr!(*elem),
                     set!(first),
                     set!(follow),
                     pos!(range)

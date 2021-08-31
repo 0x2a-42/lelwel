@@ -4,8 +4,8 @@ language rust;
 token Token='token' Language='language' Import='import' Error='error'
       Start='start' Preamble='preamble' Pars='parameters' Limit='limit';
 /// Punctuator
-token Colon=':' Semi=';' Equal='=' LPar='(' RPar=')' Or='|' Star='*' Plus='+'
-      Quest='?';
+token Colon=':' Semi=';' Equal='=' LPar='(' RPar=')' LBrak='[' RBrak=']'
+      Or='|' Star='*' Plus='+';
 /// Identifier for rules and tokens
 token Id{Symbol}='<identifier>' Str{Symbol}='<string literal>';
 /// Segment of code delimited by `{` and `}`
@@ -16,6 +16,8 @@ token Int{u16}='<integer>';
 token Predicate{u64}='<semantic predicate>';
 /// Semantic action identifier
 token Action{u64}='<semantic action>';
+/// Error handler identifier
+token ErrorHandler{u64}='<error handler>';
 /// Documentation comment
 token _Comment{Symbol};
 
@@ -30,21 +32,18 @@ start{Module<'a>}:
   | 'import' Str ';' #6
   | 'error' Code #7
   | 'limit' Int ';' #8
-  | error #9
-  )* #10
+  | !1
+  )* #9
 ;
 /// Token list definition
 tokens{()}{elements: &mut BVec<'a, &'a Element<'a>>}:
-  'token' (
-    (Id #1 (Code #2)? ('=' Str #3)? #4)+
-  | error #5
-  ) ';' #6
+  'token' ((Id #1 [Code #2] ['=' Str #3] #4)+ | !1) ';' #5
 ;
 /// Grammar rule, action, or predicate definition
 rule_or_action{&'a Element<'a>}:
   (Id #1 | 'start' #2) (
-    (Code #3 (Code #4)?)? ':' regex ';' #5
-  | (Action #6 | Predicate #7) Code #8
+    [Code #3 [Code #4]] ':' regex ';' #5
+  | (Action #6 | Predicate #7 | ErrorHandler #8) Code #9
   )
 ;
 /// Alternation (e.g. `R1 | R2 | ...`)
@@ -57,7 +56,7 @@ concat{&'a Regex<'a>}:
 ;
 /// Postfix operators (e.g. Kleene star `R*`)
 postfix{&'a Regex<'a>}:
-  (atomic #1 ('*' #2 | '+' #3 | '?' #4)* | error #5) #6
+  (atomic #1 ('*' #2 | '+' #3)* | !1) #4
 ;
 /// Atomic or parenthesized regular expressions
 atomic{&'a Regex<'a>}:
@@ -65,8 +64,9 @@ atomic{&'a Regex<'a>}:
 | Str #2
 | Predicate #3
 | Action #4
-| 'error' #5
+| ErrorHandler #5
 | '(' regex ')' #6
+| '[' regex ']' #7
 ;
 
 
@@ -98,16 +98,16 @@ start#5 { elements.push(Element::new_language(arena, Id.0, Id.1)); }
 /// Push to `elements`
 start#6 { elements.push(Element::new_import(arena, Str.0, Str.1)); }
 /// Push to `elements`
-start#7 { elements.push(Element::new_error(arena, Code.0, Code.1)); }
+start#7 { elements.push(Element::new_error_code(arena, Code.0, Code.1)); }
 /// Push to `elements`
 start#8 { elements.push(Element::new_limit(arena, Int.0, Int.1)); }
+/// Create the module
+start#9 { Ok(Module::new(elements)) }
 /// Create diagnostic for error and invalid element
-start#9 {
+start!1 {
     diag.error(error_code, error_range);
     elements.push(Element::new_invalid(arena, error_range));
 }
-/// Create the module
-start#10 { Ok(Module::new(elements)) }
 
 /// Save the last trivia token for the documentation comment
 tokens#0 { let trivia = input.trivia(); }
@@ -129,18 +129,23 @@ tokens#3 {
 }
 /// Create and push token definition
 tokens#4 { elements.push(Element::new_token(arena, Id.0, ty, sym, range, trivia.clone())); }
-/// Create diagnostic for error
-tokens#5 { diag.error(error_code, error_range); }
 /// Return successful
-tokens#6 { Ok(()) }
+tokens#5 { Ok(()) }
+/// Create diagnostic for error
+tokens!1 { diag.error(error_code, error_range); }
 
 /// Define variables
 rule_or_action#0 {
+    enum ElemType {
+      Action,
+      Predicate,
+      ErrorHandler,
+    }
     let name;
     let range;
     let mut ret = Symbol::default();
     let mut pars = Symbol::default();
-    let is_act;
+    let elem_type;
     let num;
     let trivia = input.trivia();
 }
@@ -169,21 +174,26 @@ rule_or_action#5 {
 }
 /// Set action number
 rule_or_action#6 {
-    is_act = true;
+    elem_type = ElemType::Action;
     num = Action.0;
 }
 /// Set predicate number
 rule_or_action#7 {
-    is_act = false;
+    elem_type = ElemType::Predicate;
     num = Predicate.0;
 }
-/// Create action or predicate
+/// Set predicate number
 rule_or_action#8 {
+    elem_type = ElemType::ErrorHandler;
+    num = ErrorHandler.0;
+}
+/// Create action or predicate
+rule_or_action#9 {
     let range = Range::span(range, Code.1);
-    if is_act {
-        Ok(Element::new_action(arena, name, num, Code.0, range, trivia))
-    } else {
-        Ok(Element::new_predicate(arena, name, num, Code.0, range, trivia))
+    match elem_type {
+        ElemType::Action => Ok(Element::new_action(arena, name, num, Code.0, range, trivia)),
+        ElemType::Predicate => Ok(Element::new_predicate(arena, name, num, Code.0, range, trivia)),
+        ElemType::ErrorHandler => Ok(Element::new_error_handler(arena, name, num, Code.0, range, trivia)),
     }
 }
 
@@ -238,15 +248,10 @@ postfix#3 {
     range = Range::span(range, Plus);
     regex = Some(Regex::new_plus(arena, regex.unwrap(), range));
 }
-/// Create option regex
-postfix#4 {
-    range = Range::span(range, Quest);
-    regex = Some(Regex::new_option(arena, regex.unwrap(), range));
-}
-/// Create diagnostic for error, result will be the last successfuly parsed regex
-postfix#5 { diag.error(error_code, error_range); }
 /// Return result regex or invalid regex if parsing was not successful
-postfix#6 { Ok(regex.unwrap_or_else(|| Regex::new_invalid(arena, range))) }
+postfix#4 { Ok(regex.unwrap_or_else(|| Regex::new_invalid(arena, range))) }
+/// Create diagnostic for error, result will be the last successfuly parsed regex
+postfix!1 { diag.error(error_code, error_range); }
 
 /// Create identifier
 atomic#1 { Ok(Regex::new_id(arena, Id.0, Id.1)) }
@@ -257,9 +262,14 @@ atomic#3 { Ok(Regex::new_predicate(arena, Predicate.0, Predicate.1)) }
 /// Create semantic action
 atomic#4 { Ok(Regex::new_action(arena, Action.0, Action.1)) }
 /// Create error handler
-atomic#5 { Ok(Regex::new_error(arena, Error)) }
-/// Create parenthesized regular expression
+atomic#5 { Ok(Regex::new_error_handler(arena, ErrorHandler.0, ErrorHandler.1)) }
+/// Create parenthesized regex
 atomic#6 {
     let range = Range::span(LPar, RPar);
     Ok(Regex::new_paren(arena, regex, range))
+}
+/// Create option regex
+atomic#7 {
+    let range = Range::span(LBrak, RBrak);
+    Ok(Regex::new_option(arena, regex, range))
 }
