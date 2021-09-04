@@ -197,7 +197,8 @@ fn to_lsp_related(range: &token::Range, url: &Url, msg: &str) -> DiagnosticRelat
 fn generate_diagnostics(url: Url, diag: diag::Diag) -> Notification {
     let mut diagnostics = vec![];
     for e in diag.error_iter() {
-        let related = e.related()
+        let related = e
+            .related()
             .iter()
             .map(|(r, m)| to_lsp_related(r, &url, &m))
             .collect::<Vec<_>>();

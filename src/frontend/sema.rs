@@ -123,7 +123,12 @@ impl<'a, 'b> GeneralValidator {
                     Self::bind(Binding::Predicate(name, num), element, &mut bindings, diag);
                 }
                 ElementKind::ErrorHandler { name, num, .. } => {
-                    Self::bind(Binding::ErrorHandler(name, num), element, &mut bindings, diag);
+                    Self::bind(
+                        Binding::ErrorHandler(name, num),
+                        element,
+                        &mut bindings,
+                        diag,
+                    );
                 }
                 ElementKind::Preamble { .. } => {
                     Self::bind(
@@ -172,15 +177,7 @@ impl<'a, 'b> GeneralValidator {
                     action.set(e)
                 }
                 let mut num = (1, 1, 1);
-                Self::check_regex(
-                    regex,
-                    diag,
-                    Symbol::START,
-                    &mut num,
-                    None,
-                    false,
-                    bindings,
-                );
+                Self::check_regex(regex, diag, Symbol::START, &mut num, None, false, bindings);
             }
             ElementKind::Rule {
                 name,
@@ -199,9 +196,7 @@ impl<'a, 'b> GeneralValidator {
                     action.set(e)
                 }
                 let mut num = (1, 1, 1);
-                Self::check_regex(
-                    regex, diag, *name, &mut num, None, false, bindings,
-                );
+                Self::check_regex(regex, diag, *name, &mut num, None, false, bindings);
             }
             ElementKind::Token { name, .. } => {
                 // check if token name starts with uppercase letter
@@ -232,18 +227,14 @@ impl<'a, 'b> GeneralValidator {
         bindings: &HashMap<Binding, &'b Element<'b>>,
     ) {
         match &regex.kind {
-            RegexKind::Id { name, elem, .. } => {
-                match bindings.get(&Binding::Term(*name)) {
-                    Some(e) => elem.set(e),
-                    None => diag.error(Code::UndefinedElement(*name), regex.range()),
-                }
-            }
-            RegexKind::Str { val, elem } => {
-                match bindings.get(&Binding::Token(*val)) {
-                    Some(e) => elem.set(e),
-                    None => diag.error(Code::UndefinedElement(*val), regex.range()),
-                }
-            }
+            RegexKind::Id { name, elem, .. } => match bindings.get(&Binding::Term(*name)) {
+                Some(e) => elem.set(e),
+                None => diag.error(Code::UndefinedElement(*name), regex.range()),
+            },
+            RegexKind::Str { val, elem } => match bindings.get(&Binding::Token(*val)) {
+                Some(e) => elem.set(e),
+                None => diag.error(Code::UndefinedElement(*val), regex.range()),
+            },
             RegexKind::Concat { ops } => {
                 let mut alt = alt;
                 let mut in_loop = in_loop;
@@ -258,15 +249,7 @@ impl<'a, 'b> GeneralValidator {
             }
             RegexKind::Or { ops, .. } => {
                 for op in ops {
-                    Self::check_regex(
-                        op,
-                        diag,
-                        name,
-                        num,
-                        Some(regex),
-                        false,
-                        bindings,
-                    );
+                    Self::check_regex(op, diag, name, num, Some(regex), false, bindings);
                 }
             }
             RegexKind::Star { op } | RegexKind::Plus { op } | RegexKind::Option { op } => {
