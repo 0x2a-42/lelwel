@@ -171,14 +171,12 @@ impl<'a, 'b> GeneralValidator {
                 if let Some(e) = bindings.get(&Binding::Action(Symbol::START, 0)) {
                     action.set(e)
                 }
-                let mut anum = 1;
-                let mut pnum = 1;
+                let mut num = (1, 1, 1);
                 Self::check_regex(
                     regex,
                     diag,
                     Symbol::START,
-                    &mut anum,
-                    &mut pnum,
+                    &mut num,
                     None,
                     false,
                     bindings,
@@ -200,10 +198,9 @@ impl<'a, 'b> GeneralValidator {
                 if let Some(e) = bindings.get(&Binding::Action(*name, 0)) {
                     action.set(e)
                 }
-                let mut anum = 1;
-                let mut pnum = 1;
+                let mut num = (1, 1, 1);
                 Self::check_regex(
-                    regex, diag, *name, &mut anum, &mut pnum, None, false, bindings,
+                    regex, diag, *name, &mut num, None, false, bindings,
                 );
             }
             ElementKind::Token { name, .. } => {
@@ -229,8 +226,7 @@ impl<'a, 'b> GeneralValidator {
         regex: &'b Regex<'b>,
         diag: &mut Diag,
         name: Symbol,
-        anum: &mut u64,
-        pnum: &mut u64,
+        num: &mut (u64, u64, u64),
         alt: Option<&'b Regex<'b>>,
         in_loop: bool,
         bindings: &HashMap<Binding, &'b Element<'b>>,
@@ -255,7 +251,7 @@ impl<'a, 'b> GeneralValidator {
                     if let RegexKind::ErrorHandler { .. } = op.kind {
                         diag.error(Code::ErrorSyntax, regex.range());
                     }
-                    Self::check_regex(op, diag, name, anum, pnum, alt, in_loop, bindings);
+                    Self::check_regex(op, diag, name, num, alt, in_loop, bindings);
                     alt = None;
                     in_loop = false;
                 }
@@ -266,8 +262,7 @@ impl<'a, 'b> GeneralValidator {
                         op,
                         diag,
                         name,
-                        anum,
-                        pnum,
+                        num,
                         Some(regex),
                         false,
                         bindings,
@@ -275,10 +270,21 @@ impl<'a, 'b> GeneralValidator {
                 }
             }
             RegexKind::Star { op } | RegexKind::Plus { op } | RegexKind::Option { op } => {
-                Self::check_regex(op, diag, name, anum, pnum, None, true, bindings);
+                Self::check_regex(op, diag, name, num, None, true, bindings);
             }
             RegexKind::Paren { op } => {
-                Self::check_regex(op, diag, name, anum, pnum, None, in_loop, bindings);
+                Self::check_regex(op, diag, name, num, None, in_loop, bindings);
+            }
+            RegexKind::Action { val, elem } => {
+                match bindings.get(&Binding::Action(name, *val)) {
+                    Some(e) => elem.set(e),
+                    None => diag.warning(Code::UndefinedAction, regex.range()),
+                }
+                if num.0 == *val {
+                    num.0 += 1;
+                } else {
+                    diag.error(Code::ExpectedAction(num.0), regex.range());
+                }
             }
             RegexKind::Predicate { val, elem } => {
                 if alt.is_none() && !in_loop {
@@ -288,21 +294,10 @@ impl<'a, 'b> GeneralValidator {
                     Some(e) => elem.set(e),
                     None => diag.warning(Code::UndefinedPredicate, regex.range()),
                 }
-                if pnum != val {
-                    diag.error(Code::ExpectedPredicate(*pnum), regex.range());
+                if num.1 == *val {
+                    num.1 += 1;
                 } else {
-                    *pnum += 1;
-                }
-            }
-            RegexKind::Action { val, elem } => {
-                match bindings.get(&Binding::Action(name, *val)) {
-                    Some(e) => elem.set(e),
-                    None => diag.warning(Code::UndefinedAction, regex.range()),
-                }
-                if anum != val {
-                    diag.error(Code::ExpectedAction(*anum), regex.range());
-                } else {
-                    *anum += 1;
+                    diag.error(Code::ExpectedPredicate(num.1), regex.range());
                 }
             }
             RegexKind::ErrorHandler { val, elem } => {
@@ -319,6 +314,11 @@ impl<'a, 'b> GeneralValidator {
                         diag.error(Code::ErrorCount, regex.range());
                     }
                     error.set(regex);
+                }
+                if num.2 == *val {
+                    num.2 += 1;
+                } else {
+                    diag.error(Code::ExpectedErrorHandler(num.2), regex.range());
                 }
             }
             _ => {}

@@ -13,6 +13,7 @@ pub enum Code {
     InvalidLang(Symbol),
     ExpectedAction(u64),
     ExpectedPredicate(u64),
+    ExpectedErrorHandler(u64),
     UndefinedAction,
     UndefinedPredicate,
     UndefinedErrorHandler,
@@ -88,6 +89,9 @@ impl std::fmt::Display for Code {
             Code::ExpectedPredicate(num) => {
                 write!(f, "Expected predicate with number '{}'", num)
             }
+            Code::ExpectedErrorHandler(num) => {
+                write!(f, "Expected error handler with number '{}'", num)
+            }
             Code::UndefinedAction => {
                 write!(f, "Undefined action")
             }
@@ -104,7 +108,7 @@ impl std::fmt::Display for Code {
                 write!(f, "Missing start rule")
             }
             Code::PredPosition => {
-                write!(f, "Predicate must be first term in alternative branch")
+                write!(f, "Predicate must be first term in alternation branch")
             }
             Code::LL1Conflict => {
                 write!(f, "LL(1) confilict")
@@ -113,10 +117,10 @@ impl std::fmt::Display for Code {
                 write!(f, "No tokens consumed")
             }
             Code::ErrorSyntax => {
-                write!(f, "Error handler must be alone in alternative branch")
+                write!(f, "Error handler must be only term in alternation branch")
             }
             Code::ErrorCount => {
-                write!(f, "Error handler can only occur once in alternative")
+                write!(f, "Error handler can only occur in one alternation branch")
             }
             Code::PredefToken => {
                 write!(f, "Cannot use predefined token name")
