@@ -159,8 +159,14 @@ impl DebugPrinter {
                     pos!(range)
                 );
             }
-            RegexKind::Concat { ops } => {
-                eprintln!("concat: {} {} {}", set!(first), set!(follow), pos!(range));
+            RegexKind::Concat { ops, error } => {
+                eprintln!(
+                    "concat: {} {} {} {}",
+                    ptr!(*error),
+                    set!(first),
+                    set!(follow),
+                    pos!(range)
+                );
                 let mut count = 0;
                 for op in ops {
                     count += 1;

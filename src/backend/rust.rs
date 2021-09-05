@@ -405,7 +405,7 @@ impl RustOutput {
 
     fn get_predicate(regex: &Regex) -> String {
         match &regex.kind {
-            RegexKind::Concat { ops } => match &ops[0].kind {
+            RegexKind::Concat { ops, .. } => match &ops[0].kind {
                 RegexKind::Predicate { elem, .. } => {
                     if let Some(Element {
                         kind: ElementKind::Predicate { code, .. },
@@ -422,6 +422,59 @@ impl RustOutput {
             RegexKind::Paren { op } => Self::get_predicate(op),
             _ => "".to_string(),
         }
+    }
+
+    fn output_error_handler(
+        error: &Regex,
+        output: &mut File,
+        common_args: &str,
+        level: usize,
+    ) -> std::io::Result<()> {
+        output.write_all(
+            format!(
+                "}})().or_else(|error_code| {{\
+               \n    // error handling\
+               \n    if input.current().kind == TokenKind::EOF {{\
+               \n        return Err(error_code);\
+               \n    }}\
+               \n    let error_range = input.current().range;\
+               \n    loop {{\
+               \n        match input.current().kind {{\
+               \n            {} => {{\n",
+                error.follow().pattern(3),
+            )
+            .indent(level - 1)
+            .as_bytes(),
+        )?;
+        Self::output_regex(error, output, common_args, level + 3)?;
+        output.write_all(
+            "                return Ok(())\
+           \n            }\n"
+                .indent(level - 1)
+                .as_bytes(),
+        )?;
+        if !error.follow().contains(&Symbol::EOF) {
+            output.write_all(
+                format!(
+                    "            pattern_EOF!() => {{\
+                   \n                return err![{}]\
+                   \n            }}\n",
+                    error.follow().error(7)
+                )
+                .indent(level - 1)
+                .as_bytes(),
+            )?;
+        }
+        output.write_all(
+            "            _ => {\
+           \n                input.advance();\
+           \n            }\
+           \n       }\
+           \n   }\
+           \n})?;\n"
+                .indent(level - 1)
+                .as_bytes(),
+        )
     }
 
     fn output_regex(
@@ -469,9 +522,37 @@ impl RustOutput {
                 }
                 _ => unreachable!(),
             },
-            RegexKind::Concat { ops } => {
+            RegexKind::Concat { ops, error } => {
+                let level = if error.get().is_some() {
+                    output.write_all("(|| {\n".indent(level).as_bytes())?;
+                    level + 1
+                } else {
+                    level
+                };
                 for op in ops {
-                    Self::output_regex(op, output, common_args, level)?;
+                    if let RegexKind::ErrorHandler { .. } = op.kind {
+                        output.write_all(
+                            format!(
+                                "match input.current().kind {{\
+                               \n    {} => {{\
+                               \n        Ok(())\
+                               \n    }}\
+                               \n    _ => {{\
+                               \n        err![{}]\
+                               \n    }}\
+                               \n}}\n",
+                                op.follow().pattern(1),
+                                op.follow().error(5)
+                            )
+                            .indent(level)
+                            .as_bytes(),
+                        )?;
+                    } else {
+                        Self::output_regex(op, output, common_args, level)?;
+                    }
+                }
+                if let Some(error) = error.get() {
+                    Self::output_error_handler(error, output, common_args, level)?;
                 }
             }
             RegexKind::Or { ops, error } => {
@@ -514,51 +595,7 @@ impl RustOutput {
                     .as_bytes(),
                 )?;
                 if let Some(error) = error.get() {
-                    output.write_all(
-                        format!(
-                            "}})().or_else(|error_code| {{\
-                           \n    // error handling\
-                           \n    if input.current().kind == TokenKind::EOF {{\
-                           \n        return Err(error_code);\
-                           \n    }}\
-                           \n    let error_range = input.current().range;\
-                           \n    loop {{\
-                           \n        match input.current().kind {{\
-                           \n            {} => {{\n",
-                            error.follow().pattern(3),
-                        )
-                        .indent(level - 1)
-                        .as_bytes(),
-                    )?;
-                    Self::output_regex(error, output, common_args, level + 3)?;
-                    output.write_all(
-                        "                return Ok(())\
-                       \n            }\n"
-                            .indent(level - 1)
-                            .as_bytes(),
-                    )?;
-                    if !error.follow().contains(&Symbol::EOF) {
-                        output.write_all(
-                            format!(
-                                "            pattern_EOF!() => {{\
-                               \n                return err![{}]\
-                               \n            }}\n",
-                                error.follow().error(7)
-                            )
-                            .indent(level - 1)
-                            .as_bytes(),
-                        )?;
-                    }
-                    output.write_all(
-                        "            _ => {\
-                       \n                input.advance();\
-                       \n            }\
-                       \n       }\
-                       \n   }\
-                       \n})?;\n"
-                            .indent(level - 1)
-                            .as_bytes(),
-                    )?;
+                    Self::output_error_handler(error, output, common_args, level)?;
                 }
             }
             RegexKind::Star { op } => {

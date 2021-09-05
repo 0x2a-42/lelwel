@@ -27,7 +27,7 @@ impl<'a> LookupNode {
 
     fn visit_regex(regex: &'a Regex<'a>, pos: Position) -> Option<&'a Regex<'a>> {
         match &regex.kind {
-            RegexKind::Concat { ops } | RegexKind::Or { ops, .. } => {
+            RegexKind::Concat { ops, .. } | RegexKind::Or { ops, .. } => {
                 if let Some(regex) = ops.lookup(pos) {
                     Self::visit_regex(regex, pos)
                 } else {
@@ -95,7 +95,7 @@ impl<'a> LookupReferences {
 
     fn visit_regex(regex: &'a Regex<'a>, def: &'a Element<'a>, refs: &mut Vec<Range>) {
         match &regex.kind {
-            RegexKind::Concat { ops } | RegexKind::Or { ops, .. } => {
+            RegexKind::Concat { ops, .. } | RegexKind::Or { ops, .. } => {
                 for op in ops {
                     Self::visit_regex(op, def, refs)
                 }

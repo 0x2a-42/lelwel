@@ -235,12 +235,17 @@ impl<'a, 'b> GeneralValidator {
                 Some(e) => elem.set(e),
                 None => diag.error(Code::UndefinedElement(*val), regex.range()),
             },
-            RegexKind::Concat { ops } => {
+            RegexKind::Concat { ops, error } => {
                 let mut alt = alt;
                 let mut in_loop = in_loop;
-                for op in ops {
+                for (i, op) in ops.iter().enumerate() {
                     if let RegexKind::ErrorHandler { .. } = op.kind {
-                        diag.error(Code::ErrorSyntax, regex.range());
+                        if i != ops.len() - 1 {
+                            // only allow error handler as last term in concatenation
+                            diag.error(Code::ErrorSyntax, regex.range());
+                        } else {
+                            error.set(op);
+                        }
                     }
                     Self::check_regex(op, diag, name, num, alt, in_loop, bindings);
                     alt = None;
@@ -265,7 +270,7 @@ impl<'a, 'b> GeneralValidator {
                 }
                 if num.0 == *val {
                     num.0 += 1;
-                } else {
+                } else if num.0 != *val + 1 {
                     diag.error(Code::ExpectedAction(num.0), regex.range());
                 }
             }
@@ -279,7 +284,7 @@ impl<'a, 'b> GeneralValidator {
                 }
                 if num.1 == *val {
                     num.1 += 1;
-                } else {
+                } else if num.1 != *val + 1 {
                     diag.error(Code::ExpectedPredicate(num.1), regex.range());
                 }
             }
@@ -300,7 +305,7 @@ impl<'a, 'b> GeneralValidator {
                 }
                 if num.2 == *val {
                     num.2 += 1;
-                } else {
+                } else if num.2 != *val + 1 {
                     diag.error(Code::ExpectedErrorHandler(num.2), regex.range());
                 }
             }
@@ -355,7 +360,7 @@ impl<'a> LL1Validator {
                 }
                 _ => unreachable!(),
             },
-            RegexKind::Concat { ops } => {
+            RegexKind::Concat { ops, .. } => {
                 let mut use_next = true;
                 for op in ops {
                     Self::calc_first_regex(op, change);
@@ -372,8 +377,12 @@ impl<'a> LL1Validator {
             }
             RegexKind::Or { ops, .. } => {
                 for op in ops {
-                    Self::calc_first_regex(op, change);
-                    regex.first_mut().extend(op.first().iter());
+                    if let RegexKind::ErrorHandler { .. } = op.kind {
+                        // error handler in alternation has empty first set to avoid conflicts
+                    } else {
+                        Self::calc_first_regex(op, change);
+                        regex.first_mut().extend(op.first().iter());
+                    }
                 }
             }
             RegexKind::Star { op } | RegexKind::Option { op } => {
@@ -391,7 +400,6 @@ impl<'a> LL1Validator {
                 }
                 _ => unreachable!(),
             },
-            RegexKind::ErrorHandler { .. } => {}
             _ => {
                 regex.first_mut().insert(Symbol::EMPTY);
             }
@@ -434,7 +442,7 @@ impl<'a> LL1Validator {
                     *change |= size != rule_regex.follow().len();
                 }
             }
-            RegexKind::Concat { ops } => {
+            RegexKind::Concat { ops, .. } => {
                 let mut follow = regex.follow().clone();
                 for op in ops.iter().rev() {
                     op.follow_mut().extend(follow.iter());
@@ -489,7 +497,7 @@ impl<'a> LL1Validator {
 
     fn has_predicate(regex: &'a Regex<'a>) -> bool {
         match &regex.kind {
-            RegexKind::Concat { ops } => matches!(&ops[0].kind, RegexKind::Predicate { .. }),
+            RegexKind::Concat { ops, .. } => matches!(&ops[0].kind, RegexKind::Predicate { .. }),
             RegexKind::Paren { op } => Self::has_predicate(op),
             _ => false,
         }
@@ -498,7 +506,7 @@ impl<'a> LL1Validator {
     /// Checks if LL(1) condition holds for the regex.
     fn check_regex(regex: &'a Regex<'a>, diag: &mut Diag) {
         match &regex.kind {
-            RegexKind::Concat { ops } => {
+            RegexKind::Concat { ops, .. } => {
                 for op in ops {
                     Self::check_regex(op, diag);
                 }
@@ -598,7 +606,7 @@ impl UsageValidator {
             RegexKind::Id { elem, .. } | RegexKind::Str { elem, .. } => {
                 elem.get().unwrap().attr.used.set(true);
             }
-            RegexKind::Concat { ops } | RegexKind::Or { ops, .. } => {
+            RegexKind::Concat { ops, .. } | RegexKind::Or { ops, .. } => {
                 for op in ops {
                     Self::check_regex(op);
                 }

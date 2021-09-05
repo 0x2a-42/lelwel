@@ -302,6 +302,7 @@ pub enum RegexKind<'a> {
     },
     Concat {
         ops: BVec<'a, &'a Regex<'a>>,
+        error: Ref<'a, Regex<'a>>,
     },
     Or {
         ops: BVec<'a, &'a Regex<'a>>,
@@ -354,7 +355,10 @@ impl<'a> Regex<'a> {
         range: Range,
     ) -> &'a Regex<'a> {
         arena.alloc(Regex {
-            kind: RegexKind::Concat { ops },
+            kind: RegexKind::Concat {
+                ops,
+                error: Ref::new(None),
+            },
             attr: RegexAttr::new_in(arena, range),
         })
     }

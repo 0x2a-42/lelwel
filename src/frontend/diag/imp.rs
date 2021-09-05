@@ -84,13 +84,13 @@ impl std::fmt::Display for Code {
                 write!(f, "Invalid target language '{}'", sym)
             }
             Code::ExpectedAction(num) => {
-                write!(f, "Expected action with number '{}'", num)
+                write!(f, "Expected action with number {} or {}", num - 1, num)
             }
             Code::ExpectedPredicate(num) => {
-                write!(f, "Expected predicate with number '{}'", num)
+                write!(f, "Expected predicate with number {} or {}", num - 1, num)
             }
             Code::ExpectedErrorHandler(num) => {
-                write!(f, "Expected error handler with number '{}'", num)
+                write!(f, "Expected error handler with number {} or {}", num - 1, num)
             }
             Code::UndefinedAction => {
                 write!(f, "Undefined action")
@@ -117,7 +117,7 @@ impl std::fmt::Display for Code {
                 write!(f, "No tokens consumed")
             }
             Code::ErrorSyntax => {
-                write!(f, "Error handler must be only term in alternation branch")
+                write!(f, "Error handler must be only term in alternation branch or last term of concatenation")
             }
             Code::ErrorCount => {
                 write!(f, "Error handler can only occur in one alternation branch")
