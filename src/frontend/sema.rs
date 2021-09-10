@@ -268,9 +268,9 @@ impl<'a, 'b> GeneralValidator {
                     Some(e) => elem.set(e),
                     None => diag.warning(Code::UndefinedAction, regex.range()),
                 }
-                if num.0 == *val {
+                if num.0 == *val && num.0 < u64::MAX {
                     num.0 += 1;
-                } else if num.0 != *val + 1 {
+                } else if num.0 - 1 != *val {
                     diag.error(Code::ExpectedAction(num.0), regex.range());
                 }
             }
@@ -282,9 +282,9 @@ impl<'a, 'b> GeneralValidator {
                     Some(e) => elem.set(e),
                     None => diag.warning(Code::UndefinedPredicate, regex.range()),
                 }
-                if num.1 == *val {
+                if num.1 == *val && num.1 < u64::MAX {
                     num.1 += 1;
-                } else if num.1 != *val + 1 {
+                } else if num.1 - 1 != *val {
                     diag.error(Code::ExpectedPredicate(num.1), regex.range());
                 }
             }
@@ -303,9 +303,9 @@ impl<'a, 'b> GeneralValidator {
                     }
                     error.set(regex);
                 }
-                if num.2 == *val {
+                if num.2 == *val && num.2 < u64::MAX {
                     num.2 += 1;
-                } else if num.2 != *val + 1 {
+                } else if num.2 - 1 != *val {
                     diag.error(Code::ExpectedErrorHandler(num.2), regex.range());
                 }
             }
