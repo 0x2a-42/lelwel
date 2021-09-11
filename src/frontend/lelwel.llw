@@ -1,8 +1,8 @@
 language rust;
 
 /// Keyword
-token Token='token' Language='language' Import='import' Error='error'
-      Start='start' Preamble='preamble' Pars='parameters' Limit='limit';
+token Token='token' Language='language' Error='error' Start='start'
+      Preamble='preamble' Pars='parameters' Limit='limit';
 /// Punctuator
 token Colon=':' Semi=';' Equal='=' LPar='(' RPar=')' LBrak='[' RBrak=']'
       Or='|' Star='*' Plus='+';
@@ -29,11 +29,10 @@ start{Module<'a>}:
   | 'preamble' Code #3
   | 'parameters' Code #4
   | 'language' Id ';' #5
-  | 'import' Str ';' #6
-  | 'error' Code #7
-  | 'limit' Int ';' #8
+  | 'error' Code #6
+  | 'limit' Int ';' #7
   | !1
-  )* #9
+  )* #8
 ;
 /// Token list definition
 tokens{()}{elements: &mut BVec<'a, &'a Element<'a>>}:
@@ -96,13 +95,11 @@ start#4 { elements.push(Element::new_parameters(arena, Code.0, Code.1)); }
 /// Push to `elements`
 start#5 { elements.push(Element::new_language(arena, Id.0, Id.1)); }
 /// Push to `elements`
-start#6 { elements.push(Element::new_import(arena, Str.0, Str.1)); }
+start#6 { elements.push(Element::new_error_code(arena, Code.0, Code.1)); }
 /// Push to `elements`
-start#7 { elements.push(Element::new_error_code(arena, Code.0, Code.1)); }
-/// Push to `elements`
-start#8 { elements.push(Element::new_limit(arena, Int.0, Int.1)); }
+start#7 { elements.push(Element::new_limit(arena, Int.0, Int.1)); }
 /// Create the module
-start#9 { Ok(Module::new(elements)) }
+start#8 { Ok(Module::new(elements)) }
 /// Create diagnostic for error and invalid element
 start!1 {
     diag.error(error_code, error_range);

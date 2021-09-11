@@ -53,7 +53,6 @@ impl Lexer {
             Symbol::ERROR => self.emit(TokenKind::Error),
             Symbol::TOKEN => self.emit(TokenKind::Token),
             Symbol::LANGUGAE => self.emit(TokenKind::Language),
-            Symbol::IMPORT => self.emit(TokenKind::Import),
             Symbol::PARAMETERS => self.emit(TokenKind::Pars),
             Symbol::LIMIT => self.emit(TokenKind::Limit),
             _ => self.emit(TokenKind::Id(sym)),

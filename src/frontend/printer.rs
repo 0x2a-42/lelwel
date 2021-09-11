@@ -132,9 +132,6 @@ impl DebugPrinter {
             ElementKind::Language { name } => {
                 eprintln!("language: {} {}", member!(name), pos!(range));
             }
-            ElementKind::Import { name } => {
-                eprintln!("import: {} {}", member!(name), pos!(range));
-            }
             ElementKind::Limit { depth } => {
                 eprintln!("limit: {} {}", member!(depth), pos!(range));
             }

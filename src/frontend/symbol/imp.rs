@@ -28,7 +28,6 @@ predefine! {
     [ERROR,      "error"],
     [TOKEN,      "token"],
     [LANGUGAE,   "language"],
-    [IMPORT,     "import"],
     [PARAMETERS, "parameters"],
     [EOF,        "EOF"],
     [INVALID,    "Invalid"],

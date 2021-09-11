@@ -144,9 +144,6 @@ pub enum ElementKind<'a> {
     Language {
         name: Symbol,
     },
-    Import {
-        name: Symbol,
-    },
     Limit {
         depth: u16,
     },
@@ -265,12 +262,6 @@ impl<'a> Element<'a> {
     pub fn new_language(arena: &'a Bump, name: Symbol, range: Range) -> &'a Element<'a> {
         arena.alloc(Element {
             kind: ElementKind::Language { name },
-            attr: ElementAttr::new(range),
-        })
-    }
-    pub fn new_import(arena: &'a Bump, name: Symbol, range: Range) -> &'a Element<'a> {
-        arena.alloc(Element {
-            kind: ElementKind::Import { name },
             attr: ElementAttr::new(range),
         })
     }

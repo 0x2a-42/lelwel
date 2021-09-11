@@ -17,7 +17,6 @@ pub enum TokenKind {
     Invalid,
     Token,
     Language,
-    Import,
     Error,
     Start,
     Preamble,
@@ -47,7 +46,6 @@ macro_rules! pattern_EOF { () => { TokenKind::EOF } }
 macro_rules! pattern_Invalid { () => { TokenKind::Invalid } }
 macro_rules! pattern_Token { () => { TokenKind::Token } }
 macro_rules! pattern_Language { () => { TokenKind::Language } }
-macro_rules! pattern_Import { () => { TokenKind::Import } }
 macro_rules! pattern_Error { () => { TokenKind::Error } }
 macro_rules! pattern_Start { () => { TokenKind::Start } }
 macro_rules! pattern_Preamble { () => { TokenKind::Preamble } }
@@ -75,7 +73,6 @@ macro_rules! pattern__Comment { () => { TokenKind::_Comment(_) } }
 macro_rules! default_EOF { () => { TokenKind::EOF } }
 macro_rules! default_Token { () => { TokenKind::Token } }
 macro_rules! default_Language { () => { TokenKind::Language } }
-macro_rules! default_Import { () => { TokenKind::Import } }
 macro_rules! default_Error { () => { TokenKind::Error } }
 macro_rules! default_Start { () => { TokenKind::Start } }
 macro_rules! default_Preamble { () => { TokenKind::Preamble } }
@@ -130,17 +127,6 @@ macro_rules! consume_Language {
             range
         } else {
             return err![default_Language!()]
-        }
-    }
-}
-macro_rules! consume_Import {
-    ($input:ident) => {
-        if let TokenKind::Import = $input.current().kind {
-            let range = $input.current().range;
-            $input.advance();
-            range
-        } else {
-            return err![default_Import!()]
         }
     }
 }
@@ -395,7 +381,6 @@ impl fmt::Display for TokenKind {
             pattern_Invalid!() => write!(f, "invalid token"),
             pattern_Token!() => write!(f, "{}", r###"token"###),
             pattern_Language!() => write!(f, "{}", r###"language"###),
-            pattern_Import!() => write!(f, "{}", r###"import"###),
             pattern_Error!() => write!(f, "{}", r###"error"###),
             pattern_Start!() => write!(f, "{}", r###"start"###),
             pattern_Preamble!() => write!(f, "{}", r###"preamble"###),
@@ -452,7 +437,6 @@ impl<'a> Parser {
             match input.current().kind {
                 pattern_Token!()
                 | pattern_Language!()
-                | pattern_Import!()
                 | pattern_Error!()
                 | pattern_Start!()
                 | pattern_Preamble!()
@@ -496,18 +480,10 @@ impl<'a> Parser {
                                 elements.push(Element::new_language(arena, Id.0, Id.1));
                                 Ok(())
                             }
-                            pattern_Import!() => {
-                                let r#Import = consume_Import!(input);
-                                let r#Str = consume_Str!(input);
-                                let r#Semi = consume_Semi!(input);
-                                // semantic action 6
-                                elements.push(Element::new_import(arena, Str.0, Str.1));
-                                Ok(())
-                            }
                             pattern_Error!() => {
                                 let r#Error = consume_Error!(input);
                                 let r#Code = consume_Code!(input);
-                                // semantic action 7
+                                // semantic action 6
                                 elements.push(Element::new_error_code(arena, Code.0, Code.1));
                                 Ok(())
                             }
@@ -515,14 +491,13 @@ impl<'a> Parser {
                                 let r#Limit = consume_Limit!(input);
                                 let r#Int = consume_Int!(input);
                                 let r#Semi = consume_Semi!(input);
-                                // semantic action 8
+                                // semantic action 7
                                 elements.push(Element::new_limit(arena, Int.0, Int.1));
                                 Ok(())
                             }
                             _ => {
                                 return err![default_Token!(),
                                             default_Language!(),
-                                            default_Import!(),
                                             default_Error!(),
                                             default_Start!(),
                                             default_Preamble!(),
@@ -542,7 +517,6 @@ impl<'a> Parser {
                                 pattern_EOF!()
                                 | pattern_Token!()
                                 | pattern_Language!()
-                                | pattern_Import!()
                                 | pattern_Error!()
                                 | pattern_Start!()
                                 | pattern_Preamble!()
@@ -566,7 +540,6 @@ impl<'a> Parser {
                     return err![default_EOF!(),
                                 default_Token!(),
                                 default_Language!(),
-                                default_Import!(),
                                 default_Error!(),
                                 default_Start!(),
                                 default_Preamble!(),
@@ -576,7 +549,7 @@ impl<'a> Parser {
                 }
             }
         }
-        // semantic action 9
+        // semantic action 8
         Ok(Module::new(elements))
     }
     fn r#tokens<Input: TokenStream>(depth: u16, input: &mut Input, arena: &'a Bump, diag: &mut Diag, elements: &mut BVec<'a, &'a Element<'a>>) -> Result<(), Code> {
