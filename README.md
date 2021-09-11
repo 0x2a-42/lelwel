@@ -10,7 +10,7 @@ Semantic actions are used for ad hoc syntax-directed translation.
 Unlike in other parser generators (e.g. Bison, JavaCC, or Coco/R), actions and predicates are not defined inline, which makes it easier to read the grammar.
 
 Lelwel is written as a library, which is used by the CLI tool `llw` and the language server `lelwel-ls`.
-There are plugins for [Neovim](https://github.com/0x2a-42/nvim-lelwel) and Visual Studio Code that use the language server.
+There are plugins for [Neovim](https://github.com/0x2a-42/nvim-lelwel) and Visual Studio Code (not published yet) that use the language server.
 
 ## Why Yet Another Parser Generator?
 * **Language Server:** Get instant feedback when your grammar contains conflicts or errors.
