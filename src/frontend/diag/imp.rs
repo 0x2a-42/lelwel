@@ -87,10 +87,18 @@ impl std::fmt::Display for Code {
                 write!(f, "Expected action with number {} or {}", num - 1, num)
             }
             Code::ExpectedPredicate(num) => {
-                write!(f, "Expected predicate with number {} or {}", num - 1, num)
+                if *num == 1 {
+                    write!(f, "Expected predicate with number {}", num)
+                } else {
+                    write!(f, "Expected predicate with number {} or {}", num - 1, num)
+                }
             }
             Code::ExpectedErrorHandler(num) => {
-                write!(f, "Expected error handler with number {} or {}", num - 1, num)
+                if *num == 1 {
+                    write!(f, "Expected error handler with number {}", num)
+                } else {
+                    write!(f, "Expected error handler with number {} or {}", num - 1, num)
+                }
             }
             Code::UndefinedAction => {
                 write!(f, "Undefined action")

@@ -9,11 +9,11 @@ pub struct SemanticPass {}
 impl SemanticPass {
     pub fn run(module: &Module, diag: &mut Diag) {
         GeneralValidator::run(module, diag);
+        UsageValidator::run(module, diag);
         if diag.has_errors() {
             return;
         }
         LL1Validator::run(module, diag);
-        UsageValidator::run(module, diag);
     }
 }
 
@@ -284,7 +284,7 @@ impl<'a, 'b> GeneralValidator {
                 }
                 if num.1 == *val && num.1 < u64::MAX {
                     num.1 += 1;
-                } else if num.1 - 1 != *val {
+                } else if num.1 - 1 != *val || *val == 0 {
                     diag.error(Code::ExpectedPredicate(num.1), regex.range());
                 }
             }
@@ -305,7 +305,7 @@ impl<'a, 'b> GeneralValidator {
                 }
                 if num.2 == *val && num.2 < u64::MAX {
                     num.2 += 1;
-                } else if num.2 - 1 != *val {
+                } else if num.2 - 1 != *val || *val == 0 {
                     diag.error(Code::ExpectedErrorHandler(num.2), regex.range());
                 }
             }
@@ -567,31 +567,35 @@ struct UsageValidator {}
 
 impl UsageValidator {
     fn run(module: &Module, diag: &mut Diag) {
-        for element in module.elements.iter() {
-            match &element.kind {
-                ElementKind::Start { regex, .. } => {
-                    element.attr.used.set(true);
-                    Self::check_regex(regex);
-                }
-                ElementKind::Rule { regex, name, .. } => {
-                    let c = name.to_string().chars().next().unwrap();
-                    if c == '_' {
-                        element.attr.used.set(true)
+        let mut change = true;
+        while change {
+            change = false;
+            for element in module.elements.iter() {
+                match &element.kind {
+                    ElementKind::Start { regex, .. } => {
+                        element.attr.used.set(true);
+                        Self::check_regex(regex, &mut change);
                     }
-                    if !regex.follow().is_empty() {
-                        Self::check_regex(regex);
+                    ElementKind::Rule { regex, name, .. } => {
+                        if name.as_str().chars().next().unwrap() == '_' {
+                            element.attr.used.set(true)
+                        }
+                        if element.attr.used.get() {
+                            Self::check_regex(regex, &mut change);
+                        }
                     }
-                }
-                ElementKind::Token { name, .. } => {
-                    let c = name.to_string().chars().next().unwrap();
-                    if c == '_' {
-                        element.attr.used.set(true)
+                    ElementKind::Token { name, .. } => {
+                        if name.as_str().chars().next().unwrap() == '_' {
+                            element.attr.used.set(true)
+                        }
                     }
-                }
-                ElementKind::Action { num, .. } | ElementKind::Predicate { num, .. }
-                    if *num != 0 => {}
-                _ => element.attr.used.set(true),
-            };
+                    ElementKind::Action { num, .. }
+                    | ElementKind::Predicate { num, .. }
+                    | ElementKind::ErrorHandler { num, .. }
+                        if *num != 0 => {}
+                    _ => element.attr.used.set(true),
+                };
+            }
         }
         for element in module.elements.iter() {
             if !element.attr.used.get() {
@@ -600,25 +604,30 @@ impl UsageValidator {
         }
     }
 
-    /// Calculates the first set for each regular expression within a rule.
-    fn check_regex(regex: &Regex) {
+    fn check_regex(regex: &Regex, change: &mut bool) {
         match &regex.kind {
             RegexKind::Id { elem, .. } | RegexKind::Str { elem, .. } => {
-                elem.get().unwrap().attr.used.set(true);
+                if let Some(elem) = elem.get() {
+                    *change |= !elem.attr.used.get();
+                    elem.attr.used.set(true);
+                }
             }
             RegexKind::Concat { ops, .. } | RegexKind::Or { ops, .. } => {
                 for op in ops {
-                    Self::check_regex(op);
+                    Self::check_regex(op, change);
                 }
             }
             RegexKind::Star { op }
             | RegexKind::Plus { op }
             | RegexKind::Option { op }
             | RegexKind::Paren { op } => {
-                Self::check_regex(op);
+                Self::check_regex(op, change);
             }
-            RegexKind::Action { elem, .. } | RegexKind::Predicate { elem, .. } => {
+            RegexKind::Action { elem, .. }
+            | RegexKind::Predicate { elem, .. }
+            | RegexKind::ErrorHandler { elem, .. } => {
                 if let Some(elem) = elem.get() {
+                    *change |= !elem.attr.used.get();
                     elem.attr.used.set(true);
                 }
             }
