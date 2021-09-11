@@ -336,6 +336,7 @@ pub enum RegexKind<'a> {
         val: u64,
         elem: Ref<'a, Element<'a>>,
     },
+    Empty,
     Invalid,
 }
 
@@ -428,6 +429,12 @@ impl<'a> Regex<'a> {
                 val,
                 elem: Ref::new(None),
             },
+            attr: RegexAttr::new_in(arena, range),
+        })
+    }
+    pub fn new_empty(arena: &'a Bump, range: Range) -> &'a Regex<'a> {
+        arena.alloc(Regex {
+            kind: RegexKind::Empty,
             attr: RegexAttr::new_in(arena, range),
         })
     }

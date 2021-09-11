@@ -243,6 +243,9 @@ impl DebugPrinter {
                     pos!(range)
                 );
             }
+            RegexKind::Empty => {
+                eprintln!("empty: {} {} {}", set!(first), set!(follow), pos!(range));
+            }
             RegexKind::Invalid => {
                 eprintln!("invalid: {} {} {}", set!(first), set!(follow), pos!(range));
             }

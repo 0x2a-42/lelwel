@@ -736,10 +736,33 @@ impl<'a> Parser {
                     }
                 }
                 let r#Colon = consume_Colon!(input);
-                let r#regex = Self::r#regex(depth + 1, input, arena, diag)?;
+                let r#regex = match input.current().kind {
+                    pattern_LPar!()
+                    | pattern_LBrak!()
+                    | pattern_Id!()
+                    | pattern_Str!()
+                    | pattern_Predicate!()
+                    | pattern_Action!()
+                    | pattern_ErrorHandler!() => {
+                        let r#regex = Self::r#regex(depth + 1, input, arena, diag)?;
+                        Some(regex)
+                    }
+                    pattern_Semi!() => None,
+                    _ => {
+                        return err![default_Semi!(),
+                                    default_LPar!(),
+                                    default_LBrak!(),
+                                    default_Id!(),
+                                    default_Str!(),
+                                    default_Predicate!(),
+                                    default_Action!(),
+                                    default_ErrorHandler!()]
+                    }
+                };
                 let r#Semi = consume_Semi!(input);
                 // semantic action 5
                 let range = Range::span(range, Semi);
+                let regex = regex.unwrap_or_else(|| Regex::new_empty(arena, range));
                 if name == Symbol::START {
                     Ok(Element::new_start(arena, ret, pars, regex, range, trivia))
                 } else {

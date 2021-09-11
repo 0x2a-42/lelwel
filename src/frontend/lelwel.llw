@@ -42,7 +42,7 @@ tokens{()}{elements: &mut BVec<'a, &'a Element<'a>>}:
 /// Grammar rule, action, or predicate definition
 rule_or_action{&'a Element<'a>}:
   (Id #1 | 'start' #2) (
-    [Code #3 [Code #4]] ':' regex ';' #5
+    [Code #3 [Code #4]] ':' [regex] ';' #5
   | (Action #6 | Predicate #7 | ErrorHandler #8) Code #9
   )
 ;
@@ -166,6 +166,7 @@ rule_or_action#4 { pars = Code.0; }
 /// Create the rule
 rule_or_action#5 {
     let range = Range::span(range, Semi);
+    let regex = regex.unwrap_or_else(|| Regex::new_empty(arena, range));
     if name == Symbol::START {
         Ok(Element::new_start(arena, ret, pars, regex, range, trivia))
     } else {
