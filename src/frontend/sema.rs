@@ -9,10 +9,10 @@ pub struct SemanticPass {}
 impl SemanticPass {
     pub fn run(module: &Module, diag: &mut Diag) {
         GeneralValidator::run(module, diag);
-        UsageValidator::run(module, diag);
         if diag.has_errors() {
             return;
         }
+        UsageValidator::run(module, diag);
         LL1Validator::run(module, diag);
     }
 }
