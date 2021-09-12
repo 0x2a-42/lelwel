@@ -97,7 +97,12 @@ impl std::fmt::Display for Code {
                 if *num == 1 {
                     write!(f, "Expected error handler with number {}", num)
                 } else {
-                    write!(f, "Expected error handler with number {} or {}", num - 1, num)
+                    write!(
+                        f,
+                        "Expected error handler with number {} or {}",
+                        num - 1,
+                        num
+                    )
                 }
             }
             Code::UndefinedAction => {
