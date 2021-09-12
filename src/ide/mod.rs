@@ -23,7 +23,7 @@ impl<'a> Server<'a> {
         }
 
         let mut lexer = Lexer::new(contents, false);
-        let mut diag = Diag::new(filename, 100);
+        let mut diag = Diag::new(filename, 1000);
         let ast = Ast::new(&mut lexer, &mut diag);
 
         if let Some(root) = ast.root() {
