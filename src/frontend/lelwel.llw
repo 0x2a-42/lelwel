@@ -248,7 +248,7 @@ postfix#3 {
 }
 /// Return result regex or invalid regex if parsing was not successful
 postfix#4 { Ok(regex.unwrap_or_else(|| Regex::new_invalid(arena, range))) }
-/// Create diagnostic for error, result will be the last successfuly parsed regex
+/// Create diagnostic for error, result will be the last successfully parsed regex
 postfix!1 { diag.error(error_code, error_range); }
 
 /// Create identifier
