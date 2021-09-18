@@ -44,7 +44,7 @@ fn main() {
             Range::default(),
         )
     }
-    diag.print();
+    diag.print(true);
     if diag.has_errors() {
         std::process::exit(1);
     }

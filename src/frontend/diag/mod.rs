@@ -5,13 +5,21 @@ pub use imp::Code;
 use std::fmt;
 
 macro_rules! red {
-    ($e: expr) => {
-        format!("\x1b[31;1m{}\x1b[0m", $e)
+    ($e: expr, $c: expr) => {
+        if $c {
+            format!("\x1b[31;1m{}\x1b[0m", $e)
+        } else {
+            $e.to_string()
+        }
     };
 }
 macro_rules! yellow {
-    ($e: expr) => {
-        format!("\x1b[33;1m{}\x1b[0m", $e)
+    ($e: expr, $c: expr) => {
+        if $c {
+            format!("\x1b[33;1m{}\x1b[0m", $e)
+        } else {
+            $e.to_string()
+        }
     };
 }
 
@@ -116,19 +124,19 @@ impl Diag {
         self.warnings.iter()
     }
     #[allow(dead_code)]
-    pub fn print(&self) {
+    pub fn print(&self, color: bool) {
         for e in self.errors.iter() {
-            eprintln!("{} {}:{}", red!("error:"), self.filename, e);
+            eprintln!("{} {}:{}", red!("error:", color), self.filename, e);
             for (r, msg) in e.related().iter() {
                 eprintln!("     | {}: {}", r, msg);
             }
         }
         for e in self.warnings.iter() {
-            eprintln!("{} {}:{}", yellow!("warning:"), self.filename, e);
+            eprintln!("{} {}:{}", yellow!("warning:", color), self.filename, e);
         }
     }
     #[allow(dead_code)]
-    pub fn fatal_error(msg: &str) {
-        eprintln!("{} {}", red!("fatal error:"), msg);
+    pub fn fatal_error(msg: &str, color: bool) {
+        eprintln!("{} {}", red!("fatal error:", color), msg);
     }
 }

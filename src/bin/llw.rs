@@ -1,6 +1,7 @@
 #![cfg(feature = "cli")]
 
 use clap::{crate_name, crate_version, App, ArgMatches};
+use atty::Stream;
 use lelwel::backend::rust::*;
 use lelwel::frontend::ast::*;
 use lelwel::frontend::diag::*;
@@ -73,7 +74,7 @@ fn translate(matches: ArgMatches) -> std::io::Result<()> {
             diag.error(Code::ParserError("invalid token"), tok.range);
         }
 
-        diag.print();
+        diag.print(atty::is(Stream::Stderr));
         if diag.has_errors() {
             std::process::exit(1);
         }
@@ -105,7 +106,7 @@ fn main() {
 
     match translate(matches) {
         Err(e) => {
-            Diag::fatal_error(&format!("{}", e));
+            Diag::fatal_error(&format!("{}", e), atty::is(Stream::Stderr));
             std::process::exit(1);
         }
         _ => {}
