@@ -1,0 +1,5 @@
+token EOF Invalid;
+
+start:
+  Invalid EOF
+;

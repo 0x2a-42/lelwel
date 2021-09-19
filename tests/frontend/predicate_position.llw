@@ -1,0 +1,10 @@
+token A;
+
+start:
+  ?1 (
+    ?1 A
+  | A
+  )
+;
+
+start?1 {}

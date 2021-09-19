@@ -1,0 +1,16 @@
+token A;
+
+start:
+  ?0 A
+| ?1 A
+| ?1 A
+| ?2 A
+| ?3 A
+| ?5 A
+| ?1 A
+;
+
+start?1 {}
+start?2 {}
+start?3 {}
+start?5 {}

@@ -1,0 +1,17 @@
+token A B C
+token D;
+
+start:
+  A B (C
+;
+
+a:
+  A
+
+b:
+  B
+;
+
+c:
+  C
+;

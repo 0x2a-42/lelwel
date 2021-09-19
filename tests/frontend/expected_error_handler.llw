@@ -1,0 +1,9 @@
+token A;
+
+start:
+  (((((A !0) !1) !1) !2) !4) !1
+;
+
+start!1 {}
+start!2 {}
+start!4 {}

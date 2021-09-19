@@ -1,0 +1,22 @@
+token A B _C;
+
+start:
+  c
+;
+
+a:
+  b
+;
+
+b:
+;
+
+c:
+  B d
+;
+
+d:
+;
+
+_e:
+;
