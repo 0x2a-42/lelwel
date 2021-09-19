@@ -1,7 +1,7 @@
 #![cfg(feature = "cli")]
 
-use clap::{crate_name, crate_version, App, ArgMatches};
 use atty::Stream;
+use clap::{crate_name, crate_version, App, ArgMatches};
 use lelwel::backend::rust::*;
 use lelwel::frontend::ast::*;
 use lelwel::frontend::diag::*;
