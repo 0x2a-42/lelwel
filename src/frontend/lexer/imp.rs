@@ -5,7 +5,7 @@ impl Lexer {
     pub fn state_start(&mut self) -> Transition {
         match self.consume() {
             Some(c) if c.is_alphabetic() || c == '_' => self.state_id(),
-            Some(c) if c.is_numeric() => self.state_int(),
+            Some(c) if c.is_ascii_digit() => self.state_int(),
             Some(c) if c.is_whitespace() => self.state_ws(c),
             Some('\'') => self.state_str(),
             Some('{') => self.state_code(),
@@ -59,7 +59,7 @@ impl Lexer {
         }
     }
     fn state_int(&mut self) -> Transition {
-        self.accept_star(char::is_numeric);
+        self.accept_star(|c| c.is_ascii_digit());
         if let Ok(val) = self.get(0, 0).parse() {
             self.emit(TokenKind::Int(val))
         } else {
