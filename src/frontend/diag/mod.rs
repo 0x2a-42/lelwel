@@ -28,11 +28,12 @@ pub struct Message {
     code: Code,
     range: Range,
     related: Vec<(Range, String)>,
+    filename: String,
 }
 
 #[derive(Debug)]
 pub struct Diag {
-    filename: String,
+    filenames: Vec<String>,
     errors: Vec<Message>,
     warnings: Vec<Message>,
     notes: Vec<Message>,
@@ -41,19 +42,26 @@ pub struct Diag {
 
 impl Message {
     #[allow(dead_code)]
-    fn new(code: Code, range: Range) -> Message {
+    fn new(code: Code, range: Range, filename: String) -> Message {
         Message {
             code,
             range,
             related: vec![],
+            filename,
         }
     }
     #[allow(dead_code)]
-    fn new_with_related(code: Code, range: Range, related: Vec<(Range, String)>) -> Message {
+    fn new_with_related(
+        code: Code,
+        range: Range,
+        filename: String,
+        related: Vec<(Range, String)>,
+    ) -> Message {
         Message {
             code,
             range,
             related,
+            filename,
         }
     }
     #[allow(dead_code)]
@@ -72,43 +80,63 @@ impl Message {
 
 impl fmt::Display for Message {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: {}", self.range, self.code)
+        write!(f, "{}:{}: {}", self.filename, self.range, self.code)
     }
 }
 
 impl Diag {
     pub fn new(filename: &str, max_count: usize) -> Diag {
         Diag {
-            filename: filename.to_string(),
+            filenames: vec![filename.to_string()],
             errors: vec![],
             warnings: vec![],
             notes: vec![],
             max_count,
         }
     }
+    pub fn push_filename(&mut self, filename: &str) {
+        self.filenames.push(filename.to_string());
+    }
+    pub fn pop_filename(&mut self) {
+        if self.filenames.len() > 1 {
+            self.filenames.pop();
+        }
+    }
+    pub fn last_filename(&self) -> String {
+        // there is always at least one filename
+        self.filenames.last().unwrap().clone()
+    }
+
     #[allow(dead_code)]
     pub fn error(&mut self, code: Code, range: Range) {
         if self.errors.len() < self.max_count {
-            self.errors.push(Message::new(code, range));
+            self.errors
+                .push(Message::new(code, range, self.last_filename()));
         }
     }
     #[allow(dead_code)]
     pub fn error_with_related(&mut self, code: Code, range: Range, related: Vec<(Range, String)>) {
         if self.errors.len() < self.max_count {
-            self.errors
-                .push(Message::new_with_related(code, range, related));
+            self.errors.push(Message::new_with_related(
+                code,
+                range,
+                self.last_filename(),
+                related,
+            ));
         }
     }
     #[allow(dead_code)]
     pub fn warning(&mut self, code: Code, range: Range) {
         if self.warnings.len() < self.max_count {
-            self.warnings.push(Message::new(code, range));
+            self.warnings
+                .push(Message::new(code, range, self.last_filename()));
         }
     }
     #[allow(dead_code)]
     pub fn notes(&mut self, code: Code, range: Range) {
         if self.notes.len() < self.max_count {
-            self.notes.push(Message::new(code, range));
+            self.notes
+                .push(Message::new(code, range, self.last_filename()));
         }
     }
     #[allow(dead_code)]
@@ -126,13 +154,13 @@ impl Diag {
     #[allow(dead_code)]
     pub fn print(&self, color: bool) {
         for e in self.errors.iter() {
-            eprintln!("{} {}:{}", red!("error:", color), self.filename, e);
+            eprintln!("{} {}", red!("error:", color), e);
             for (r, msg) in e.related().iter() {
                 eprintln!("     | {}: {}", r, msg);
             }
         }
         for e in self.warnings.iter() {
-            eprintln!("{} {}:{}", yellow!("warning:", color), self.filename, e);
+            eprintln!("{} {}", yellow!("warning:", color), e);
         }
     }
     #[allow(dead_code)]
