@@ -577,7 +577,7 @@ impl UsageValidator {
                         Self::check_regex(regex, &mut change);
                     }
                     ElementKind::Rule { regex, name, .. } => {
-                        if name.as_str().chars().next().unwrap() == '_' {
+                        if name.as_str().starts_with('_') {
                             element.attr.used.set(true)
                         }
                         if element.attr.used.get() {
@@ -585,7 +585,7 @@ impl UsageValidator {
                         }
                     }
                     ElementKind::Token { name, .. } => {
-                        if name.as_str().chars().next().unwrap() == '_' {
+                        if name.as_str().starts_with('_') {
                             element.attr.used.set(true)
                         }
                     }

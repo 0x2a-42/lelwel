@@ -4,15 +4,14 @@ use crate::frontend::{ast::*, diag::*, lexer::*, sema::*, symbol::*, token::*};
 use lookup::*;
 use std::collections::HashMap;
 
+#[derive(Default)]
 pub struct Server<'a> {
     asts: HashMap<String, Ast<'a, Lexer>>,
 }
 
 impl<'a> Server<'a> {
-    pub fn new() -> Server<'a> {
-        Server {
-            asts: HashMap::new(),
-        }
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn analyze(&mut self, filename: &str, contents: String) -> Diag {

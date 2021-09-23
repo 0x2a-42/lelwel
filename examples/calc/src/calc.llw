@@ -28,13 +28,13 @@ atomic{f64}:
 start#1 { Ok(expr) }
 
 expr#1 { let mut res = term; }
-expr#2 { res = res + term; }
-expr#3 { res = res - term; }
+expr#2 { res += term; }
+expr#3 { res -= term; }
 expr#4 { Ok(res) }
 
 term#1 { let mut res = atomic; }
-term#2 { res = res * atomic; }
-term#3 { res = res / atomic; }
+term#2 { res *= atomic; }
+term#3 { res /= atomic; }
 term#4 { Ok(res) }
 
 atomic#1 { Ok(Num.0) }

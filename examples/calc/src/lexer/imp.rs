@@ -18,8 +18,7 @@ impl Lexer {
     }
     fn state_ws(&mut self) -> Transition {
         self.accept_star(|c| c.is_whitespace());
-        self.ignore();
-        Transition::Next(Self::state_start)
+        self.ignore()
     }
     fn state_num(&mut self) -> Transition {
         self.accept_star(|c| c.is_ascii_digit());

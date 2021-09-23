@@ -117,10 +117,8 @@ impl Lexer {
                 is_valid = false;
             }
         }
-        if self.accept_char('.') {
-            if !self.accept_plus(|c| c.is_ascii_digit()) {
-                is_valid = false;
-            }
+        if self.accept_char('.') && !self.accept_plus(|c| c.is_ascii_digit()) {
+            is_valid = false;
         }
         if self.accept_oneof("eE") {
             self.accept_oneof("-+");

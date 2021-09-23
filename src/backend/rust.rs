@@ -178,6 +178,7 @@ impl RustOutput {
                 \nmacro_rules! predefine {\
                 \n    ( $([$id:ident, $name:expr]),* $(,)? ) => {\
                 \n        #[repr(usize)]\
+                \n        #[allow(clippy::upper_case_acronyms)]\
                 \n        enum Predef {\
                 \n            EMPTY,\
                 \n            $($id),*\

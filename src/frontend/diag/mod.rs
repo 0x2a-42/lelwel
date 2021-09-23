@@ -94,14 +94,17 @@ impl Diag {
             max_count,
         }
     }
+    #[allow(dead_code)]
     pub fn push_filename(&mut self, filename: &str) {
         self.filenames.push(filename.to_string());
     }
+    #[allow(dead_code)]
     pub fn pop_filename(&mut self) {
         if self.filenames.len() > 1 {
             self.filenames.pop();
         }
     }
+    #[allow(dead_code)]
     pub fn last_filename(&self) -> String {
         // there is always at least one filename
         self.filenames.last().unwrap().clone()

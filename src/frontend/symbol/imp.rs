@@ -3,6 +3,7 @@ use super::*;
 macro_rules! predefine {
     ( $([$id:ident, $name:expr]),* $(,)? ) => {
         #[repr(usize)]
+        #[allow(clippy::upper_case_acronyms)]
         enum Predef {
             EMPTY,
             $($id),*

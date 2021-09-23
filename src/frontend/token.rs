@@ -258,17 +258,15 @@ pub trait TokenStream {
     fn finalize(&mut self);
 }
 
+#[derive(Default)]
 pub struct TokenBuffer {
     tokens: Vec<(Token, Option<Token>)>,
     pos: usize,
 }
 
 impl TokenBuffer {
-    pub fn new() -> TokenBuffer {
-        TokenBuffer {
-            tokens: vec![],
-            pos: 0,
-        }
+    pub fn new() -> Self {
+        Self::default()
     }
     pub fn push(&mut self, token: Token) {
         self.tokens.push((token, None));
