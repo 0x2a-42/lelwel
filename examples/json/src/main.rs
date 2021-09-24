@@ -35,8 +35,8 @@ fn main() {
             diag.error(Code::ParserError("invalid token"), tok.range);
         }
         match root {
-            Ok(root) => println!("{:#?}", root),
-            Err(e) => diag.error(e, lexer.current().range)
+            Err(e) => diag.error(e, lexer.current().range),
+            _ => {}
         }
     } else {
         diag.error(
