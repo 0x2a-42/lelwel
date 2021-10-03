@@ -1,6 +1,6 @@
 mod lookup;
 
-use crate::frontend::{ast::*, diag::*, lexer::*, sema::*, symbol::*, token::*};
+use crate::frontend::{ast::*, diag::*, lexer::*, parser::*, sema::*, symbol::*, token::*};
 use lookup::*;
 use std::collections::HashMap;
 
@@ -31,7 +31,9 @@ impl<'a> Server<'a> {
         }
 
         for tok in lexer.invalid_iter() {
-            diag.error(Code::ParserError("invalid token"), tok.range);
+            if let TokenKind::Invalid(msg) = tok.kind {
+                diag.error(Code::ParserError(msg), tok.range);
+            }
         }
         diag
     }

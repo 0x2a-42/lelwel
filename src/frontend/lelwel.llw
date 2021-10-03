@@ -41,8 +41,8 @@ tokens{()}{elements: &mut BVec<'a, &'a Element<'a>>}:
 /// Grammar rule, action, or predicate definition
 rule_or_action{&'a Element<'a>}:
   (Id #1 | 'start' #2) (
-    [Code #3 [Code #4]] ':' [regex] ';' #5
-  | (Action #6 | Predicate #7 | ErrorHandler #8) Code #9
+    [Code #3 [Code #4]] ':' [regex #5 | !1] ';' #6
+  | (Action #7 | Predicate #8 | ErrorHandler #9) Code #10
   )
 ;
 /// Alternation (e.g. `R1 | R2 | ...`)
@@ -145,6 +145,7 @@ rule_or_action#0 {
     let elem_type;
     let num;
     let trivia = input.trivia();
+    let mut rule_regex = None;
 }
 /// Set name and range
 rule_or_action#1 {
@@ -160,10 +161,12 @@ rule_or_action#2 {
 rule_or_action#3 { ret = Code.0; }
 /// Set parameters
 rule_or_action#4 { pars = Code.0; }
+/// Set regex
+rule_or_action#5 { rule_regex = Some(regex); }
 /// Create the rule
-rule_or_action#5 {
+rule_or_action#6 {
     let range = Range::span(range, Semi);
-    let regex = regex.unwrap_or_else(|| Regex::new_empty(arena, range));
+    let regex = rule_regex.unwrap_or_else(|| Regex::new_empty(arena, range));
     if name == Symbol::START {
         Ok(Element::new_start(arena, ret, pars, regex, range, trivia))
     } else {
@@ -171,28 +174,32 @@ rule_or_action#5 {
     }
 }
 /// Set action number
-rule_or_action#6 {
+rule_or_action#7 {
     elem_type = ElemType::Action;
     num = Action.0;
 }
 /// Set predicate number
-rule_or_action#7 {
+rule_or_action#8 {
     elem_type = ElemType::Predicate;
     num = Predicate.0;
 }
 /// Set predicate number
-rule_or_action#8 {
+rule_or_action#9 {
     elem_type = ElemType::ErrorHandler;
     num = ErrorHandler.0;
 }
 /// Create action or predicate
-rule_or_action#9 {
+rule_or_action#10 {
     let range = Range::span(range, Code.1);
     match elem_type {
         ElemType::Action => Ok(Element::new_action(arena, name, num, Code.0, range, trivia)),
         ElemType::Predicate => Ok(Element::new_predicate(arena, name, num, Code.0, range, trivia)),
         ElemType::ErrorHandler => Ok(Element::new_error_handler(arena, name, num, Code.0, range, trivia)),
     }
+}
+rule_or_action!1 {
+  rule_regex = Some(Regex::new_invalid(arena, range));
+  diag.error(error_code, error_range);
 }
 
 /// Create vector for operands

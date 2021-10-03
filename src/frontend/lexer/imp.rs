@@ -24,7 +24,7 @@ impl Lexer {
             Some(':') => self.emit(TokenKind::Colon),
             Some(';') => self.emit(TokenKind::Semi),
             None => self.emit(TokenKind::EOF),
-            _ => self.emit_invalid(),
+            _ => self.emit_invalid("invalid token"),
         }
     }
     fn state_ws(&mut self, c: char) -> Transition {
@@ -63,7 +63,7 @@ impl Lexer {
         if let Ok(val) = self.get(0, 0).parse() {
             self.emit(TokenKind::Int(val))
         } else {
-            self.emit_invalid()
+            self.emit_invalid("invalid integer")
         }
     }
     fn state_str(&mut self) -> Transition {
@@ -80,13 +80,17 @@ impl Lexer {
                         let sym = self.get(1, 1).replace("\\", "").into_symbol();
                         return self.emit(TokenKind::Str(sym));
                     } else {
-                        return self.emit_invalid();
+                        return self.emit_invalid("invalid string literal");
                     }
+                }
+                '\n' => {
+                    self.backup();
+                    return self.emit_invalid("invalid string literal");
                 }
                 _ => (),
             }
         }
-        self.emit_invalid()
+        self.emit_invalid("invalid string literal")
     }
     fn state_code(&mut self) -> Transition {
         let mut i = 1;
@@ -104,7 +108,7 @@ impl Lexer {
                 Some('\n') => {
                     self.line();
                 }
-                None => return self.emit_invalid(),
+                None => return self.emit_invalid("code segment"),
                 _ => (),
             }
         }
@@ -116,10 +120,10 @@ impl Lexer {
             if let Ok(val) = self.get(1, 0).parse() {
                 self.emit(TokenKind::Predicate(val))
             } else {
-                self.emit_invalid()
+                self.emit_invalid("invalid semantic predicate")
             }
         } else {
-            self.emit_invalid()
+            self.emit_invalid("invalid semantic predicate")
         }
     }
     fn state_sema(&mut self) -> Transition {
@@ -127,10 +131,10 @@ impl Lexer {
             if let Ok(val) = self.get(1, 0).parse() {
                 self.emit(TokenKind::Action(val))
             } else {
-                self.emit_invalid()
+                self.emit_invalid("invalid semantic action")
             }
         } else {
-            self.emit_invalid()
+            self.emit_invalid("invalid semantic action")
         }
     }
     fn state_error(&mut self) -> Transition {
@@ -138,10 +142,10 @@ impl Lexer {
             if let Ok(val) = self.get(1, 0).parse() {
                 self.emit(TokenKind::ErrorHandler(val))
             } else {
-                self.emit_invalid()
+                self.emit_invalid("invalid error handler")
             }
         } else {
-            self.emit_invalid()
+            self.emit_invalid("invalid error handler")
         }
     }
     fn state_slash(&mut self) -> Transition {
@@ -150,7 +154,7 @@ impl Lexer {
             Some('*') => self.state_c_comment(),
             _ => {
                 self.backup();
-                self.emit_invalid()
+                self.emit_invalid("invalid token")
             }
         }
     }
@@ -183,7 +187,7 @@ impl Lexer {
                 Some('/') if star => break,
                 Some('\n') => self.line(),
                 Some(_) => (),
-                None => return self.emit_invalid(),
+                None => return self.emit_invalid("unclosed block comment"),
             }
         }
         self.trivia = None;

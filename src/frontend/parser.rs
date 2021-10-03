@@ -14,7 +14,7 @@ use bumpalo::{Bump, collections::Vec as BVec};
 #[derive(PartialEq, Clone, Debug)]
 pub enum TokenKind {
     EOF,
-    Invalid,
+    Invalid(&'static str),
     Token,
     Language,
     Error,
@@ -43,7 +43,6 @@ pub enum TokenKind {
 }
 
 macro_rules! pattern_EOF { () => { TokenKind::EOF } }
-macro_rules! pattern_Invalid { () => { TokenKind::Invalid } }
 macro_rules! pattern_Token { () => { TokenKind::Token } }
 macro_rules! pattern_Language { () => { TokenKind::Language } }
 macro_rules! pattern_Error { () => { TokenKind::Error } }
@@ -378,7 +377,7 @@ impl fmt::Display for TokenKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             pattern_EOF!() => write!(f, "end of file"),
-            pattern_Invalid!() => write!(f, "invalid token"),
+            Self::Invalid(msg) => write!(f, "{}", msg),
             pattern_Token!() => write!(f, "{}", r###"token"###),
             pattern_Language!() => write!(f, "{}", r###"language"###),
             pattern_Error!() => write!(f, "{}", r###"error"###),
@@ -663,6 +662,7 @@ impl<'a> Parser {
         let elem_type;
         let num;
         let trivia = input.trivia();
+        let mut rule_regex = None;
         match input.current().kind {
             pattern_Id!() => {
                 let r#Id = consume_Id!(input);
@@ -709,7 +709,7 @@ impl<'a> Parser {
                     }
                 }
                 let r#Colon = consume_Colon!(input);
-                let r#regex = match input.current().kind {
+                match input.current().kind {
                     pattern_LPar!()
                     | pattern_LBrak!()
                     | pattern_Id!()
@@ -717,10 +717,55 @@ impl<'a> Parser {
                     | pattern_Predicate!()
                     | pattern_Action!()
                     | pattern_ErrorHandler!() => {
-                        let r#regex = Self::r#regex(depth + 1, input, arena, diag)?;
-                        Some(regex)
+                        (|| {
+                            match input.current().kind {
+                                pattern_LPar!()
+                                | pattern_LBrak!()
+                                | pattern_Id!()
+                                | pattern_Str!()
+                                | pattern_Predicate!()
+                                | pattern_Action!()
+                                | pattern_ErrorHandler!() => {
+                                    let r#regex = Self::r#regex(depth + 1, input, arena, diag)?;
+                                    // semantic action 5
+                                    rule_regex = Some(regex);
+                                    Ok(())
+                                }
+                                _ => {
+                                    return err![default_LPar!(),
+                                                default_LBrak!(),
+                                                default_Id!(),
+                                                default_Str!(),
+                                                default_Predicate!(),
+                                                default_Action!(),
+                                                default_ErrorHandler!()]
+                                }
+                            }
+                        })().or_else(|error_code| {
+                            // error handling
+                            if input.current().kind == TokenKind::EOF {
+                                return Err(error_code);
+                            }
+                            let error_range = input.current().range;
+                            loop {
+                                match input.current().kind {
+                                    pattern_Semi!() => {
+                                        // error handler 1
+                                      rule_regex = Some(Regex::new_invalid(arena, range));
+                                      diag.error(error_code, error_range);
+                                        return Ok(())
+                                    }
+                                    pattern_EOF!() => {
+                                        return err![default_Semi!()]
+                                    }
+                                    _ => {
+                                        input.advance();
+                                    }
+                               }
+                           }
+                        })?;
                     }
-                    pattern_Semi!() => None,
+                    pattern_Semi!() => {}
                     _ => {
                         return err![default_Semi!(),
                                     default_LPar!(),
@@ -731,11 +776,11 @@ impl<'a> Parser {
                                     default_Action!(),
                                     default_ErrorHandler!()]
                     }
-                };
+                }
                 let r#Semi = consume_Semi!(input);
-                // semantic action 5
+                // semantic action 6
                 let range = Range::span(range, Semi);
-                let regex = regex.unwrap_or_else(|| Regex::new_empty(arena, range));
+                let regex = rule_regex.unwrap_or_else(|| Regex::new_empty(arena, range));
                 if name == Symbol::START {
                     Ok(Element::new_start(arena, ret, pars, regex, range, trivia))
                 } else {
@@ -748,19 +793,19 @@ impl<'a> Parser {
                 match input.current().kind {
                     pattern_Action!() => {
                         let r#Action = consume_Action!(input);
-                        // semantic action 6
+                        // semantic action 7
                         elem_type = ElemType::Action;
                         num = Action.0;
                     }
                     pattern_Predicate!() => {
                         let r#Predicate = consume_Predicate!(input);
-                        // semantic action 7
+                        // semantic action 8
                         elem_type = ElemType::Predicate;
                         num = Predicate.0;
                     }
                     pattern_ErrorHandler!() => {
                         let r#ErrorHandler = consume_ErrorHandler!(input);
-                        // semantic action 8
+                        // semantic action 9
                         elem_type = ElemType::ErrorHandler;
                         num = ErrorHandler.0;
                     }
@@ -771,7 +816,7 @@ impl<'a> Parser {
                     }
                 }
                 let r#Code = consume_Code!(input);
-                // semantic action 9
+                // semantic action 10
                 let range = Range::span(range, Code.1);
                 match elem_type {
                     ElemType::Action => Ok(Element::new_action(arena, name, num, Code.0, range, trivia)),

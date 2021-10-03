@@ -792,7 +792,7 @@ impl RustOutput {
             b"#[derive(PartialEq, Clone, Debug)]\n\
               pub enum TokenKind {\
             \n    EOF,\
-            \n    Invalid,\n",
+            \n    Invalid(&'static str),\n",
         )?;
         for element in module.elements.iter() {
             if let ElementKind::Token { name, ty, .. } = element.kind {
@@ -809,7 +809,6 @@ impl RustOutput {
     /// Outputs the pattern_* macros.
     fn output_patterns(module: &Module, output: &mut File) -> std::io::Result<()> {
         output.write_all(b"macro_rules! pattern_EOF { () => { TokenKind::EOF } }\n")?;
-        output.write_all(b"macro_rules! pattern_Invalid { () => { TokenKind::Invalid } }\n")?;
         for element in module.elements.iter() {
             if let ElementKind::Token { name, ty, .. } = element.kind {
                 let s = if ty.is_empty() {
@@ -969,7 +968,7 @@ impl RustOutput {
             \n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\
             \n        match self {\
             \n            pattern_EOF!() => write!(f, \"end of file\"),\
-            \n            pattern_Invalid!() => write!(f, \"invalid token\"),\n",
+            \n            Self::Invalid(msg) => write!(f, \"{}\", msg),\n",
         )?;
         for element in module.elements.iter() {
             if let ElementKind::Token { name, sym, .. } = element.kind {

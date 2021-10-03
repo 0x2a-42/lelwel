@@ -18,7 +18,7 @@ fn main() {
     match Parser::parse(&mut lexer) {
         Ok(result) => {
             for tok in lexer.invalid_iter() {
-                eprintln!("invalid token at {}", tok.range);
+                eprintln!("{} at {}", tok.kind, tok.range);
             }
             println!("{}", result)
         }

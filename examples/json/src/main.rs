@@ -32,7 +32,9 @@ fn main() {
         let mut lexer = Lexer::new(contents, false);
         let root = Parser::parse(&mut lexer, &mut diag);
         for tok in lexer.invalid_iter() {
-            diag.error(Code::ParserError("invalid token"), tok.range);
+            if let TokenKind::Invalid(msg) = tok.kind {
+                diag.error(Code::ParserError(msg), tok.range);
+            }
         }
         match root {
             Err(e) => diag.error(e, lexer.current().range),

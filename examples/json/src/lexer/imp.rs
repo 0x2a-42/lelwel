@@ -42,7 +42,7 @@ impl Lexer {
             None => self.emit(TokenKind::EOF),
             _ => {
                 self.accept_star(|c| c.is_json_delimiter());
-                self.emit_invalid()
+                self.emit_invalid("invalid token")
             }
         }
     }
@@ -69,20 +69,20 @@ impl Lexer {
             "true" => self.emit(TokenKind::True),
             "false" => self.emit(TokenKind::False),
             "null" => self.emit(TokenKind::Null),
-            _ => self.emit_invalid(),
+            _ => self.emit_invalid("invalid token"),
         }
     }
     fn state_string(&mut self) -> Transition {
         let mut is_valid = true;
         loop {
             match self.consume() {
-                None => break self.emit_invalid(),
+                None => break self.emit_invalid("unclosed string"),
                 Some('"') => {
                     let val = self.get(1, 1).to_string();
                     break if is_valid {
                         self.emit(TokenKind::String(val))
                     } else {
-                        self.emit_invalid()
+                        self.emit_invalid("invalid string")
                     };
                 }
                 Some('\\') => match self.consume() {
@@ -103,7 +103,7 @@ impl Lexer {
         let mut is_valid = true;
         if has_sign {
             if !self.accept(|c| c.is_ascii_digit()) {
-                return self.emit_invalid();
+                return self.emit_invalid("invalid number");
             }
         } else {
             self.accept_char('-');
@@ -133,7 +133,7 @@ impl Lexer {
             let val = self.get(0, 0).to_string();
             self.emit(TokenKind::Number(val))
         } else {
-            self.emit_invalid()
+            self.emit_invalid("invalid number")
         }
     }
 }

@@ -294,8 +294,8 @@ impl Lexer {
 
     /// Finishes lexing, logs invalid token, and continue in start state.
     #[allow(dead_code)]
-    fn emit_invalid(&mut self) -> Transition {
-        self.emit_with_mode(TokenKind::Invalid, EmitMode::Invalid)
+    fn emit_invalid(&mut self, msg: &'static str) -> Transition {
+        self.emit_with_mode(TokenKind::Invalid(msg), EmitMode::Invalid)
     }
 
     /// Continue lexing at the start state.
