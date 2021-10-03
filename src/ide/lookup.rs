@@ -20,6 +20,7 @@ impl<'a> LookupNode {
             }
             ElementKind::Predicate { .. }
             | ElementKind::Action { .. }
+            | ElementKind::ErrorHandler { .. }
             | ElementKind::Token { .. } => Some(Node::Element(element)),
             _ => None,
         }
@@ -60,7 +61,8 @@ impl<'a> LookupDefinition {
                     RegexKind::Id { elem, .. }
                     | RegexKind::Str { elem, .. }
                     | RegexKind::Predicate { elem, .. }
-                    | RegexKind::Action { elem, .. },
+                    | RegexKind::Action { elem, .. }
+                    | RegexKind::ErrorHandler { elem, .. },
                 ..
             })) => elem.get(),
             _ => None,
@@ -107,7 +109,8 @@ impl<'a> LookupReferences {
             RegexKind::Id { elem, .. }
             | RegexKind::Str { elem, .. }
             | RegexKind::Predicate { elem, .. }
-            | RegexKind::Action { elem, .. } => {
+            | RegexKind::Action { elem, .. }
+            | RegexKind::ErrorHandler { elem, .. } => {
                 if let Some(elem) = elem.get() {
                     if std::ptr::eq(elem, def) {
                         refs.push(regex.range());
