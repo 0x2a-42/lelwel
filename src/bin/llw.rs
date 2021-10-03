@@ -2,6 +2,7 @@
 
 use atty::Stream;
 use clap::{crate_name, crate_version, App, ArgMatches};
+use lelwel::backend::graphviz::*;
 use lelwel::backend::rust::*;
 use lelwel::frontend::ast::*;
 use lelwel::frontend::diag::*;
@@ -51,21 +52,26 @@ fn translate(matches: ArgMatches) -> std::io::Result<()> {
                     printer.visit(root);
                 }
             }
-            if !diag.has_errors() && !matches.is_present("check") {
-                let output = matches.value_of("output").unwrap_or(".");
-                let path = std::path::Path::new(output);
+            if !diag.has_errors() {
+                if matches.is_present("graph") {
+                    GraphvizOutput::visit(root)?;
+                }
+                if !matches.is_present("check") {
+                    let output = matches.value_of("output").unwrap_or(".");
+                    let path = std::path::Path::new(output);
 
-                match root.language.get() {
-                    None => {
-                        output_rust(&matches, root, &path)?;
+                    match root.language.get() {
+                        None => {
+                            output_rust(&matches, root, &path)?;
+                        }
+                        Some(Element {
+                            kind: ElementKind::Language { name },
+                            ..
+                        }) if name.as_str() == "rust" => {
+                            output_rust(&matches, root, &path)?;
+                        }
+                        _ => {}
                     }
-                    Some(Element {
-                        kind: ElementKind::Language { name },
-                        ..
-                    }) if name.as_str() == "rust" => {
-                        output_rust(&matches, root, &path)?;
-                    }
-                    _ => {}
                 }
             }
         }
@@ -88,16 +94,13 @@ fn main() {
     let matches = App::new(crate_name!())
         .max_term_width(80)
         .version(crate_version!())
-        .about(
-            "Generates recursive descent parsers for Rust using LL(1) grammars. \
-             Conflicts are resolved with semantic predicates. \
-             Semantic actions are used for ad hoc syntax-directed translation.",
-        )
+        .about("Generates recursive descent parsers for Rust using LL(1) grammars.")
         .arg("-c, --check         'Only check the file for errors'")
         .arg("-l, --lexer         'Generate a lexer skeleton'")
         .arg("-s, --symbol        'Generate a symbol handling skeleton'")
         .arg("-d, --diag          'Generate a diagnostic handling skeleton'")
         .arg("-a, --ast           'Generate an AST skeleton (implies -d)'")
+        .arg("-g, --graph         'Output a graphviz file for the grammar'")
         .arg("<INPUT>             'Sets the input file to use'")
         .arg("-v...               'Sets the level of verbosity'")
         .arg("-o, --output=[FILE] 'Sets the output directory'")
