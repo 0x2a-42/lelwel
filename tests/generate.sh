@@ -45,6 +45,7 @@ for path in frontend/*.llw; do
   cat << EOF >> $output
 
 #[test]
+#[rustfmt::skip]
 fn ${file%.llw}() {
     let diag = gen_diag("tests/$path").unwrap();
     let mut errors = diag.error_iter();

@@ -35,6 +35,7 @@ fn gen_diag(input: &str) -> std::io::Result<Diag> {
 }
 
 #[test]
+#[rustfmt::skip]
 fn calc() {
     let diag = gen_diag("tests/frontend/calc.llw").unwrap();
     let mut errors = diag.error_iter();
@@ -46,6 +47,7 @@ fn calc() {
 }
 
 #[test]
+#[rustfmt::skip]
 fn empty() {
     let diag = gen_diag("tests/frontend/empty.llw").unwrap();
     let mut errors = diag.error_iter();
@@ -58,6 +60,7 @@ fn empty() {
 }
 
 #[test]
+#[rustfmt::skip]
 fn error_syntax() {
     let diag = gen_diag("tests/frontend/error_syntax.llw").unwrap();
     let mut errors = diag.error_iter();
@@ -72,6 +75,7 @@ fn error_syntax() {
 }
 
 #[test]
+#[rustfmt::skip]
 fn expected_action() {
     let diag = gen_diag("tests/frontend/expected_action.llw").unwrap();
     let mut errors = diag.error_iter();
@@ -86,6 +90,7 @@ fn expected_action() {
 }
 
 #[test]
+#[rustfmt::skip]
 fn expected_error_handler() {
     let diag = gen_diag("tests/frontend/expected_error_handler.llw").unwrap();
     let mut errors = diag.error_iter();
@@ -101,6 +106,7 @@ fn expected_error_handler() {
 }
 
 #[test]
+#[rustfmt::skip]
 fn expected_predicate() {
     let diag = gen_diag("tests/frontend/expected_predicate.llw").unwrap();
     let mut errors = diag.error_iter();
@@ -116,6 +122,7 @@ fn expected_predicate() {
 }
 
 #[test]
+#[rustfmt::skip]
 fn invalid_lang() {
     let diag = gen_diag("tests/frontend/invalid_lang.llw").unwrap();
     let mut errors = diag.error_iter();
@@ -128,6 +135,7 @@ fn invalid_lang() {
 }
 
 #[test]
+#[rustfmt::skip]
 fn invalid_token() {
     let diag = gen_diag("tests/frontend/invalid_token.llw").unwrap();
     let mut errors = diag.error_iter();
@@ -144,6 +152,7 @@ fn invalid_token() {
 }
 
 #[test]
+#[rustfmt::skip]
 fn json() {
     let diag = gen_diag("tests/frontend/json.llw").unwrap();
     let mut errors = diag.error_iter();
@@ -155,6 +164,7 @@ fn json() {
 }
 
 #[test]
+#[rustfmt::skip]
 fn left_recursive() {
     let diag = gen_diag("tests/frontend/left_recursive.llw").unwrap();
     let mut errors = diag.error_iter();
@@ -168,6 +178,7 @@ fn left_recursive() {
 }
 
 #[test]
+#[rustfmt::skip]
 fn lelwel() {
     let diag = gen_diag("tests/frontend/lelwel.llw").unwrap();
     let mut errors = diag.error_iter();
@@ -179,6 +190,7 @@ fn lelwel() {
 }
 
 #[test]
+#[rustfmt::skip]
 fn ll1_conflict() {
     let diag = gen_diag("tests/frontend/ll1_conflict.llw").unwrap();
     let mut errors = diag.error_iter();
@@ -197,6 +209,7 @@ fn ll1_conflict() {
 }
 
 #[test]
+#[rustfmt::skip]
 fn lowercase_token() {
     let diag = gen_diag("tests/frontend/lowercase_token.llw").unwrap();
     let mut errors = diag.error_iter();
@@ -210,6 +223,7 @@ fn lowercase_token() {
 }
 
 #[test]
+#[rustfmt::skip]
 fn predef_token() {
     let diag = gen_diag("tests/frontend/predef_token.llw").unwrap();
     let mut errors = diag.error_iter();
@@ -225,6 +239,7 @@ fn predef_token() {
 }
 
 #[test]
+#[rustfmt::skip]
 fn predicate_position() {
     let diag = gen_diag("tests/frontend/predicate_position.llw").unwrap();
     let mut errors = diag.error_iter();
@@ -237,6 +252,7 @@ fn predicate_position() {
 }
 
 #[test]
+#[rustfmt::skip]
 fn recursion_depth() {
     let diag = gen_diag("tests/frontend/recursion_depth.llw").unwrap();
     let mut errors = diag.error_iter();
@@ -249,6 +265,7 @@ fn recursion_depth() {
 }
 
 #[test]
+#[rustfmt::skip]
 fn redefinition() {
     let diag = gen_diag("tests/frontend/redefinition.llw").unwrap();
     let mut errors = diag.error_iter();
@@ -264,6 +281,7 @@ fn redefinition() {
 }
 
 #[test]
+#[rustfmt::skip]
 fn syntax_error() {
     let diag = gen_diag("tests/frontend/syntax_error.llw").unwrap();
     let mut errors = diag.error_iter();
@@ -280,6 +298,7 @@ fn syntax_error() {
 }
 
 #[test]
+#[rustfmt::skip]
 fn undefined_action() {
     let diag = gen_diag("tests/frontend/undefined_action.llw").unwrap();
     let mut errors = diag.error_iter();
@@ -295,6 +314,7 @@ fn undefined_action() {
 }
 
 #[test]
+#[rustfmt::skip]
 fn undefined_error_handler() {
     let diag = gen_diag("tests/frontend/undefined_error_handler.llw").unwrap();
     let mut errors = diag.error_iter();
@@ -310,6 +330,7 @@ fn undefined_error_handler() {
 }
 
 #[test]
+#[rustfmt::skip]
 fn undefined() {
     let diag = gen_diag("tests/frontend/undefined.llw").unwrap();
     let mut errors = diag.error_iter();
@@ -325,6 +346,7 @@ fn undefined() {
 }
 
 #[test]
+#[rustfmt::skip]
 fn undefined_predicate() {
     let diag = gen_diag("tests/frontend/undefined_predicate.llw").unwrap();
     let mut errors = diag.error_iter();
@@ -340,6 +362,7 @@ fn undefined_predicate() {
 }
 
 #[test]
+#[rustfmt::skip]
 fn unused_element() {
     let diag = gen_diag("tests/frontend/unused_element.llw").unwrap();
     let mut errors = diag.error_iter();
@@ -354,6 +377,7 @@ fn unused_element() {
 }
 
 #[test]
+#[rustfmt::skip]
 fn uppercase_rule() {
     let diag = gen_diag("tests/frontend/uppercase_rule.llw").unwrap();
     let mut errors = diag.error_iter();
@@ -367,6 +391,7 @@ fn uppercase_rule() {
 }
 
 #[test]
+#[rustfmt::skip]
 fn valid_lang() {
     let diag = gen_diag("tests/frontend/valid_lang.llw").unwrap();
     let mut errors = diag.error_iter();
