@@ -18,14 +18,20 @@ impl GraphvizOutput {
         match &element.kind {
             ElementKind::Start { regex, .. } => {
                 output.write_all(format!("  \"{:p}\" [label=\"start\"];\n", element).as_bytes())?;
+                let regex = Self::skip_paren(*regex);
                 Self::visit_regex(regex, output)?;
-                output.write_all(format!("  \"{:p}\" -> \"{:p}\";\n", element, *regex).as_bytes())
+                output.write_all(
+                    format!("  \"{:p}\" -> \"{}\";\n", element, Self::skip_id(regex)).as_bytes(),
+                )
             }
             ElementKind::Rule { name, regex, .. } => {
                 output
                     .write_all(format!("  \"{:p}\" [label=\"{}\"];\n", element, name).as_bytes())?;
+                let regex = Self::skip_paren(*regex);
                 Self::visit_regex(regex, output)?;
-                output.write_all(format!("  \"{:p}\" -> \"{:p}\";\n", element, *regex).as_bytes())
+                output.write_all(
+                    format!("  \"{:p}\" -> \"{}\";\n", element, Self::skip_id(regex)).as_bytes(),
+                )
             }
             _ => Ok(()),
         }
