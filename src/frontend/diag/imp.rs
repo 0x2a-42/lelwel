@@ -69,74 +69,74 @@ impl std::fmt::Display for Code {
                 write!(f, "{}", msg)
             }
             Code::UndefinedElement(sym) => {
-                write!(f, "Undefined element '{}'", sym)
+                write!(f, "undefined element '{}'", sym)
             }
             Code::UppercaseRule(sym) => {
-                write!(f, "Rule '{}' must start with lowercase letter", sym)
+                write!(f, "rule '{}' must start with lowercase letter", sym)
             }
             Code::LowercaseToken(sym) => {
-                write!(f, "Token '{}' must start with uppercase letter or '_'", sym)
+                write!(f, "token '{}' must start with uppercase letter or '_'", sym)
             }
             Code::Redefinition(sym) => {
-                write!(f, "Redefinition of {}", sym)
+                write!(f, "redefinition of {}", sym)
             }
             Code::InvalidLang(sym) => {
-                write!(f, "Invalid target language '{}'", sym)
+                write!(f, "invalid target language '{}'", sym)
             }
             Code::ExpectedAction(num) => {
-                write!(f, "Expected action with number {} or {}", num - 1, num)
+                write!(f, "expected action with number {} or {}", num - 1, num)
             }
             Code::ExpectedPredicate(num) => {
                 if *num == 1 {
-                    write!(f, "Expected predicate with number {}", num)
+                    write!(f, "expected predicate with number {}", num)
                 } else {
-                    write!(f, "Expected predicate with number {} or {}", num - 1, num)
+                    write!(f, "expected predicate with number {} or {}", num - 1, num)
                 }
             }
             Code::ExpectedErrorHandler(num) => {
                 if *num == 1 {
-                    write!(f, "Expected error handler with number {}", num)
+                    write!(f, "expected error handler with number {}", num)
                 } else {
                     write!(
                         f,
-                        "Expected error handler with number {} or {}",
+                        "expected error handler with number {} or {}",
                         num - 1,
                         num
                     )
                 }
             }
             Code::UndefinedAction => {
-                write!(f, "Undefined action")
+                write!(f, "undefined action")
             }
             Code::UndefinedPredicate => {
-                write!(f, "Undefined predicate")
+                write!(f, "undefined predicate")
             }
             Code::UndefinedErrorHandler => {
-                write!(f, "Undefined error handler")
+                write!(f, "undefined error handler")
             }
             Code::UnusedElement => {
-                write!(f, "Unused element")
+                write!(f, "unused element")
             }
             Code::MissingStart => {
-                write!(f, "Missing start rule")
+                write!(f, "missing start rule")
             }
             Code::PredPosition => {
-                write!(f, "Predicate must be first term in alternation branch")
+                write!(f, "predicate must be first term in alternation branch")
             }
             Code::LL1Conflict => {
                 write!(f, "LL(1) confilict")
             }
             Code::ConsumeTokens => {
-                write!(f, "No tokens consumed")
+                write!(f, "no tokens consumed")
             }
             Code::ErrorSyntax => {
-                write!(f, "Error handler must be only term in alternation branch or last term of concatenation")
+                write!(f, "error handler must be only term in alternation branch or last term of concatenation")
             }
             Code::ErrorCount => {
-                write!(f, "Error handler can only occur in one alternation branch")
+                write!(f, "error handler can only occur in one alternation branch")
             }
             Code::PredefToken => {
-                write!(f, "Cannot use predefined token name")
+                write!(f, "cannot use predefined token name")
             }
         }
     }

@@ -53,7 +53,7 @@ fn empty() {
     let mut errors = diag.error_iter();
     let mut warnings = diag.warning_iter();
 
-    check_next!(errors, "tests/frontend/empty.llw:1:1-1:1: Missing start rule");
+    check_next!(errors, "tests/frontend/empty.llw:1:1-1:1: missing start rule");
     check_empty!(errors);
 
     check_empty!(warnings);
@@ -66,9 +66,9 @@ fn error_syntax() {
     let mut errors = diag.error_iter();
     let mut warnings = diag.warning_iter();
 
-    check_next!(errors, "tests/frontend/error_syntax.llw:6:3-6:5: Error handler can only occur in one alternation branch");
-    check_next!(errors, "tests/frontend/error_syntax.llw:19:3-19:9: Error handler must be only term in alternation branch or last term of concatenation");
-    check_next!(errors, "tests/frontend/error_syntax.llw:24:3-24:7: Error handler must be only term in alternation branch or last term of concatenation");
+    check_next!(errors, "tests/frontend/error_syntax.llw:6:3-6:5: error handler can only occur in one alternation branch");
+    check_next!(errors, "tests/frontend/error_syntax.llw:19:3-19:9: error handler must be only term in alternation branch or last term of concatenation");
+    check_next!(errors, "tests/frontend/error_syntax.llw:24:3-24:7: error handler must be only term in alternation branch or last term of concatenation");
     check_empty!(errors);
 
     check_empty!(warnings);
@@ -81,9 +81,9 @@ fn expected_action() {
     let mut errors = diag.error_iter();
     let mut warnings = diag.warning_iter();
 
-    check_next!(errors, "tests/frontend/expected_action.llw:2:21-2:23: Expected action with number 3 or 4");
-    check_next!(errors, "tests/frontend/expected_action.llw:2:24-2:26: Expected action with number 3 or 4");
-    check_next!(errors, "tests/frontend/expected_action.llw:2:27-2:29: Expected action with number 3 or 4");
+    check_next!(errors, "tests/frontend/expected_action.llw:2:21-2:23: expected action with number 3 or 4");
+    check_next!(errors, "tests/frontend/expected_action.llw:2:24-2:26: expected action with number 3 or 4");
+    check_next!(errors, "tests/frontend/expected_action.llw:2:27-2:29: expected action with number 3 or 4");
     check_empty!(errors);
 
     check_empty!(warnings);
@@ -96,12 +96,12 @@ fn expected_error_handler() {
     let mut errors = diag.error_iter();
     let mut warnings = diag.warning_iter();
 
-    check_next!(errors, "tests/frontend/expected_error_handler.llw:4:10-4:12: Expected error handler with number 1");
-    check_next!(errors, "tests/frontend/expected_error_handler.llw:4:26-4:28: Expected error handler with number 2 or 3");
-    check_next!(errors, "tests/frontend/expected_error_handler.llw:4:30-4:32: Expected error handler with number 2 or 3");
+    check_next!(errors, "tests/frontend/expected_error_handler.llw:4:10-4:12: expected error handler with number 1");
+    check_next!(errors, "tests/frontend/expected_error_handler.llw:4:26-4:28: expected error handler with number 2 or 3");
+    check_next!(errors, "tests/frontend/expected_error_handler.llw:4:30-4:32: expected error handler with number 2 or 3");
     check_empty!(errors);
 
-    check_next!(warnings, "tests/frontend/expected_error_handler.llw:4:10-4:12: Undefined error handler");
+    check_next!(warnings, "tests/frontend/expected_error_handler.llw:4:10-4:12: undefined error handler");
     check_empty!(warnings);
 }
 
@@ -112,12 +112,12 @@ fn expected_predicate() {
     let mut errors = diag.error_iter();
     let mut warnings = diag.warning_iter();
 
-    check_next!(errors, "tests/frontend/expected_predicate.llw:4:3-4:5: Expected predicate with number 1");
-    check_next!(errors, "tests/frontend/expected_predicate.llw:9:3-9:5: Expected predicate with number 3 or 4");
-    check_next!(errors, "tests/frontend/expected_predicate.llw:10:3-10:5: Expected predicate with number 3 or 4");
+    check_next!(errors, "tests/frontend/expected_predicate.llw:4:3-4:5: expected predicate with number 1");
+    check_next!(errors, "tests/frontend/expected_predicate.llw:9:3-9:5: expected predicate with number 3 or 4");
+    check_next!(errors, "tests/frontend/expected_predicate.llw:10:3-10:5: expected predicate with number 3 or 4");
     check_empty!(errors);
 
-    check_next!(warnings, "tests/frontend/expected_predicate.llw:4:3-4:5: Undefined predicate");
+    check_next!(warnings, "tests/frontend/expected_predicate.llw:4:3-4:5: undefined predicate");
     check_empty!(warnings);
 }
 
@@ -128,7 +128,7 @@ fn invalid_lang() {
     let mut errors = diag.error_iter();
     let mut warnings = diag.warning_iter();
 
-    check_next!(errors, "tests/frontend/invalid_lang.llw:1:10-1:17: Invalid target language 'unknown'");
+    check_next!(errors, "tests/frontend/invalid_lang.llw:1:10-1:17: invalid target language 'unknown'");
     check_empty!(errors);
 
     check_empty!(warnings);
@@ -170,8 +170,8 @@ fn left_recursive() {
     let mut errors = diag.error_iter();
     let mut warnings = diag.warning_iter();
 
-    check_next!(errors, "tests/frontend/left_recursive.llw:2:3-2:4: No tokens consumed");
-    check_next!(errors, "tests/frontend/left_recursive.llw:6:3-6:4: No tokens consumed");
+    check_next!(errors, "tests/frontend/left_recursive.llw:2:3-2:4: no tokens consumed");
+    check_next!(errors, "tests/frontend/left_recursive.llw:6:3-6:4: no tokens consumed");
     check_empty!(errors);
 
     check_empty!(warnings);
@@ -215,8 +215,8 @@ fn lowercase_token() {
     let mut errors = diag.error_iter();
     let mut warnings = diag.warning_iter();
 
-    check_next!(errors, "tests/frontend/lowercase_token.llw:1:7-1:8: Token 'a' must start with uppercase letter or '_'");
-    check_next!(errors, "tests/frontend/lowercase_token.llw:1:9-1:11: Token '_b' must start with uppercase letter or '_'");
+    check_next!(errors, "tests/frontend/lowercase_token.llw:1:7-1:8: token 'a' must start with uppercase letter or '_'");
+    check_next!(errors, "tests/frontend/lowercase_token.llw:1:9-1:11: token '_b' must start with uppercase letter or '_'");
     check_empty!(errors);
 
     check_empty!(warnings);
@@ -229,10 +229,10 @@ fn predef_token() {
     let mut errors = diag.error_iter();
     let mut warnings = diag.warning_iter();
 
-    check_next!(errors, "tests/frontend/predef_token.llw:1:7-1:10: Cannot use predefined token name");
-    check_next!(errors, "tests/frontend/predef_token.llw:1:11-1:18: Cannot use predefined token name");
-    check_next!(errors, "tests/frontend/predef_token.llw:4:3-4:10: Undefined element 'Invalid'");
-    check_next!(errors, "tests/frontend/predef_token.llw:4:11-4:14: Undefined element 'EOF'");
+    check_next!(errors, "tests/frontend/predef_token.llw:1:7-1:10: cannot use predefined token name");
+    check_next!(errors, "tests/frontend/predef_token.llw:1:11-1:18: cannot use predefined token name");
+    check_next!(errors, "tests/frontend/predef_token.llw:4:3-4:10: undefined element 'Invalid'");
+    check_next!(errors, "tests/frontend/predef_token.llw:4:11-4:14: undefined element 'EOF'");
     check_empty!(errors);
 
     check_empty!(warnings);
@@ -245,7 +245,7 @@ fn predicate_position() {
     let mut errors = diag.error_iter();
     let mut warnings = diag.warning_iter();
 
-    check_next!(errors, "tests/frontend/predicate_position.llw:4:3-4:5: Predicate must be first term in alternation branch");
+    check_next!(errors, "tests/frontend/predicate_position.llw:4:3-4:5: predicate must be first term in alternation branch");
     check_empty!(errors);
 
     check_empty!(warnings);
@@ -271,10 +271,10 @@ fn redefinition() {
     let mut errors = diag.error_iter();
     let mut warnings = diag.warning_iter();
 
-    check_next!(errors, "tests/frontend/redefinition.llw:1:9-1:10: Redefinition of element 'A'");
-    check_next!(errors, "tests/frontend/redefinition.llw:1:13-1:14: Redefinition of element 'B'");
-    check_next!(errors, "tests/frontend/redefinition.llw:9:1-10:2: Redefinition of element 'a'");
-    check_next!(errors, "tests/frontend/redefinition.llw:14:1-15:2: Redefinition of element 'b'");
+    check_next!(errors, "tests/frontend/redefinition.llw:1:9-1:10: redefinition of element 'A'");
+    check_next!(errors, "tests/frontend/redefinition.llw:1:13-1:14: redefinition of element 'B'");
+    check_next!(errors, "tests/frontend/redefinition.llw:9:1-10:2: redefinition of element 'a'");
+    check_next!(errors, "tests/frontend/redefinition.llw:14:1-15:2: redefinition of element 'b'");
     check_empty!(errors);
 
     check_empty!(warnings);
@@ -290,8 +290,8 @@ fn syntax_error() {
     check_next!(errors, "tests/frontend/syntax_error.llw:2:1-2:6: invalid syntax, expected one of: ';', '=', <identifier>, <code segment>.");
     check_next!(errors, "tests/frontend/syntax_error.llw:6:1-6:2: invalid syntax, expected: ')'.");
     check_next!(errors, "tests/frontend/syntax_error.llw:11:2-11:3: invalid syntax, expected one of: ';', '(', ')', '[', ']', '|', '*', '+', <identifier>, <string literal>, <semantic predicate>, <semantic action>, <error handler>.");
-    check_next!(errors, "tests/frontend/syntax_error.llw:11:1-11:2: Undefined element 'b'");
-    check_next!(errors, "tests/frontend/syntax_error.llw:16:3-16:4: Undefined element 'C'");
+    check_next!(errors, "tests/frontend/syntax_error.llw:11:1-11:2: undefined element 'b'");
+    check_next!(errors, "tests/frontend/syntax_error.llw:16:3-16:4: undefined element 'C'");
     check_empty!(errors);
 
     check_empty!(warnings);
@@ -306,10 +306,10 @@ fn undefined_action() {
 
     check_empty!(errors);
 
-    check_next!(warnings, "tests/frontend/undefined_action.llw:2:3-2:5: Undefined action");
-    check_next!(warnings, "tests/frontend/undefined_action.llw:2:11-2:13: Undefined action");
-    check_next!(warnings, "tests/frontend/undefined_action.llw:6:3-6:5: Undefined action");
-    check_next!(warnings, "tests/frontend/undefined_action.llw:6:6-6:8: Undefined action");
+    check_next!(warnings, "tests/frontend/undefined_action.llw:2:3-2:5: undefined action");
+    check_next!(warnings, "tests/frontend/undefined_action.llw:2:11-2:13: undefined action");
+    check_next!(warnings, "tests/frontend/undefined_action.llw:6:3-6:5: undefined action");
+    check_next!(warnings, "tests/frontend/undefined_action.llw:6:6-6:8: undefined action");
     check_empty!(warnings);
 }
 
@@ -322,10 +322,10 @@ fn undefined_error_handler() {
 
     check_empty!(errors);
 
-    check_next!(warnings, "tests/frontend/undefined_error_handler.llw:2:11-2:13: Undefined error handler");
-    check_next!(warnings, "tests/frontend/undefined_error_handler.llw:2:15-2:17: Undefined error handler");
-    check_next!(warnings, "tests/frontend/undefined_error_handler.llw:6:5-6:7: Undefined error handler");
-    check_next!(warnings, "tests/frontend/undefined_error_handler.llw:6:13-6:15: Undefined error handler");
+    check_next!(warnings, "tests/frontend/undefined_error_handler.llw:2:11-2:13: undefined error handler");
+    check_next!(warnings, "tests/frontend/undefined_error_handler.llw:2:15-2:17: undefined error handler");
+    check_next!(warnings, "tests/frontend/undefined_error_handler.llw:6:5-6:7: undefined error handler");
+    check_next!(warnings, "tests/frontend/undefined_error_handler.llw:6:13-6:15: undefined error handler");
     check_empty!(warnings);
 }
 
@@ -336,10 +336,10 @@ fn undefined() {
     let mut errors = diag.error_iter();
     let mut warnings = diag.warning_iter();
 
-    check_next!(errors, "tests/frontend/undefined.llw:2:3-2:4: Undefined element 'A'");
-    check_next!(errors, "tests/frontend/undefined.llw:2:5-2:6: Undefined element 'b'");
-    check_next!(errors, "tests/frontend/undefined.llw:2:7-2:8: Undefined element 'C'");
-    check_next!(errors, "tests/frontend/undefined.llw:2:9-2:10: Undefined element 'd'");
+    check_next!(errors, "tests/frontend/undefined.llw:2:3-2:4: undefined element 'A'");
+    check_next!(errors, "tests/frontend/undefined.llw:2:5-2:6: undefined element 'b'");
+    check_next!(errors, "tests/frontend/undefined.llw:2:7-2:8: undefined element 'C'");
+    check_next!(errors, "tests/frontend/undefined.llw:2:9-2:10: undefined element 'd'");
     check_empty!(errors);
 
     check_empty!(warnings);
@@ -354,10 +354,10 @@ fn undefined_predicate() {
 
     check_empty!(errors);
 
-    check_next!(warnings, "tests/frontend/undefined_predicate.llw:5:3-5:5: Undefined predicate");
-    check_next!(warnings, "tests/frontend/undefined_predicate.llw:6:3-6:5: Undefined predicate");
-    check_next!(warnings, "tests/frontend/undefined_predicate.llw:10:3-10:5: Undefined predicate");
-    check_next!(warnings, "tests/frontend/undefined_predicate.llw:12:3-12:5: Undefined predicate");
+    check_next!(warnings, "tests/frontend/undefined_predicate.llw:5:3-5:5: undefined predicate");
+    check_next!(warnings, "tests/frontend/undefined_predicate.llw:6:3-6:5: undefined predicate");
+    check_next!(warnings, "tests/frontend/undefined_predicate.llw:10:3-10:5: undefined predicate");
+    check_next!(warnings, "tests/frontend/undefined_predicate.llw:12:3-12:5: undefined predicate");
     check_empty!(warnings);
 }
 
@@ -370,9 +370,9 @@ fn unused_element() {
 
     check_empty!(errors);
 
-    check_next!(warnings, "tests/frontend/unused_element.llw:1:7-1:8: Unused element");
-    check_next!(warnings, "tests/frontend/unused_element.llw:7:1-9:2: Unused element");
-    check_next!(warnings, "tests/frontend/unused_element.llw:11:1-12:2: Unused element");
+    check_next!(warnings, "tests/frontend/unused_element.llw:1:7-1:8: unused element");
+    check_next!(warnings, "tests/frontend/unused_element.llw:7:1-9:2: unused element");
+    check_next!(warnings, "tests/frontend/unused_element.llw:11:1-12:2: unused element");
     check_empty!(warnings);
 }
 
@@ -383,8 +383,8 @@ fn uppercase_rule() {
     let mut errors = diag.error_iter();
     let mut warnings = diag.warning_iter();
 
-    check_next!(errors, "tests/frontend/uppercase_rule.llw:4:1-5:2: Rule 'A' must start with lowercase letter");
-    check_next!(errors, "tests/frontend/uppercase_rule.llw:7:1-8:2: Rule '_B' must start with lowercase letter");
+    check_next!(errors, "tests/frontend/uppercase_rule.llw:4:1-5:2: rule 'A' must start with lowercase letter");
+    check_next!(errors, "tests/frontend/uppercase_rule.llw:7:1-8:2: rule '_B' must start with lowercase letter");
     check_empty!(errors);
 
     check_empty!(warnings);
