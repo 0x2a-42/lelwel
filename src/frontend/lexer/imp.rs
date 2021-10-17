@@ -108,7 +108,7 @@ impl Lexer {
                 Some('\n') => {
                     self.line();
                 }
-                None => return self.emit_invalid("code segment"),
+                None => return self.emit_invalid("unclosed code segment"),
                 _ => (),
             }
         }
@@ -120,10 +120,10 @@ impl Lexer {
             if let Ok(val) = self.get(1, 0).parse() {
                 self.emit(TokenKind::Predicate(val))
             } else {
-                self.emit_invalid("invalid semantic predicate")
+                self.emit_invalid("invalid predicate")
             }
         } else {
-            self.emit_invalid("invalid semantic predicate")
+            self.emit_invalid("invalid predicate")
         }
     }
     fn state_sema(&mut self) -> Transition {
@@ -131,10 +131,10 @@ impl Lexer {
             if let Ok(val) = self.get(1, 0).parse() {
                 self.emit(TokenKind::Action(val))
             } else {
-                self.emit_invalid("invalid semantic action")
+                self.emit_invalid("invalid action")
             }
         } else {
-            self.emit_invalid("invalid semantic action")
+            self.emit_invalid("invalid action")
         }
     }
     fn state_error(&mut self) -> Transition {
