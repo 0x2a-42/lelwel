@@ -556,93 +556,103 @@ impl<'a> Parser {
         // semantic action 0
         let trivia = input.trivia();
         let r#Token = consume_Token!(input);
-        (|| {
+        let mut is_first = true;
+        loop {
             match input.current().kind {
                 pattern_Id!() => {
-                    let mut is_first = true;
-                    loop {
+                    (|| {
+                        let r#Id = consume_Id!(input);
+                        // semantic action 1
+                        let mut range = Id.1;
+                        let mut ty = Symbol::default();
+                        let mut sym = Symbol::default();
                         match input.current().kind {
-                            pattern_Id!() => {
-                                let r#Id = consume_Id!(input);
-                                // semantic action 1
-                                let mut range = Id.1;
-                                let mut ty = Symbol::default();
-                                let mut sym = Symbol::default();
-                                match input.current().kind {
-                                    pattern_Code!() => {
-                                        let r#Code = consume_Code!(input);
-                                        // semantic action 2
-                                        ty = Code.0;
-                                        range = Range::span(range, Code.1);
-                                    }
-                                    pattern_Semi!()
-                                    | pattern_Equal!()
-                                    | pattern_Id!() => {}
-                                    _ => {
-                                        return err![default_Semi!(),
-                                                    default_Equal!(),
-                                                    default_Id!(),
-                                                    default_Code!()]
-                                    }
-                                }
-                                match input.current().kind {
-                                    pattern_Equal!() => {
-                                        let r#Equal = consume_Equal!(input);
-                                        let r#Str = consume_Str!(input);
-                                        // semantic action 3
-                                        sym = Str.0;
-                                        range = Range::span(range, Str.1);
-                                    }
-                                    pattern_Semi!()
-                                    | pattern_Id!() => {}
-                                    _ => {
-                                        return err![default_Semi!(),
-                                                    default_Equal!(),
-                                                    default_Id!()]
-                                    }
-                                }
-                                // semantic action 4
-                                elements.push(Element::new_token(arena, Id.0, ty, sym, range, trivia.clone()));
+                            pattern_Code!() => {
+                                let r#Code = consume_Code!(input);
+                                // semantic action 2
+                                ty = Code.0;
+                                range = Range::span(range, Code.1);
                             }
-                            pattern_Semi!() if !is_first => break,
-                            _ if is_first => {
-                                return err![default_Id!()]
-                            }
+                            pattern_Semi!()
+                            | pattern_Equal!()
+                            | pattern_Id!() => {}
                             _ => {
-                                return err![default_Id!(),
-                                            default_Semi!()]
+                                return err![default_Semi!(),
+                                            default_Equal!(),
+                                            default_Id!(),
+                                            default_Code!()]
                             }
                         }
-                        is_first = false;
-                    }
-                    Ok(())
+                        match input.current().kind {
+                            pattern_Equal!() => {
+                                let r#Equal = consume_Equal!(input);
+                                let r#Str = consume_Str!(input);
+                                // semantic action 3
+                                sym = Str.0;
+                                range = Range::span(range, Str.1);
+                            }
+                            pattern_Semi!()
+                            | pattern_Id!() => {}
+                            _ => {
+                                return err![default_Semi!(),
+                                            default_Equal!(),
+                                            default_Id!()]
+                            }
+                        }
+                        // semantic action 4
+                        elements.push(Element::new_token(arena, Id.0, ty, sym, range, trivia.clone()));
+                        match input.current().kind {
+                            pattern_Semi!()
+                            | pattern_Id!() => {
+                                Ok(())
+                            }
+                            _ => {
+                                return err![default_Semi!(),
+                                            default_Id!()]
+                            }
+                        }
+                    })().or_else(|error_code| {
+                        // error handling
+                        if input.current().kind == TokenKind::EOF {
+                            return Err(error_code);
+                        }
+                        let error_range = input.current().range;
+                        loop {
+                            match input.current().kind {
+                                pattern_Semi!()
+                                | pattern_Id!() => {
+                                    // error handler 1
+                                    diag.error(error_code, error_range);
+                                    return Ok(())
+                                }
+                                pattern_EOF!()
+                                | pattern_Token!()
+                                | pattern_Language!()
+                                | pattern_Error!()
+                                | pattern_Start!()
+                                | pattern_Preamble!()
+                                | pattern_Pars!()
+                                | pattern_Limit!() => {
+                                    return Err(error_code)
+                                }
+                                _ => {
+                                    input.advance();
+                                }
+                           }
+                       }
+                    })?;
                 }
-                _ => {
+                pattern_Semi!() if !is_first => break,
+                _ if is_first => {
                     return err![default_Id!()]
                 }
+                _ => {
+                    return err![default_Id!(),
+                                default_Semi!()]
+                }
             }
-        })().or_else(|error_code| {
-            // error handling
-            if input.current().kind == TokenKind::EOF {
-                return Err(error_code);
-            }
-            let error_range = input.current().range;
-            loop {
-                match input.current().kind {
-                    pattern_Semi!() => {
-                        // error handler 1
-                        diag.error(error_code, error_range);
-                        return Ok(())
-                    }
-                    pattern_EOF!() => {
-                        return err![default_Semi!()]
-                    }
-                    _ => {
-                        input.advance();
-                    }
-               }
-           }
-        })?;
+            is_first = false;
+        }
         let r#Semi = consume_Semi!(input);
         // semantic action 5
         Ok(())
@@ -755,8 +765,16 @@ impl<'a> Parser {
                                       diag.error(error_code, error_range);
                                         return Ok(())
                                     }
-                                    pattern_EOF!() => {
-                                        return err![default_Semi!()]
+                                    pattern_EOF!()
+                                    | pattern_Token!()
+                                    | pattern_Language!()
+                                    | pattern_Error!()
+                                    | pattern_Start!()
+                                    | pattern_Preamble!()
+                                    | pattern_Pars!()
+                                    | pattern_Limit!()
+                                    | pattern_Id!() => {
+                                        return Err(error_code)
                                     }
                                     _ => {
                                         input.advance();
@@ -1025,18 +1043,15 @@ impl<'a> Parser {
                         diag.error(error_code, error_range);
                         return Ok(())
                     }
-                    pattern_EOF!() => {
-                        return err![default_Semi!(),
-                                    default_LPar!(),
-                                    default_RPar!(),
-                                    default_LBrak!(),
-                                    default_RBrak!(),
-                                    default_Or!(),
-                                    default_Id!(),
-                                    default_Str!(),
-                                    default_Predicate!(),
-                                    default_Action!(),
-                                    default_ErrorHandler!()]
+                    pattern_EOF!()
+                    | pattern_Token!()
+                    | pattern_Language!()
+                    | pattern_Error!()
+                    | pattern_Start!()
+                    | pattern_Preamble!()
+                    | pattern_Pars!()
+                    | pattern_Limit!() => {
+                        return Err(error_code)
                     }
                     _ => {
                         input.advance();

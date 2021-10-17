@@ -148,20 +148,22 @@ impl DebugPrinter {
         match &regex.kind {
             RegexKind::Id { name, elem, .. } => {
                 eprintln!(
-                    "id: {} {} {} {} {}",
+                    "id: {} {} {} {} {} {}",
                     member!(name),
                     ptr!(*elem),
                     set!(first),
                     set!(follow),
+                    addr!(regex),
                     pos!(range)
                 );
             }
             RegexKind::Concat { ops, error } => {
                 eprintln!(
-                    "concat: {} {} {} {}",
+                    "concat: {} {} {} {} {}",
                     ptr!(*error),
                     set!(first),
                     set!(follow),
+                    addr!(regex),
                     pos!(range)
                 );
                 let mut count = 0;
@@ -172,10 +174,11 @@ impl DebugPrinter {
             }
             RegexKind::Or { ops, error } => {
                 eprintln!(
-                    "or: {} {} {} {}",
+                    "or: {} {} {} {} {}",
                     ptr!(*error),
                     set!(first),
                     set!(follow),
+                    addr!(regex),
                     pos!(range)
                 );
                 let mut count = 0;
@@ -185,66 +188,106 @@ impl DebugPrinter {
                 }
             }
             RegexKind::Star { op } => {
-                eprintln!("star: {} {} {}", set!(first), set!(follow), pos!(range));
+                eprintln!(
+                    "star: {} {} {} {}",
+                    set!(first),
+                    set!(follow),
+                    addr!(regex),
+                    pos!(range)
+                );
                 self.branch(true, op);
             }
             RegexKind::Plus { op } => {
-                eprintln!("plus: {} {} {}", set!(first), set!(follow), pos!(range));
+                eprintln!(
+                    "plus: {} {} {} {}",
+                    set!(first),
+                    set!(follow),
+                    addr!(regex),
+                    pos!(range)
+                );
                 self.branch(true, op);
             }
             RegexKind::Option { op } => {
-                eprintln!("option: {} {} {}", set!(first), set!(follow), pos!(range));
+                eprintln!(
+                    "option: {} {} {} {}",
+                    set!(first),
+                    set!(follow),
+                    addr!(regex),
+                    pos!(range)
+                );
                 self.branch(true, op);
             }
             RegexKind::Paren { op } => {
-                eprintln!("paren: {} {} {}", set!(first), set!(follow), pos!(range));
+                eprintln!(
+                    "paren: {} {} {} {}",
+                    set!(first),
+                    set!(follow),
+                    addr!(regex),
+                    pos!(range)
+                );
                 self.branch(true, op);
             }
             RegexKind::Str { val, elem } => {
                 eprintln!(
-                    "str: {} {} {} {} {}",
+                    "str: {} {} {} {} {} {}",
                     member!(val),
                     ptr!(*elem),
                     set!(first),
                     set!(follow),
+                    addr!(regex),
                     pos!(range)
                 );
             }
             RegexKind::Predicate { val, elem } => {
                 eprintln!(
-                    "predicate: {} {} {} {} {}",
+                    "predicate: {} {} {} {} {} {}",
                     member!(val),
                     ptr!(*elem),
                     set!(first),
                     set!(follow),
+                    addr!(regex),
                     pos!(range)
                 );
             }
             RegexKind::Action { val, elem } => {
                 eprintln!(
-                    "action: {} {} {} {} {}",
+                    "action: {} {} {} {} {} {}",
                     member!(val),
                     ptr!(*elem),
                     set!(first),
                     set!(follow),
+                    addr!(regex),
                     pos!(range)
                 );
             }
-            RegexKind::ErrorHandler { val, elem } => {
+            RegexKind::ErrorHandler { val, elem, .. } => {
                 eprintln!(
-                    "error: {} {} {} {} {}",
+                    "error: {} {} {} {} {} {}",
                     member!(val),
                     ptr!(*elem),
                     set!(first),
                     set!(follow),
+                    addr!(regex),
                     pos!(range)
                 );
             }
             RegexKind::Empty => {
-                eprintln!("empty: {} {} {}", set!(first), set!(follow), pos!(range));
+                eprintln!(
+                    "empty: {} {} {} {}",
+                    set!(first),
+                    set!(follow),
+                    addr!(regex),
+                    pos!(range)
+                );
             }
             RegexKind::Invalid => {
-                eprintln!("invalid: {} {} {}", set!(first), set!(follow), pos!(range));
+                eprintln!(
+                    "invalid: {} {} {} {}",
+                    set!(first),
+                    set!(follow),
+                    addr!(regex),
+                    pos!(range)
+                );
             }
         }
     }

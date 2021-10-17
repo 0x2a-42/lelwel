@@ -73,6 +73,8 @@ pub struct RegexAttr<'a> {
     first: Box<'a, RefCell<BTreeSet<Symbol>>>,
     /// Follow set of the regex (use BTreeSet so order in genereted code is fixed).
     follow: Box<'a, RefCell<BTreeSet<Symbol>>>,
+    /// Cancel set of the regex (use BTreeSet so order in genereted code is fixed).
+    cancel: Box<'a, RefCell<BTreeSet<Symbol>>>,
 }
 
 impl<'a> RegexAttr<'a> {
@@ -81,6 +83,7 @@ impl<'a> RegexAttr<'a> {
             range,
             first: Box::new_in(RefCell::new(BTreeSet::new()), arena),
             follow: Box::new_in(RefCell::new(BTreeSet::new()), arena),
+            cancel: Box::new_in(RefCell::new(BTreeSet::new()), arena),
         }
     }
 }
@@ -455,6 +458,12 @@ impl<'a> Regex<'a> {
             set.extend(self.follow().iter());
         }
         set
+    }
+    pub fn cancel(&self) -> std::cell::Ref<BTreeSet<Symbol>> {
+        self.attr.cancel.borrow()
+    }
+    pub fn cancel_mut(&self) -> std::cell::RefMut<BTreeSet<Symbol>> {
+        self.attr.cancel.borrow_mut()
     }
 }
 

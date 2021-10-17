@@ -2,18 +2,20 @@ use super::ast::*;
 use super::diag::*;
 use super::symbol::*;
 use super::token::*;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, HashSet};
+use std::iter::FromIterator;
 
 pub struct SemanticPass {}
 
-impl SemanticPass {
-    pub fn run(module: &Module, diag: &mut Diag) {
+impl<'a> SemanticPass {
+    pub fn run(module: &'a Module<'a>, diag: &mut Diag) {
         GeneralValidator::run(module, diag);
         if diag.has_errors() {
             return;
         }
         UsageValidator::run(module, diag);
         LL1Validator::run(module, diag);
+        CancelSetGenerator::new().run(module);
     }
 }
 
@@ -288,7 +290,7 @@ impl<'a, 'b> GeneralValidator {
                     diag.error(Code::ExpectedPredicate(num.1), regex.range());
                 }
             }
-            RegexKind::ErrorHandler { val, elem } => {
+            RegexKind::ErrorHandler { val, elem, .. } => {
                 match bindings.get(&Binding::ErrorHandler(name, *val)) {
                     Some(e) => elem.set(e),
                     None => diag.warning(Code::UndefinedErrorHandler, regex.range()),
@@ -332,10 +334,7 @@ impl<'a> LL1Validator {
             change = false;
             for element in module.elements.iter() {
                 match element.kind {
-                    ElementKind::Start { regex, .. } => {
-                        Self::calc_first_regex(regex, &mut change);
-                    }
-                    ElementKind::Rule { regex, .. } => {
+                    ElementKind::Start { regex, .. } | ElementKind::Rule { regex, .. } => {
                         Self::calc_first_regex(regex, &mut change);
                     }
                     _ => {}
@@ -630,6 +629,146 @@ impl UsageValidator {
                     *change |= !elem.attr.used.get();
                     elem.attr.used.set(true);
                 }
+            }
+            _ => {}
+        }
+    }
+}
+
+impl<'a> std::hash::Hash for Regex<'a> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        (self as *const Self).hash(state)
+    }
+}
+
+impl<'a> PartialEq<Regex<'a>> for Regex<'a> {
+    fn eq(&self, other: &Regex<'a>) -> bool {
+        self as *const Self == other as *const Self
+    }
+}
+
+impl<'a> Eq for Regex<'a> {}
+
+#[derive(Default)]
+struct CancelSetGenerator<'a> {
+    dom: HashMap<&'a Regex<'a>, HashSet<&'a Regex<'a>>>,
+    pred: HashMap<&'a Regex<'a>, HashSet<&'a Regex<'a>>>,
+}
+
+impl<'a> CancelSetGenerator<'a> {
+    fn new() -> Self {
+        Self::default()
+    }
+    fn run(&mut self, module: &'a Module<'a>) {
+        let mut start = None;
+        for element in module.elements.iter() {
+            match &element.kind {
+                ElementKind::Start { regex, .. } => {
+                    start = Some(*regex);
+                    self.set_regex_pred(regex);
+                }
+                ElementKind::Rule { regex, .. } => {
+                    if element.attr.used.get() {
+                        self.set_regex_pred(regex);
+                    }
+                }
+                _ => {}
+            };
+        }
+        // there must be a start rule at this point of the semantic pass
+        let start = start.unwrap();
+
+        let nodes_no_start: HashSet<_> = self.pred.keys().map(|k| *k).collect();
+        let mut nodes = nodes_no_start.clone();
+        nodes.insert(start);
+
+        // start node dominates itself
+        self.dom
+            .insert(start, HashSet::from_iter([start]));
+        // other nodes are initialized with all nodes as dominators
+        for regex in nodes_no_start.iter() {
+            self.dom.insert(*regex, nodes.clone());
+        }
+        // iteratively eliminate nodes that are not dominators
+        let mut change = true;
+        while change {
+            change = false;
+            for regex in nodes_no_start.iter() {
+                let mut pred = self.pred[regex].iter();
+                if let Some(p) = pred.next() {
+                    let mut dom = self.dom[p].clone();
+                    for p in pred {
+                        dom = dom.intersection(&self.dom[p]).map(|r| *r).collect();
+                    }
+                    dom.insert(*regex);
+                    change |= dom.len() != self.dom[regex].len();
+                    if change {
+                        self.dom.insert(*regex, dom);
+                    }
+                } else {
+                    self.dom.insert(*regex, HashSet::from_iter([*regex]));
+                }
+            }
+        }
+        // extract the error handler of the regex if there is one
+        let get_error_handler = |regex: &'a Regex<'a>| -> Option<&'a Regex<'a>> {
+            match &regex.kind {
+                RegexKind::Concat { error, .. } | RegexKind::Or { error, .. }
+                    if error.get().is_some() =>
+                {
+                    error.get()
+                }
+                _ => None,
+            }
+        };
+        // calculate cancel set for error handlers
+        for regex in nodes_no_start.iter() {
+            if let Some(error) = get_error_handler(regex) {
+                let mut cancel = error.cancel_mut();
+                for dom in self.dom[regex].iter() {
+                    if get_error_handler(dom).is_none() && *dom != start {
+                        continue;
+                    }
+                    cancel.extend(dom.follow().iter());
+                }
+                for sym in regex.follow().iter() {
+                    cancel.remove(sym);
+                }
+            }
+        }
+    }
+
+    fn add_pred(&mut self, r: &'a Regex<'a>, p: &'a Regex<'a>) {
+        if let Some(pred) = self.pred.get_mut(&r) {
+            pred.insert(p);
+        } else {
+            self.pred.insert(r, HashSet::from_iter([p]));
+        }
+    }
+
+    fn set_regex_pred(&mut self, regex: &'a Regex<'a>) {
+        match &regex.kind {
+            RegexKind::Id { elem, .. } => {
+                if let Some(Element {
+                    kind: ElementKind::Rule { regex: op, .. },
+                    ..
+                }) = elem.get()
+                {
+                    self.add_pred(op, regex);
+                }
+            }
+            RegexKind::Concat { ops, .. } | RegexKind::Or { ops, .. } => {
+                for op in ops {
+                    self.add_pred(op, regex);
+                    self.set_regex_pred(op);
+                }
+            }
+            RegexKind::Star { op }
+            | RegexKind::Plus { op }
+            | RegexKind::Option { op }
+            | RegexKind::Paren { op } => {
+                self.add_pred(op, regex);
+                self.set_regex_pred(op);
             }
             _ => {}
         }

@@ -454,13 +454,13 @@ impl RustOutput {
                 .indent(level - 1)
                 .as_bytes(),
         )?;
-        if !error.follow().contains(&Symbol::EOF) {
+        if !error.cancel().is_empty() {
             output.write_all(
                 format!(
-                    "            pattern_EOF!() => {{\
-                   \n                return err![{}]\
+                    "            {} => {{\
+                   \n                return Err(error_code)\
                    \n            }}\n",
-                    error.follow().error(7)
+                    error.cancel().pattern(3),
                 )
                 .indent(level - 1)
                 .as_bytes(),
@@ -539,7 +539,7 @@ impl RustOutput {
                                \n        Ok(())\
                                \n    }}\
                                \n    _ => {{\
-                               \n        err![{}]\
+                               \n        return err![{}]\
                                \n    }}\
                                \n}}\n",
                                 op.follow().pattern(1),

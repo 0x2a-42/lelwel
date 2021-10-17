@@ -122,6 +122,17 @@ impl<'a> Server<'a> {
                         regex.range(),
                     ))
                 }
+                Regex {
+                    kind: RegexKind::ErrorHandler { .. },
+                    ..
+                } => Some((
+                    format!(
+                        "**Follow:** {:?}  \n**Cancel:** {:?}\n",
+                        regex.follow(),
+                        regex.cancel()
+                    ),
+                    regex.range(),
+                )),
                 _ => Some((
                     format!(
                         "**First:** {:?}  \n**Follow:** {:?}\n",
