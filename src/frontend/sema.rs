@@ -643,7 +643,7 @@ impl<'a> std::hash::Hash for Regex<'a> {
 
 impl<'a> PartialEq<Regex<'a>> for Regex<'a> {
     fn eq(&self, other: &Regex<'a>) -> bool {
-        self as *const Self == other as *const Self
+        std::ptr::eq(self, other)
     }
 }
 
@@ -655,6 +655,7 @@ struct CancelSetGenerator<'a> {
     pred: HashMap<&'a Regex<'a>, HashSet<&'a Regex<'a>>>,
 }
 
+#[allow(clippy::mutable_key_type)]
 impl<'a> CancelSetGenerator<'a> {
     fn new() -> Self {
         Self::default()
@@ -678,13 +679,12 @@ impl<'a> CancelSetGenerator<'a> {
         // there must be a start rule at this point of the semantic pass
         let start = start.unwrap();
 
-        let nodes_no_start: HashSet<_> = self.pred.keys().map(|k| *k).collect();
+        let nodes_no_start: HashSet<_> = self.pred.keys().copied().collect();
         let mut nodes = nodes_no_start.clone();
         nodes.insert(start);
 
         // start node dominates itself
-        self.dom
-            .insert(start, HashSet::from_iter([start]));
+        self.dom.insert(start, HashSet::from_iter([start]));
         // other nodes are initialized with all nodes as dominators
         for regex in nodes_no_start.iter() {
             self.dom.insert(*regex, nodes.clone());
@@ -698,7 +698,7 @@ impl<'a> CancelSetGenerator<'a> {
                 if let Some(p) = pred.next() {
                     let mut dom = self.dom[p].clone();
                     for p in pred {
-                        dom = dom.intersection(&self.dom[p]).map(|r| *r).collect();
+                        dom = dom.intersection(&self.dom[p]).copied().collect();
                     }
                     dom.insert(*regex);
                     change |= dom.len() != self.dom[regex].len();
