@@ -150,7 +150,7 @@ impl RustOutput {
                 \n        match self.consume() {\
                 \n            // TODO\
                 \n            None => self.emit(TokenKind::EOF),\
-                \n            _ => self.emit_invalid()\
+                \n            _ => self.emit_invalid(\"invalid token\")\
                 \n        }\
                 \n    }\
                 \n}",
