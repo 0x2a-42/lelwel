@@ -2,13 +2,10 @@
 
 use atty::Stream;
 use clap::{crate_name, crate_version, App, ArgMatches};
-use lelwel::backend::graphviz::*;
-use lelwel::backend::rust::*;
-use lelwel::frontend::ast::*;
-use lelwel::frontend::diag::*;
-use lelwel::frontend::lexer::*;
-use lelwel::frontend::printer::*;
-use lelwel::frontend::sema::*;
+use lelwel::{
+    backend::{graphviz::*, rust::*},
+    frontend::{ast::*, diag::*, lexer::*, printer::*, sema::*},
+};
 
 fn output_rust(matches: &ArgMatches, root: &Module, path: &std::path::Path) -> std::io::Result<()> {
     RustOutput::create_parser(root, path, crate_version!())?;
