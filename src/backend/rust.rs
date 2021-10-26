@@ -150,7 +150,10 @@ impl RustOutput {
                 \n        match self.consume() {\
                 \n            // TODO\
                 \n            None => self.emit(TokenKind::EOF),\
-                \n            _ => self.emit_invalid(\"invalid token\")\
+                \n            _ => {
+                \n                self.error(\"invalid token\");\
+                \n                self.ignore()\
+                \n            }\
                 \n        }\
                 \n    }\
                 \n}",
@@ -791,8 +794,7 @@ impl RustOutput {
         output.write_all(
             b"#[derive(PartialEq, Clone, Debug)]\n\
               pub enum TokenKind {\
-            \n    EOF,\
-            \n    Invalid(&'static str),\n",
+            \n    EOF,\n",
         )?;
         for element in module.elements.iter() {
             if let ElementKind::Token { name, ty, .. } = element.kind {
@@ -967,8 +969,7 @@ impl RustOutput {
               impl fmt::Display for TokenKind {\
             \n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\
             \n        match self {\
-            \n            pattern_EOF!() => write!(f, \"end of file\"),\
-            \n            Self::Invalid(msg) => write!(f, \"{}\", msg),\n",
+            \n            pattern_EOF!() => write!(f, \"end of file\"),\n",
         )?;
         for element in module.elements.iter() {
             if let ElementKind::Token { name, sym, .. } = element.kind {

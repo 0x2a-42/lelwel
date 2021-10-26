@@ -7,7 +7,6 @@ use lelwel::backend::rust::*;
 use lelwel::frontend::ast::*;
 use lelwel::frontend::diag::*;
 use lelwel::frontend::lexer::*;
-use lelwel::frontend::parser::*;
 use lelwel::frontend::printer::*;
 use lelwel::frontend::sema::*;
 
@@ -77,10 +76,8 @@ fn translate(matches: ArgMatches) -> std::io::Result<()> {
             }
         }
 
-        for tok in lexer.invalid_iter() {
-            if let TokenKind::Invalid(msg) = tok.kind {
-                diag.error(Code::ParserError(msg), tok.range);
-            }
+        for (range, msg) in lexer.error_iter() {
+            diag.error(Code::ParserError(msg), *range);
         }
 
         diag.print(atty::is(Stream::Stderr));

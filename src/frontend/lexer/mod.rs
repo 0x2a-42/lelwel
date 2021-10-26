@@ -16,7 +16,6 @@ pub enum Transition {
 enum EmitMode {
     Parser,
     Trivia,
-    Invalid,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -64,10 +63,12 @@ pub struct Lexer {
     current: Token,
     /// Buffer used for peeking
     lookahead: std::collections::VecDeque<Token>,
-    /// Buffer of all scanned tokens (except invalid ones).
+    /// Buffer of all scanned tokens
     buffer: Vec<Token>,
-    /// Buffer of all invalid tokens.
-    invalid: Vec<Token>,
+    /// Error messages emitted by the lexer
+    errors: Vec<(Range, &'static str)>,
+    /// Warning messages emitted by the lexer
+    warnings: Vec<(Range, &'static str)>,
     /// The current trivia token.
     trivia: Option<Token>,
 }
@@ -83,10 +84,28 @@ impl Lexer {
         }
     }
 
-    /// Gets an iterator of invalid tokens.
+    /// Gets an iterator of the lexer errors
     #[allow(dead_code)]
-    pub fn invalid_iter(&self) -> std::slice::Iter<'_, Token> {
-        self.invalid.iter()
+    pub fn error_iter(&self) -> std::slice::Iter<'_, (Range, &'static str)> {
+        self.errors.iter()
+    }
+
+    /// Gets an iterator of the lexer warnings
+    #[allow(dead_code)]
+    pub fn warning_iter(&self) -> std::slice::Iter<'_, (Range, &'static str)> {
+        self.warnings.iter()
+    }
+
+    /// Emits error
+    #[allow(dead_code)]
+    fn error(&mut self, msg: &'static str) {
+        self.errors.push((self.current_range(), msg));
+    }
+
+    /// Emits warning
+    #[allow(dead_code)]
+    fn warning(&mut self, msg: &'static str) {
+        self.warnings.push((self.current_range(), msg));
     }
 
     /// Gets an iterator of buffered tokens.
@@ -249,14 +268,18 @@ impl Lexer {
         }
     }
 
-    /// Finishes lexing and emits a token for the parser in the specified channel.
-    #[allow(dead_code)]
-    fn emit_with_mode(&mut self, kind: TokenKind, mode: EmitMode) -> Transition {
+    fn current_range(&self) -> Range {
         let end = Position::new(
             self.state.line,
             self.state.cursor.character - self.state.start.character_line,
         );
-        let token = Token::new(kind, Range::new(self.state.start.pos, end));
+        Range::new(self.state.start.pos, end)
+    }
+
+    /// Finishes lexing and emits a token for the parser in the specified channel.
+    #[allow(dead_code)]
+    fn emit_with_mode(&mut self, kind: TokenKind, mode: EmitMode) -> Transition {
+        let token = Token::new(kind, self.current_range());
         self.state.start.byte = self.state.cursor.byte;
         self.state.start.character = self.state.cursor.character;
         self.state.start.pos = Position::new(
@@ -273,10 +296,6 @@ impl Lexer {
                 self.trivia = Some(token);
                 Transition::Next(Self::state_start)
             }
-            EmitMode::Invalid => {
-                self.invalid.push(token);
-                Transition::Next(Self::state_start)
-            }
         }
     }
 
@@ -286,23 +305,10 @@ impl Lexer {
         self.emit_with_mode(kind, EmitMode::Parser)
     }
 
-    /// Finishes lexing and continue in start state.
+    /// Finishes lexing and continues in start state.
     #[allow(dead_code)]
     fn emit_trivia(&mut self, kind: TokenKind) -> Transition {
         self.emit_with_mode(kind, EmitMode::Trivia)
-    }
-
-    /// Finishes lexing, logs invalid token, and continue in start state.
-    #[allow(dead_code)]
-    fn emit_invalid(&mut self, msg: &'static str) -> Transition {
-        self.emit_with_mode(TokenKind::Invalid(msg), EmitMode::Invalid)
-    }
-
-    /// Continue lexing at the start state.
-    #[allow(dead_code)]
-    fn emit_continue(&mut self) -> Transition {
-        self.ignore();
-        Transition::Next(Self::state_start)
     }
 
     /// Advances to next line.

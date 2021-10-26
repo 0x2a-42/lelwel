@@ -33,8 +33,8 @@ fn gen_diag(input: &str) -> std::io::Result<Diag> {
     if let Some(root) = ast.root() {
         SemanticPass::run(root, &mut diag);
     }
-    for tok in lexer.invalid_iter() {
-        diag.error(Code::ParserError("invalid token"), tok.range);
+    for (range, msg) in lexer.error_iter() {
+        diag.error(Code::ParserError(msg), *range);
     }
     Ok(diag)
 }

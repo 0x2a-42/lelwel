@@ -14,7 +14,6 @@ use bumpalo::{Bump, collections::Vec as BVec};
 #[derive(PartialEq, Clone, Debug)]
 pub enum TokenKind {
     EOF,
-    Invalid(&'static str),
     Token,
     Language,
     Error,
@@ -377,7 +376,6 @@ impl fmt::Display for TokenKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             pattern_EOF!() => write!(f, "end of file"),
-            Self::Invalid(msg) => write!(f, "{}", msg),
             pattern_Token!() => write!(f, "{}", r###"token"###),
             pattern_Language!() => write!(f, "{}", r###"language"###),
             pattern_Error!() => write!(f, "{}", r###"error"###),

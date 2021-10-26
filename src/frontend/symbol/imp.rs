@@ -31,7 +31,6 @@ predefine! {
     [LANGUGAE,   "language"],
     [PARAMETERS, "parameters"],
     [EOF,        "EOF"],
-    [INVALID,    "Invalid"],
     [RUST,       "rust"],
     [LIMIT,      "limit"],
 }

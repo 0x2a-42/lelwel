@@ -31,10 +31,8 @@ fn main() {
     if let Ok(contents) = std::fs::read_to_string(&args[1]) {
         let mut lexer = Lexer::new(contents, false);
         let root = Parser::parse(&mut lexer, &mut diag);
-        for tok in lexer.invalid_iter() {
-            if let TokenKind::Invalid(msg) = tok.kind {
-                diag.error(Code::ParserError(msg), tok.range);
-            }
+        for (range, msg) in lexer.error_iter() {
+            diag.error(Code::ParserError(msg), *range);
         }
         match root {
             Err(e) => diag.error(e, lexer.current().range),

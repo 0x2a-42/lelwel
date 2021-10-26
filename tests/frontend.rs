@@ -28,8 +28,8 @@ fn gen_diag(input: &str) -> std::io::Result<Diag> {
     if let Some(root) = ast.root() {
         SemanticPass::run(root, &mut diag);
     }
-    for tok in lexer.invalid_iter() {
-        diag.error(Code::ParserError("invalid token"), tok.range);
+    for (range, msg) in lexer.error_iter() {
+        diag.error(Code::ParserError(msg), *range);
     }
     Ok(diag)
 }
@@ -230,8 +230,6 @@ fn predef_token() {
     let mut warnings = diag.warning_iter();
 
     check_next!(errors, "tests/frontend/predef_token.llw:1:7-1:10: cannot use predefined token name");
-    check_next!(errors, "tests/frontend/predef_token.llw:1:11-1:18: cannot use predefined token name");
-    check_next!(errors, "tests/frontend/predef_token.llw:4:3-4:10: undefined element 'Invalid'");
     check_next!(errors, "tests/frontend/predef_token.llw:4:11-4:14: undefined element 'EOF'");
     check_empty!(errors);
 

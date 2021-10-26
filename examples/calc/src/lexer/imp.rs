@@ -13,7 +13,10 @@ impl Lexer {
             Some('(') => self.emit(TokenKind::LPar),
             Some(')') => self.emit(TokenKind::RPar),
             None => self.emit(TokenKind::EOF),
-            _ => self.emit_invalid("invalid token"),
+            _ => {
+                self.error("invalid token");
+                self.ignore()
+            }
         }
     }
     fn state_ws(&mut self) -> Transition {
@@ -28,7 +31,8 @@ impl Lexer {
         if let Ok(value) = f64::from_str(self.get(0, 0)) {
             self.emit(TokenKind::Num(value))
         } else {
-            self.emit_invalid("invalid number")
+            self.error("invalid number");
+            self.ignore()
         }
     }
 }

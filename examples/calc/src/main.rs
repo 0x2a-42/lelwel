@@ -17,8 +17,8 @@ fn main() {
     let mut lexer = Lexer::new(args[1].clone(), false);
     match Parser::parse(&mut lexer) {
         Ok(result) => {
-            for tok in lexer.invalid_iter() {
-                eprintln!("{} at {}", tok.kind, tok.range);
+            for (range, msg) in lexer.error_iter() {
+                eprintln!("{} at {}", msg, range);
             }
             println!("{}", result)
         }

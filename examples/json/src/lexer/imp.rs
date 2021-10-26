@@ -42,7 +42,8 @@ impl Lexer {
             None => self.emit(TokenKind::EOF),
             _ => {
                 self.accept_star(|c| c.is_json_delimiter());
-                self.emit_invalid("invalid token")
+                self.error("invalid token");
+                self.ignore()
             }
         }
     }
@@ -69,20 +70,27 @@ impl Lexer {
             "true" => self.emit(TokenKind::True),
             "false" => self.emit(TokenKind::False),
             "null" => self.emit(TokenKind::Null),
-            _ => self.emit_invalid("invalid token"),
+            _ => {
+                self.error("invalid token");
+                self.ignore()
+            }
         }
     }
     fn state_string(&mut self) -> Transition {
         let mut is_valid = true;
         loop {
             match self.consume() {
-                None => break self.emit_invalid("unclosed string"),
+                None => {
+                    self.error("unclosed string");
+                    break self.ignore();
+                }
                 Some('"') => {
                     let val = self.get(1, 1).to_string();
                     break if is_valid {
                         self.emit(TokenKind::String(val))
                     } else {
-                        self.emit_invalid("invalid string")
+                        self.error("invalid string");
+                        self.ignore()
                     };
                 }
                 Some('\\') => match self.consume() {
@@ -103,7 +111,8 @@ impl Lexer {
         let mut is_valid = true;
         if has_sign {
             if !self.accept(|c| c.is_ascii_digit()) {
-                return self.emit_invalid("invalid number");
+                self.error("invalid number");
+                return self.ignore();
             }
         } else {
             self.accept_char('-');
@@ -133,7 +142,8 @@ impl Lexer {
             let val = self.get(0, 0).to_string();
             self.emit(TokenKind::Number(val))
         } else {
-            self.emit_invalid("invalid number")
+            self.error("invalid number");
+            self.ignore()
         }
     }
 }

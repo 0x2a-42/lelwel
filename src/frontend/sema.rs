@@ -109,7 +109,7 @@ impl<'a, 'b> GeneralValidator {
                     Self::bind(Binding::Term(name), element, &mut bindings, diag);
                 }
                 ElementKind::Token { name, sym, .. } => {
-                    if name == Symbol::EOF || name == Symbol::INVALID {
+                    if name == Symbol::EOF {
                         diag.error(Code::PredefToken, element.range());
                         continue;
                     }

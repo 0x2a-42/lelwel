@@ -24,7 +24,10 @@ impl Lexer {
             Some(':') => self.emit(TokenKind::Colon),
             Some(';') => self.emit(TokenKind::Semi),
             None => self.emit(TokenKind::EOF),
-            _ => self.emit_invalid("invalid token"),
+            _ => {
+                self.error("invalid token");
+                self.ignore()
+            }
         }
     }
     fn state_ws(&mut self, c: char) -> Transition {
@@ -63,7 +66,8 @@ impl Lexer {
         if let Ok(val) = self.get(0, 0).parse() {
             self.emit(TokenKind::Int(val))
         } else {
-            self.emit_invalid("invalid integer")
+            self.error("invalid integer");
+            self.ignore()
         }
     }
     fn state_str(&mut self) -> Transition {
@@ -80,17 +84,20 @@ impl Lexer {
                         let sym = self.get(1, 1).replace("\\", "").into_symbol();
                         return self.emit(TokenKind::Str(sym));
                     } else {
-                        return self.emit_invalid("invalid string literal");
+                        self.error("invalid string literal");
+                        return self.ignore();
                     }
                 }
                 '\n' => {
                     self.backup();
-                    return self.emit_invalid("invalid string literal");
+                    self.error("invalid string literal");
+                    return self.ignore();
                 }
                 _ => (),
             }
         }
-        self.emit_invalid("invalid string literal")
+        self.error("invalid string literal");
+        self.ignore()
     }
     fn state_code(&mut self) -> Transition {
         let mut i = 1;
@@ -108,7 +115,10 @@ impl Lexer {
                 Some('\n') => {
                     self.line();
                 }
-                None => return self.emit_invalid("unclosed code segment"),
+                None => {
+                    self.error("unclosed code segment");
+                    return self.ignore();
+                }
                 _ => (),
             }
         }
@@ -120,10 +130,12 @@ impl Lexer {
             if let Ok(val) = self.get(1, 0).parse() {
                 self.emit(TokenKind::Predicate(val))
             } else {
-                self.emit_invalid("invalid predicate")
+                self.error("invalid predicate");
+                self.ignore()
             }
         } else {
-            self.emit_invalid("invalid predicate")
+            self.error("invalid predicate");
+            self.ignore()
         }
     }
     fn state_sema(&mut self) -> Transition {
@@ -131,10 +143,12 @@ impl Lexer {
             if let Ok(val) = self.get(1, 0).parse() {
                 self.emit(TokenKind::Action(val))
             } else {
-                self.emit_invalid("invalid action")
+                self.error("invalid action");
+                self.ignore()
             }
         } else {
-            self.emit_invalid("invalid action")
+            self.error("invalid action");
+            self.ignore()
         }
     }
     fn state_error(&mut self) -> Transition {
@@ -142,10 +156,12 @@ impl Lexer {
             if let Ok(val) = self.get(1, 0).parse() {
                 self.emit(TokenKind::ErrorHandler(val))
             } else {
-                self.emit_invalid("invalid error handler")
+                self.error("invalid error handler");
+                self.ignore()
             }
         } else {
-            self.emit_invalid("invalid error handler")
+            self.error("invalid error handler");
+            self.ignore()
         }
     }
     fn state_slash(&mut self) -> Transition {
@@ -154,7 +170,8 @@ impl Lexer {
             Some('*') => self.state_c_comment(),
             _ => {
                 self.backup();
-                self.emit_invalid("invalid token")
+                self.error("invalid token");
+                self.ignore()
             }
         }
     }
@@ -187,7 +204,10 @@ impl Lexer {
                 Some('/') if star => break,
                 Some('\n') => self.line(),
                 Some(_) => (),
-                None => return self.emit_invalid("unclosed block comment"),
+                None => {
+                    self.error("unclosed block comment");
+                    return self.ignore();
+                }
             }
         }
         self.trivia = None;
