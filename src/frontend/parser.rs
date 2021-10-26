@@ -761,8 +761,8 @@ impl<'a> Parser {
                                 match input.current().kind {
                                     pattern_Semi!() => {
                                         // error handler 1
-                                      rule_regex = Some(Regex::new_invalid(arena, range));
-                                      diag.error(error_code, error_range);
+                                        rule_regex = Some(Regex::new_invalid(arena, range));
+                                        diag.error(error_code, error_range);
                                         return Ok(())
                                     }
                                     pattern_EOF!()

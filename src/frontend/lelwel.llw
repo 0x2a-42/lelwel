@@ -198,8 +198,8 @@ rule_or_action#10 {
     }
 }
 rule_or_action!1 {
-  rule_regex = Some(Regex::new_invalid(arena, range));
-  diag.error(error_code, error_range);
+    rule_regex = Some(Regex::new_invalid(arena, range));
+    diag.error(error_code, error_range);
 }
 
 /// Create vector for operands
