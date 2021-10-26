@@ -183,6 +183,12 @@ impl GraphvizOutput {
                     format!("  \"{:p}\" -> \"{}\";\n", regex, Self::skip_id(op)).as_bytes(),
                 )
             }
+            RegexKind::Action { val, .. } => output.write_all(
+                format!("  \"{:p}\" [shape=box, label=\"#{}\"];\n", regex, val,).as_bytes(),
+            ),
+            RegexKind::Predicate { val, .. } => output.write_all(
+                format!("  \"{:p}\" [shape=box, label=\"?{}\"];\n", regex, val,).as_bytes(),
+            ),
             _ => Ok(()),
         }
     }
