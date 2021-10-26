@@ -39,7 +39,7 @@ fn translate(matches: ArgMatches) -> std::io::Result<()> {
             )?;
         }
         let contents = std::fs::read_to_string(path)?;
-        let mut diag = Diag::new(&input, 100);
+        let mut diag = Diag::new(input, 100);
         let mut lexer = Lexer::new(contents, false);
         let ast = Ast::new(&mut lexer, &mut diag);
 
@@ -62,13 +62,13 @@ fn translate(matches: ArgMatches) -> std::io::Result<()> {
 
                     match root.language.get() {
                         None => {
-                            output_rust(&matches, root, &path)?;
+                            output_rust(&matches, root, path)?;
                         }
                         Some(Element {
                             kind: ElementKind::Language { name },
                             ..
                         }) if name.as_str() == "rust" => {
-                            output_rust(&matches, root, &path)?;
+                            output_rust(&matches, root, path)?;
                         }
                         _ => {}
                     }
@@ -107,11 +107,8 @@ fn main() {
         .after_help("Report bugs to <https://github.com/0x2a-42/lelwel>.")
         .get_matches();
 
-    match translate(matches) {
-        Err(e) => {
-            Diag::fatal_error(&format!("{}", e), atty::is(Stream::Stderr));
-            std::process::exit(1);
-        }
-        _ => {}
+    if let Err(e) = translate(matches) {
+        Diag::fatal_error(&format!("{}", e), atty::is(Stream::Stderr));
+        std::process::exit(1);
     }
 }

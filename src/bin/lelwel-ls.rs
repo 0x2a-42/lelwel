@@ -200,7 +200,7 @@ fn generate_diagnostics(url: Url, diag: diag::Diag) -> Notification {
         let related = e
             .related()
             .iter()
-            .map(|(r, m)| to_lsp_related(r, &url, &m))
+            .map(|(r, m)| to_lsp_related(r, &url, m))
             .collect::<Vec<_>>();
         for r in related.iter() {
             diagnostics.push(Diagnostic::new(
