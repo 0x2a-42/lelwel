@@ -36,8 +36,8 @@ impl std::fmt::Display for Binding {
         match self {
             Self::Term(name) => write!(f, "element '{}'", name),
             Self::Token(name) => write!(f, "token string '{}'", name),
-            Self::Action(name, num) => write!(f, "semantic action '{}#{}'", name, num),
-            Self::Predicate(name, num) => write!(f, "semantic predicate '{}?{}'", name, num),
+            Self::Action(name, num) => write!(f, "action '{}#{}'", name, num),
+            Self::Predicate(name, num) => write!(f, "predicate '{}?{}'", name, num),
             Self::ErrorHandler(name, num) => write!(f, "error handler '{}!{}'", name, num),
         }
     }
