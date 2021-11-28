@@ -83,7 +83,7 @@ impl RustOutput {
         Self::output_parser(module, &mut file)
     }
 
-    pub fn create_parser_skel(path: &Path, with_ast: bool, with_diag: bool) -> std::io::Result<()> {
+    pub fn create_llw_skel(path: &Path, with_ast: bool, with_diag: bool) -> std::io::Result<()> {
         let mut file = File::create(path)?;
         file.write_all(
             b"start:\

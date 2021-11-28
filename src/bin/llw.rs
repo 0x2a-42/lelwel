@@ -3,49 +3,21 @@
 use atty::Stream;
 use clap::{crate_name, crate_version, App, ArgMatches};
 use lelwel::{
-    backend::{graphviz::*, rust::*},
-    frontend::{ast::*, diag::*, lexer::*, printer::*, sema::*},
+    backend::graphviz::*,
+    frontend::{diag::*, printer::*},
 };
-
-fn output_rust(matches: &ArgMatches, root: &Module, path: &std::path::Path) -> std::io::Result<()> {
-    RustOutput::create_parser(root, path, crate_version!())?;
-    RustOutput::create_token(path)?;
-    if matches.is_present("lexer") {
-        RustOutput::create_lexer(path)?;
-    }
-    if matches.is_present("symbol") {
-        RustOutput::create_symbol(path)?;
-    }
-    if matches.is_present("diag") || matches.is_present("ast") {
-        RustOutput::create_diag(path)?;
-    }
-    if matches.is_present("ast") {
-        RustOutput::create_ast(path)?;
-    }
-    Ok(())
-}
 
 fn translate(matches: ArgMatches) -> std::io::Result<()> {
     if let Some(input) = matches.value_of("INPUT") {
-        let path = std::path::Path::new(input);
-        if !path.exists() {
-            RustOutput::create_parser_skel(
-                path,
-                matches.is_present("ast"),
-                matches.is_present("diag"),
-            )?;
-        }
-        let contents = std::fs::read_to_string(path)?;
-        let mut diag = Diag::new(input, 100);
-        let mut lexer = Lexer::new(contents, false);
-        let ast = Ast::new(&mut lexer, &mut diag);
-
-        for (range, msg) in lexer.error_iter() {
-            diag.error(Code::ParserError(msg), *range);
-        }
+        let with_lexer = matches.is_present("lexer");
+        let with_symbol = matches.is_present("symbol");
+        let with_diag = matches.is_present("diag");
+        let with_ast = matches.is_present("ast");
+        let output = matches.value_of("output").unwrap_or(".");
+        lelwel::output_llw_skel(with_diag, with_ast, input)?;
+        let (ast, diag) = lelwel::llw_to_ast(input)?;
 
         if let Some(root) = ast.root() {
-            SemanticPass::run(root, &mut diag);
             match matches.occurrences_of("v") {
                 0 => {}
                 _ => {
@@ -57,24 +29,11 @@ fn translate(matches: ArgMatches) -> std::io::Result<()> {
                 if matches.is_present("graph") {
                     GraphvizOutput::visit(root)?;
                 }
-                if !matches.is_present("check") {
-                    let output = matches.value_of("output").unwrap_or(".");
-                    let path = std::path::Path::new(output);
-
-                    match root.language.get() {
-                        None => {
-                            output_rust(&matches, root, path)?;
-                        }
-                        Some(Element {
-                            kind: ElementKind::Language { name },
-                            ..
-                        }) if name.as_str() == "rust" => {
-                            output_rust(&matches, root, path)?;
-                        }
-                        _ => {}
-                    }
-                }
             }
+        }
+
+        if !matches.is_present("check") {
+            lelwel::ast_to_code(with_lexer, with_symbol, with_diag, with_ast, &ast, &diag, output, crate_version!())?;
         }
 
         diag.print(atty::is(Stream::Stderr));
