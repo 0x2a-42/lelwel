@@ -25,14 +25,15 @@ impl<'a> Server<'a> {
         let mut diag = Diag::new(filename, 1000);
         let ast = Ast::new(&mut lexer, &mut diag);
 
+        for (range, msg) in lexer.error_iter() {
+            diag.error(Code::ParserError(msg), *range);
+        }
+
         if let Some(root) = ast.root() {
             SemanticPass::run(root, &mut diag);
             self.asts.insert(filename.to_string(), ast);
         }
 
-        for (range, msg) in lexer.error_iter() {
-            diag.error(Code::ParserError(msg), *range);
-        }
         diag
     }
 

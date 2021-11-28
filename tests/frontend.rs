@@ -25,11 +25,11 @@ fn gen_diag(input: &str) -> std::io::Result<Diag> {
     let mut diag = Diag::new(&input, 100);
     let mut lexer = Lexer::new(contents, false);
     let ast = Ast::new(&mut lexer, &mut diag);
-    if let Some(root) = ast.root() {
-        SemanticPass::run(root, &mut diag);
-    }
     for (range, msg) in lexer.error_iter() {
         diag.error(Code::ParserError(msg), *range);
+    }
+    if let Some(root) = ast.root() {
+        SemanticPass::run(root, &mut diag);
     }
     Ok(diag)
 }

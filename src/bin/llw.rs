@@ -40,6 +40,10 @@ fn translate(matches: ArgMatches) -> std::io::Result<()> {
         let mut lexer = Lexer::new(contents, false);
         let ast = Ast::new(&mut lexer, &mut diag);
 
+        for (range, msg) in lexer.error_iter() {
+            diag.error(Code::ParserError(msg), *range);
+        }
+
         if let Some(root) = ast.root() {
             SemanticPass::run(root, &mut diag);
             match matches.occurrences_of("v") {
@@ -71,10 +75,6 @@ fn translate(matches: ArgMatches) -> std::io::Result<()> {
                     }
                 }
             }
-        }
-
-        for (range, msg) in lexer.error_iter() {
-            diag.error(Code::ParserError(msg), *range);
         }
 
         diag.print(atty::is(Stream::Stderr));
