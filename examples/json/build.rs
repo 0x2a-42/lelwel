@@ -1,12 +1,5 @@
-use std::process::Command;
-
 fn main() {
-    if !Command::new("llw")
-        .args(&["-l", "-d", "-o", "src", "src/json.llw"])
-        .status()
-        .unwrap()
-        .success()
-    {
+    if lelwel::generate(true, false, true, false, "src/json.llw", "src").is_err() {
         std::process::exit(1)
     }
     println!("cargo:rerun-if-changed=build.rs");
