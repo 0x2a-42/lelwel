@@ -1,7 +1,7 @@
 #![cfg(feature = "cli")]
 
 use atty::Stream;
-use clap::{crate_name, crate_version, App, ArgMatches};
+use clap::{crate_name, crate_version, arg, App, ArgMatches};
 use lelwel::{
     backend::graphviz::*,
     frontend::{diag::*, printer::*},
@@ -18,12 +18,9 @@ fn translate(matches: ArgMatches) -> std::io::Result<()> {
         let (ast, diag) = lelwel::llw_to_ast(input)?;
 
         if let Some(root) = ast.root() {
-            match matches.occurrences_of("v") {
-                0 => {}
-                _ => {
-                    let mut printer = DebugPrinter::new();
-                    printer.visit(root);
-                }
+            if matches.is_present("verbose") {
+                let mut printer = DebugPrinter::new();
+                printer.visit(root);
             }
             if !diag.has_errors() {
                 if matches.is_present("graph") {
@@ -51,15 +48,15 @@ fn main() {
         .max_term_width(80)
         .version(crate_version!())
         .about("Generates recursive descent parsers for Rust using LL(1) grammars.")
-        .arg("-c, --check         'Only check the file for errors'")
-        .arg("-l, --lexer         'Generate a lexer skeleton'")
-        .arg("-s, --symbol        'Generate a symbol handling skeleton'")
-        .arg("-d, --diag          'Generate a diagnostic handling skeleton'")
-        .arg("-a, --ast           'Generate an AST skeleton (implies -d)'")
-        .arg("-g, --graph         'Output a graphviz file for the grammar'")
-        .arg("<INPUT>             'Sets the input file to use'")
-        .arg("-v...               'Sets the level of verbosity'")
-        .arg("-o, --output=[FILE] 'Sets the output directory'")
+        .arg(arg!(-c --check         "Only check the file for errors"))
+        .arg(arg!(-l --lexer         "Generate a lexer skeleton"))
+        .arg(arg!(-s --symbol        "Generate a symbol handling skeleton"))
+        .arg(arg!(-d --diag          "Generate a diagnostic handling skeleton"))
+        .arg(arg!(-a --ast           "Generate an AST skeleton (implies -d)"))
+        .arg(arg!(-g --graph         "Output a graphviz file for the grammar"))
+        .arg(arg!(<INPUT>            "Sets the input file to use"))
+        .arg(arg!(-v --verbose       "Sets the level of verbosity"))
+        .arg(arg!(-o --output <FILE> "Sets the output directory").required(false))
         .after_help("Report bugs to <https://github.com/0x2a-42/lelwel>.")
         .get_matches();
 

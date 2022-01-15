@@ -47,7 +47,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
 
     // Run the server and wait for the two threads to end (typically by trigger LSP Exit event).
     let server_capabilities = serde_json::to_value(&ServerCapabilities {
-        text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::Full)),
+        text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
         definition_provider: Some(OneOf::Left(true)),
         references_provider: Some(OneOf::Left(true)),
         hover_provider: Some(HoverProviderCapability::Simple(true)),
@@ -205,7 +205,7 @@ fn generate_diagnostics(url: Url, diag: diag::Diag) -> Notification {
         for r in related.iter() {
             diagnostics.push(Diagnostic::new(
                 r.location.range,
-                Some(DiagnosticSeverity::Hint),
+                Some(DiagnosticSeverity::HINT),
                 None,
                 None,
                 r.message.clone(),
@@ -215,7 +215,7 @@ fn generate_diagnostics(url: Url, diag: diag::Diag) -> Notification {
         }
         diagnostics.push(Diagnostic::new(
             Range::from(e.range()),
-            Some(DiagnosticSeverity::Error),
+            Some(DiagnosticSeverity::ERROR),
             None,
             None,
             e.code().to_string(),
@@ -226,7 +226,7 @@ fn generate_diagnostics(url: Url, diag: diag::Diag) -> Notification {
     for e in diag.warning_iter() {
         diagnostics.push(Diagnostic::new(
             Range::from(e.range()),
-            Some(DiagnosticSeverity::Warning),
+            Some(DiagnosticSeverity::WARNING),
             None,
             None,
             e.code().to_string(),
