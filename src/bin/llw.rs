@@ -9,12 +9,21 @@ use lelwel::{
 
 fn translate(matches: ArgMatches) -> std::io::Result<()> {
     if let Some(input) = matches.value_of("INPUT") {
-        let with_lexer = matches.is_present("lexer");
-        let with_symbol = matches.is_present("symbol");
-        let with_diag = matches.is_present("diag");
-        let with_ast = matches.is_present("ast");
+        let mut config = lelwel::Config::new();
+        if matches.is_present("lexer") {
+            config.use_lexer();
+        }
+        if matches.is_present("symbol") {
+            config.use_symbol();
+        }
+        if matches.is_present("diag") {
+            config.use_diag();
+        }
+        if matches.is_present("ast") {
+            config.use_ast();
+        }
         let output = matches.value_of("output").unwrap_or(".");
-        lelwel::output_llw_skel(with_diag, with_ast, input)?;
+        lelwel::output_llw_skel(config, input)?;
         let (ast, diag) = lelwel::llw_to_ast(input)?;
 
         if let Some(root) = ast.root() {
@@ -30,7 +39,7 @@ fn translate(matches: ArgMatches) -> std::io::Result<()> {
         }
 
         if !matches.is_present("check") {
-            lelwel::ast_to_code(with_lexer, with_symbol, with_diag, with_ast, &ast, &diag, output, crate_version!())?;
+            lelwel::ast_to_code(config, &ast, &diag, output, crate_version!())?;
         }
 
         diag.print(atty::is(Stream::Stderr));

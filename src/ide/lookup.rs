@@ -11,7 +11,7 @@ impl<'a> LookupNode {
         match &element.kind {
             ElementKind::Start { regex, .. } | ElementKind::Rule { regex, .. } => {
                 if let Some(regex) = regex.lookup(pos) {
-                    Self::visit_regex(regex, pos).map(|regex| Node::Regex(regex))
+                    Self::visit_regex(regex, pos).map(Node::Regex)
                 } else if pos < regex.range().start {
                     Some(Node::Element(element))
                 } else {

@@ -7,6 +7,43 @@ use crate::{
     frontend::{ast::*, diag::*, lexer::*, sema::*},
 };
 
+#[derive(Clone, Copy)]
+pub struct Config(usize);
+
+impl Config {
+    pub fn new() -> Self {
+        Self(0)
+    }
+    pub fn use_lexer(&mut self) -> Self {
+        self.0 |= 1;
+        *self
+    }
+    pub fn use_symbol(&mut self) -> Self {
+        self.0 |= 2;
+        *self
+    }
+    pub fn use_diag(&mut self) -> Self {
+        self.0 |= 4;
+        *self
+    }
+    pub fn use_ast(&mut self) -> Self {
+        self.0 |= 8;
+        *self
+    }
+    fn has_lexer(&self) -> bool {
+        self.0 & 1 != 0
+    }
+    fn has_symbol(&self) -> bool {
+        self.0 & 2 != 0
+    }
+    fn has_diag(&self) -> bool {
+        self.0 & 4 != 0
+    }
+    fn has_ast(&self) -> bool {
+        self.0 & 8 != 0
+    }
+}
+
 pub fn llw_to_ast(
     path: &str,
 ) -> std::io::Result<(Ast<Lexer>, Diag)> {
@@ -25,10 +62,7 @@ pub fn llw_to_ast(
 }
 
 pub fn ast_to_code(
-    with_lexer: bool,
-    with_symbol: bool,
-    with_diag: bool,
-    with_ast: bool,
+    config: Config,
     ast: &Ast<Lexer>,
     diag: &Diag,
     output: &str,
@@ -39,13 +73,13 @@ pub fn ast_to_code(
             let path = std::path::Path::new(output);
             match root.language.get() {
                 None => {
-                    output_rust(with_lexer, with_symbol, with_diag, with_ast, root, path, version)?;
+                    output_rust(config, root, path, version)?;
                 }
                 Some(Element {
                     kind: ElementKind::Language { name },
                     ..
                 }) if name.as_str() == "rust" => {
-                    output_rust(with_lexer, with_symbol, with_diag, with_ast, root, path, version)?;
+                    output_rust(config, root, path, version)?;
                 }
                 _ => {}
             }
@@ -55,58 +89,51 @@ pub fn ast_to_code(
 }
 
 pub fn output_llw_skel(
-    with_diag: bool,
-    with_ast: bool,
+    config: Config,
     input: &str,
 ) -> std::io::Result<()> {
     let path = std::path::Path::new(input);
     if !path.exists() {
         RustOutput::create_llw_skel(
             path,
-            with_ast,
-            with_diag,
+            config.has_ast(),
+            config.has_diag(),
         )?;
     }
     Ok(())
 }
 
 pub fn output_rust(
-    with_lexer: bool,
-    with_symbol: bool,
-    with_diag: bool,
-    with_ast: bool,
+    config: Config,
     root: &Module,
     path: &std::path::Path,
     version: &str,
 ) -> std::io::Result<()> {
     RustOutput::create_parser(root, path, version)?;
     RustOutput::create_token(path)?;
-    if with_lexer {
+    if config.has_lexer() {
         RustOutput::create_lexer(path)?;
     }
-    if with_symbol {
+    if config.has_symbol() {
         RustOutput::create_symbol(path)?;
     }
-    if with_diag || with_ast {
+    if config.has_diag() || config.has_ast() {
         RustOutput::create_diag(path)?;
     }
-    if with_ast {
+    if config.has_ast() {
         RustOutput::create_ast(path)?;
     }
     Ok(())
 }
 
 pub fn generate(
-    with_lexer: bool,
-    with_symbol: bool,
-    with_diag: bool,
-    with_ast: bool,
+    config: Config,
     input: &str,
     output: &str,
 ) -> std::io::Result<()> {
-    output_llw_skel(with_diag, with_ast, input)?;
+    output_llw_skel(config, input)?;
     let (ast, diag) = llw_to_ast(input)?;
-    ast_to_code(with_lexer, with_symbol, with_diag, with_ast, &ast, &diag, output, "")?;
+    ast_to_code(config, &ast, &diag, output, "")?;
 
     if !diag.has_errors() {
         Ok(())
