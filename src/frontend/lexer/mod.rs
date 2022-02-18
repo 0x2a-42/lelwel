@@ -180,7 +180,7 @@ impl Lexer {
 
     /// Gets the current lexeme.
     #[allow(dead_code)]
-    fn get(&mut self, byte_start: usize, end: usize) -> &str {
+    fn get(&self, byte_start: usize, end: usize) -> &str {
         &self.input[self.state.start.byte + byte_start..self.state.cursor.byte - end]
     }
 
