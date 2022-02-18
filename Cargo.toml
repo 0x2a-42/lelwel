@@ -12,7 +12,7 @@ exclude = ["build.rs"]
 
 [dependencies]
 bumpalo = { version = "3.9.1", features = ["collections", "boxed"] }
-clap = { version = "3.0.7", features = ["cargo"], optional = true }
+clap = { version = "3.1.0", features = ["cargo"], optional = true }
 atty = { version = "0.2.14", optional = true }
 lsp-server = { version = "0.5.2", optional = true }
 lsp-types = { version = "0.91.1", optional = true }

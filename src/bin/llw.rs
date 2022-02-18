@@ -1,7 +1,7 @@
 #![cfg(feature = "cli")]
 
 use atty::Stream;
-use clap::{arg, crate_name, crate_version, App, ArgMatches};
+use clap::{arg, crate_name, crate_version, ArgMatches, Command};
 use lelwel::{
     backend::graphviz::*,
     frontend::{ast::*, diag::*, printer::*},
@@ -55,7 +55,7 @@ fn translate(matches: ArgMatches) -> std::io::Result<()> {
 }
 
 fn main() {
-    let matches = App::new(crate_name!())
+    let matches = Command::new(crate_name!())
         .max_term_width(80)
         .version(crate_version!())
         .about("Generates recursive descent parsers for Rust using LL(1) grammars.")
