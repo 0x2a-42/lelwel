@@ -35,6 +35,12 @@ impl<'a, R> Ast<'a, R> {
     }
 }
 
+impl<'a, R> Default for Ast<'a, R> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Reference to another node in the `Ast`.
 pub struct Ref<'a, T> {
     target: Cell<Option<&'a T>>,

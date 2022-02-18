@@ -44,14 +44,17 @@ impl Config {
     }
 }
 
+impl Default for Config {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub fn run_frontend<'a>(path: &str, contents: String, ast: &'a Ast<Module<'a>>) -> Diag {
     let mut diag = Diag::new(path, 100);
     let mut lexer = Lexer::new(contents, false);
-    match Parser::parse(&mut lexer, ast, &mut diag) {
-        Err(code) => {
-            diag.error(code, lexer.current().range);
-        }
-        _ => (),
+    if let Err(code) = Parser::parse(&mut lexer, ast, &mut diag) {
+        diag.error(code, lexer.current().range);
     }
     for (range, msg) in lexer.error_iter() {
         diag.error(Code::ParserError(msg), *range);
