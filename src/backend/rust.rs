@@ -83,43 +83,14 @@ impl RustOutput {
         Self::output_parser(module, &mut file)
     }
 
-    pub fn create_llw_skel(path: &Path, with_ast: bool, with_diag: bool) -> std::io::Result<()> {
+    pub fn create_llw_skel(path: &Path) -> std::io::Result<()> {
         let mut file = File::create(path)?;
         file.write_all(
             b"start:\
             \n  #1\
-            \n;\n",
-        )?;
-        if with_ast {
-            file.write_all(
-                b"\npreamble {\
-                \n    use super::symbol::Symbol;\
-                \n    use super::ast::*;\
-                \n    use super::diag::*;\
-                \n    use bumpalo::{Bump, collections::Vec as BVec};\
-                \n}\
-                \nparameters {\
-                \n    arena: &'a Bump, diag: &mut Diag\
-                \n}\
-                \nerror {\
-                \n    Code\
-                \n}\n",
-            )?;
-        } else if with_diag {
-            file.write_all(
-                b"\npreamble {\
-                \n    use super::diag::*;\
-                \n}\
-                \nparameters {\
-                \n    diag: &mut Diag\
-                \n}\
-                \nerror {\
-                \n    Code\
-                \n}\n",
-            )?;
-        }
-        file.write_all(
-            b"\nstart#1 {\
+            \n;\
+            \n\
+            \nstart#1 {\
             \n    Ok(())\
             \n}",
         )

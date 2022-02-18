@@ -23,7 +23,7 @@ fn translate(matches: ArgMatches) -> std::io::Result<()> {
             config.use_ast();
         }
         let output = matches.value_of("output").unwrap_or(".");
-        lelwel::output_llw_skel(config, input)?;
+        lelwel::output_llw_skel(input)?;
         let ast = Ast::new();
         let contents = std::fs::read_to_string(input)?;
         let diag = lelwel::run_frontend(input, contents, &ast);

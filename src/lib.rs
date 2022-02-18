@@ -88,10 +88,10 @@ pub fn run_backend(
     Ok(())
 }
 
-pub fn output_llw_skel(config: Config, input: &str) -> std::io::Result<()> {
+pub fn output_llw_skel(input: &str) -> std::io::Result<()> {
     let path = std::path::Path::new(input);
     if !path.exists() {
-        RustOutput::create_llw_skel(path, config.has_ast(), config.has_diag())?;
+        RustOutput::create_llw_skel(path)?;
     }
     Ok(())
 }
@@ -120,7 +120,7 @@ pub fn output_rust(
 }
 
 pub fn generate(config: Config, input: &str, output: &str) -> std::io::Result<()> {
-    output_llw_skel(config, input)?;
+    output_llw_skel(input)?;
     let ast = Ast::new();
     let contents = std::fs::read_to_string(input)?;
     let diag = run_frontend(input, contents, &ast);
