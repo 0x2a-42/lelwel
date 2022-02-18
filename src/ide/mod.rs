@@ -1,12 +1,13 @@
 mod lookup;
 
-use crate::frontend::{ast::*, diag::*, lexer::*, sema::*, symbol::*, token::*};
+use crate::frontend::{ast::*, diag::*, symbol::*, token::*};
+use crate::run_frontend;
 use lookup::*;
 use std::collections::HashMap;
 
 #[derive(Default)]
 pub struct Server<'a> {
-    asts: HashMap<String, Ast<'a, Lexer>>,
+    asts: HashMap<String, Ast<'a, Module<'a>>>,
 }
 
 impl<'a> Server<'a> {
@@ -21,18 +22,15 @@ impl<'a> Server<'a> {
             Symbol::reset();
         }
 
-        let mut lexer = Lexer::new(contents, false);
-        let mut diag = Diag::new(filename, 1000);
-        let ast = Ast::new(&mut lexer, &mut diag);
+        let ast = Ast::new();
 
-        for (range, msg) in lexer.error_iter() {
-            diag.error(Code::ParserError(msg), *range);
-        }
+        // SAFETY:
+        // This unsafe block is required because `ast` is later moved into `asts`.
+        // This is safe as the arena memory is not affected by the move. Also all
+        // objects allocated in the arena are only reachable through the ast.
+        let diag = run_frontend(filename, contents, unsafe { &*(&ast as *const _) });
 
-        if let Some(root) = ast.root() {
-            SemanticPass::run(root, &mut diag);
-            self.asts.insert(filename.to_string(), ast);
-        }
+        self.asts.insert(filename.to_string(), ast);
 
         diag
     }

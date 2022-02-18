@@ -4,7 +4,6 @@ mod imp;
 
 pub use imp::*;
 
-use super::diag::*;
 use super::parser::*;
 use super::token::*;
 use bumpalo::Bump;
@@ -13,36 +12,26 @@ use std::cell::Cell;
 /// Abstract syntax tree
 
 #[derive(Debug)]
-pub struct Ast<'a, Input: TokenStream> {
-    arena: Bump,
-    root: Option<&'a <Parser as Parsing<'a, Input>>::Output>,
+pub struct Ast<'a, R> {
+    arena: Box<Bump>,
+    root: Cell<Option<&'a R>>,
 }
 
-impl<'a, Input: TokenStream> Ast<'a, Input> {
-    /// Creates a new abstract syntax tree.
-    pub fn new(input: &mut Input, diag: &mut Diag) -> Ast<'a, Input> {
-        let mut ast = Ast {
-            arena: Bump::new(),
-            root: None,
-        };
-        // borrow arena for the lifetime of the returned Ast
-        match Parser::parse(input, Self::extend(&ast.arena), diag) {
-            Ok(root) => ast.root = Some(Self::extend(ast.arena.alloc(root))),
-            Err(e) => diag.error(e, input.current().range),
+impl<'a, R> Ast<'a, R> {
+    pub fn new() -> Self {
+        Self {
+            arena: Box::new(Bump::new()),
+            root: Cell::new(None),
         }
-        ast
     }
-
-    /// Gets the root node of the `Ast`.
-    #[allow(dead_code)]
-    pub fn root(&self) -> Option<&'a <Parser as Parsing<'a, Input>>::Output> {
-        self.root
+    pub fn set_root(&'a self, root: R) {
+        self.root.set(Some(self.arena.alloc(root)))
     }
-
-    /// Extends lifetime of reference to lifetime of `Ast`.
-    #[allow(dead_code)]
-    fn extend<'b, T>(reference: &'b T) -> &'a T {
-        unsafe { &*(reference as *const T) }
+    pub fn root(&self) -> Option<&'a R> {
+        self.root.get()
+    }
+    pub fn arena(&self) -> &Bump {
+        &self.arena
     }
 }
 

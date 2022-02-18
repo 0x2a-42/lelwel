@@ -9,7 +9,7 @@ use super::token::*;
 use super::symbol::Symbol;
 use super::ast::*;
 use super::diag::*;
-use bumpalo::{Bump, collections::Vec as BVec};
+use bumpalo::collections::Vec as BVec;
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum TokenKind {
@@ -405,31 +405,20 @@ impl fmt::Display for TokenKind {
     }
 }
 
-pub trait Parsing<'a, Input: TokenStream> {
-    type Output;
+pub struct Parser;
 
-    fn parse(input: &mut Input, arena: &'a Bump, diag: &mut Diag) -> Result<Self::Output, Code>;
-}
-
-impl<'a, Input: TokenStream> Parsing<'a, Input> for Parser {
-    type Output = Module<'a>;
-
-    fn parse(input: &mut Input, arena: &'a Bump, diag: &mut Diag) -> Result<Self::Output, Code> {
+impl<'a> Parser {
+    pub fn parse<Input: TokenStream>(input: &mut Input, ast: &'a Ast<Module<'a>>, diag: &mut Diag) -> Result<(), Code> {
         input.advance();
-        let out = Self::start(0, input, arena, diag)?;
+        let out = Self::start(0, input, ast, diag)?;
         if input.current().kind != TokenKind::EOF {
             return err![default_EOF!()]
         }
         Ok(out)
     }
-}
-
-pub struct Parser;
-
-impl<'a> Parser {
-    fn start<Input: TokenStream>(depth: u16, input: &mut Input, arena: &'a Bump, diag: &mut Diag) -> Result<Module<'a>, Code> {
+    fn start<Input: TokenStream>(depth: u16, input: &mut Input, ast: &'a Ast<Module<'a>>, diag: &mut Diag) -> Result<(), Code> {
         // semantic action 0
-        let mut elements = BVec::new_in(arena);
+        let mut elements = BVec::new_in(ast.arena());
         loop {
             match input.current().kind {
                 pattern_Token!()
@@ -445,12 +434,12 @@ impl<'a> Parser {
                             pattern_Token!() => {
                                 // semantic action 1
                                 let elements = &mut elements;
-                                let r#tokens = Self::r#tokens(depth + 1, input, arena, diag, elements)?;
+                                let r#tokens = Self::r#tokens(depth + 1, input, ast, diag, elements)?;
                                 Ok(())
                             }
                             pattern_Start!()
                             | pattern_Id!() => {
-                                let r#rule_or_action = Self::r#rule_or_action(depth + 1, input, arena, diag)?;
+                                let r#rule_or_action = Self::r#rule_or_action(depth + 1, input, ast, diag)?;
                                 // semantic action 2
                                 elements.push(rule_or_action);
                                 Ok(())
@@ -459,14 +448,14 @@ impl<'a> Parser {
                                 let r#Preamble = consume_Preamble!(input);
                                 let r#Code = consume_Code!(input);
                                 // semantic action 3
-                                elements.push(Element::new_preamble(arena, Code.0, Code.1));
+                                elements.push(Element::new_preamble(ast, Code.0, Code.1));
                                 Ok(())
                             }
                             pattern_Pars!() => {
                                 let r#Pars = consume_Pars!(input);
                                 let r#Code = consume_Code!(input);
                                 // semantic action 4
-                                elements.push(Element::new_parameters(arena, Code.0, Code.1));
+                                elements.push(Element::new_parameters(ast, Code.0, Code.1));
                                 Ok(())
                             }
                             pattern_Language!() => {
@@ -474,14 +463,14 @@ impl<'a> Parser {
                                 let r#Id = consume_Id!(input);
                                 let r#Semi = consume_Semi!(input);
                                 // semantic action 5
-                                elements.push(Element::new_language(arena, Id.0, Id.1));
+                                elements.push(Element::new_language(ast, Id.0, Id.1));
                                 Ok(())
                             }
                             pattern_Error!() => {
                                 let r#Error = consume_Error!(input);
                                 let r#Code = consume_Code!(input);
                                 // semantic action 6
-                                elements.push(Element::new_error_code(arena, Code.0, Code.1));
+                                elements.push(Element::new_error_code(ast, Code.0, Code.1));
                                 Ok(())
                             }
                             pattern_Limit!() => {
@@ -489,7 +478,7 @@ impl<'a> Parser {
                                 let r#Int = consume_Int!(input);
                                 let r#Semi = consume_Semi!(input);
                                 // semantic action 7
-                                elements.push(Element::new_limit(arena, Int.0, Int.1));
+                                elements.push(Element::new_limit(ast, Int.0, Int.1));
                                 Ok(())
                             }
                             _ => {
@@ -522,7 +511,7 @@ impl<'a> Parser {
                                 | pattern_Id!() => {
                                     // error handler 1
                                     diag.error(error_code, error_range);
-                                    elements.push(Element::new_invalid(arena, error_range));
+                                    elements.push(Element::new_invalid(ast, error_range));
                                     return Ok(())
                                 }
                                 _ => {
@@ -547,9 +536,10 @@ impl<'a> Parser {
             }
         }
         // semantic action 8
-        Ok(Module::new(elements))
+        ast.set_root(Module::new(elements));
+        Ok(())
     }
-    fn r#tokens<Input: TokenStream>(depth: u16, input: &mut Input, arena: &'a Bump, diag: &mut Diag, elements: &mut BVec<'a, &'a Element<'a>>) -> Result<(), Code> {
+    fn r#tokens<Input: TokenStream>(depth: u16, input: &mut Input, ast: &'a Ast<Module<'a>>, diag: &mut Diag, elements: &mut BVec<'a, &'a Element<'a>>) -> Result<(), Code> {
         check_limit!(input, depth);
         // semantic action 0
         let trivia = input.trivia();
@@ -598,7 +588,7 @@ impl<'a> Parser {
                             }
                         }
                         // semantic action 4
-                        elements.push(Element::new_token(arena, Id.0, ty, sym, range, trivia.clone()));
+                        elements.push(Element::new_token(ast, Id.0, ty, sym, range, trivia.clone()));
                         match input.current().kind {
                             pattern_Semi!()
                             | pattern_Id!() => {
@@ -655,7 +645,7 @@ impl<'a> Parser {
         // semantic action 5
         Ok(())
     }
-    fn r#rule_or_action<Input: TokenStream>(depth: u16, input: &mut Input, arena: &'a Bump, diag: &mut Diag) -> Result<&'a Element<'a>, Code> {
+    fn r#rule_or_action<Input: TokenStream>(depth: u16, input: &mut Input, ast: &'a Ast<Module<'a>>, diag: &mut Diag) -> Result<&'a Element<'a>, Code> {
         check_limit!(input, depth);
         // semantic action 0
         enum ElemType {
@@ -734,7 +724,7 @@ impl<'a> Parser {
                                 | pattern_Predicate!()
                                 | pattern_Action!()
                                 | pattern_ErrorHandler!() => {
-                                    let r#regex = Self::r#regex(depth + 1, input, arena, diag)?;
+                                    let r#regex = Self::r#regex(depth + 1, input, ast, diag)?;
                                     // semantic action 5
                                     rule_regex = Some(regex);
                                     Ok(())
@@ -759,7 +749,7 @@ impl<'a> Parser {
                                 match input.current().kind {
                                     pattern_Semi!() => {
                                         // error handler 1
-                                        rule_regex = Some(Regex::new_invalid(arena, range));
+                                        rule_regex = Some(Regex::new_invalid(ast, range));
                                         diag.error(error_code, error_range);
                                         return Ok(())
                                     }
@@ -796,11 +786,11 @@ impl<'a> Parser {
                 let r#Semi = consume_Semi!(input);
                 // semantic action 6
                 let range = Range::span(range, Semi);
-                let regex = rule_regex.unwrap_or_else(|| Regex::new_empty(arena, range));
+                let regex = rule_regex.unwrap_or_else(|| Regex::new_empty(ast, range));
                 if name == Symbol::START {
-                    Ok(Element::new_start(arena, ret, pars, regex, range, trivia))
+                    Ok(Element::new_start(ast, ret, pars, regex, range, trivia))
                 } else {
-                    Ok(Element::new_rule(arena, name, ret, pars, regex, range, trivia))
+                    Ok(Element::new_rule(ast, name, ret, pars, regex, range, trivia))
                 }
             }
             pattern_Predicate!()
@@ -835,9 +825,9 @@ impl<'a> Parser {
                 // semantic action 10
                 let range = Range::span(range, Code.1);
                 match elem_type {
-                    ElemType::Action => Ok(Element::new_action(arena, name, num, Code.0, range, trivia)),
-                    ElemType::Predicate => Ok(Element::new_predicate(arena, name, num, Code.0, range, trivia)),
-                    ElemType::ErrorHandler => Ok(Element::new_error_handler(arena, name, num, Code.0, range, trivia)),
+                    ElemType::Action => Ok(Element::new_action(ast, name, num, Code.0, range, trivia)),
+                    ElemType::Predicate => Ok(Element::new_predicate(ast, name, num, Code.0, range, trivia)),
+                    ElemType::ErrorHandler => Ok(Element::new_error_handler(ast, name, num, Code.0, range, trivia)),
                 }
             }
             _ => {
@@ -849,17 +839,17 @@ impl<'a> Parser {
             }
         }
     }
-    fn r#regex<Input: TokenStream>(depth: u16, input: &mut Input, arena: &'a Bump, diag: &mut Diag) -> Result<&'a Regex<'a>, Code> {
+    fn r#regex<Input: TokenStream>(depth: u16, input: &mut Input, ast: &'a Ast<Module<'a>>, diag: &mut Diag) -> Result<&'a Regex<'a>, Code> {
         check_limit!(input, depth);
-        let r#concat = Self::r#concat(depth + 1, input, arena, diag)?;
+        let r#concat = Self::r#concat(depth + 1, input, ast, diag)?;
         // semantic action 1
-        let mut regexes = BVec::new_in(arena);
+        let mut regexes = BVec::new_in(ast.arena());
         regexes.push(concat);
         loop {
             match input.current().kind {
                 pattern_Or!() => {
                     let r#Or = consume_Or!(input);
-                    let r#concat = Self::r#concat(depth + 1, input, arena, diag)?;
+                    let r#concat = Self::r#concat(depth + 1, input, ast, diag)?;
                     // semantic action 2
                     regexes.push(concat);
                 }
@@ -877,15 +867,15 @@ impl<'a> Parser {
         // semantic action 3
         let range = Range::span(regexes.first().unwrap().range(), regexes.last().unwrap().range());
         return if regexes.len() > 1 {
-            Ok(Regex::new_or(arena, regexes, range))
+            Ok(Regex::new_or(ast, regexes, range))
         } else {
             Ok(regexes[0])
         }
     }
-    fn r#concat<Input: TokenStream>(depth: u16, input: &mut Input, arena: &'a Bump, diag: &mut Diag) -> Result<&'a Regex<'a>, Code> {
+    fn r#concat<Input: TokenStream>(depth: u16, input: &mut Input, ast: &'a Ast<Module<'a>>, diag: &mut Diag) -> Result<&'a Regex<'a>, Code> {
         check_limit!(input, depth);
         // semantic action 0
-        let mut regexes = BVec::new_in(arena);
+        let mut regexes = BVec::new_in(ast.arena());
         let mut is_first = true;
         loop {
             match input.current().kind {
@@ -896,7 +886,7 @@ impl<'a> Parser {
                 | pattern_Predicate!()
                 | pattern_Action!()
                 | pattern_ErrorHandler!() => {
-                    let r#postfix = Self::r#postfix(depth + 1, input, arena, diag)?;
+                    let r#postfix = Self::r#postfix(depth + 1, input, ast, diag)?;
                     // semantic action 1
                     regexes.push(postfix);
                 }
@@ -932,12 +922,12 @@ impl<'a> Parser {
         // semantic action 2
         let range = Range::span(regexes.first().unwrap().range(), regexes.last().unwrap().range());
         if regexes.len() > 1 {
-            Ok(Regex::new_concat(arena, regexes, range))
+            Ok(Regex::new_concat(ast, regexes, range))
         } else {
             Ok(regexes[0])
         }
     }
-    fn r#postfix<Input: TokenStream>(depth: u16, input: &mut Input, arena: &'a Bump, diag: &mut Diag) -> Result<&'a Regex<'a>, Code> {
+    fn r#postfix<Input: TokenStream>(depth: u16, input: &mut Input, ast: &'a Ast<Module<'a>>, diag: &mut Diag) -> Result<&'a Regex<'a>, Code> {
         check_limit!(input, depth);
         // semantic action 0
         let mut regex = None;
@@ -951,7 +941,7 @@ impl<'a> Parser {
                 | pattern_Predicate!()
                 | pattern_Action!()
                 | pattern_ErrorHandler!() => {
-                    let r#atomic = Self::r#atomic(depth + 1, input, arena, diag)?;
+                    let r#atomic = Self::r#atomic(depth + 1, input, ast, diag)?;
                     // semantic action 1
                     regex = Some(atomic);
                     range = atomic.range();
@@ -964,13 +954,13 @@ impl<'a> Parser {
                                         let r#Star = consume_Star!(input);
                                         // semantic action 2
                                         range = Range::span(range, Star);
-                                        regex = Some(Regex::new_star(arena, regex.unwrap(), range));
+                                        regex = Some(Regex::new_star(ast, regex.unwrap(), range));
                                     }
                                     pattern_Plus!() => {
                                         let r#Plus = consume_Plus!(input);
                                         // semantic action 3
                                         range = Range::span(range, Plus);
-                                        regex = Some(Regex::new_plus(arena, regex.unwrap(), range));
+                                        regex = Some(Regex::new_plus(ast, regex.unwrap(), range));
                                     }
                                     _ => {
                                         return err![default_Star!(),
@@ -1058,51 +1048,51 @@ impl<'a> Parser {
            }
         })?;
         // semantic action 4
-        Ok(regex.unwrap_or_else(|| Regex::new_invalid(arena, range)))
+        Ok(regex.unwrap_or_else(|| Regex::new_invalid(ast, range)))
     }
-    fn r#atomic<Input: TokenStream>(depth: u16, input: &mut Input, arena: &'a Bump, diag: &mut Diag) -> Result<&'a Regex<'a>, Code> {
+    fn r#atomic<Input: TokenStream>(depth: u16, input: &mut Input, ast: &'a Ast<Module<'a>>, diag: &mut Diag) -> Result<&'a Regex<'a>, Code> {
         check_limit!(input, depth);
         match input.current().kind {
             pattern_Id!() => {
                 let r#Id = consume_Id!(input);
                 // semantic action 1
-                Ok(Regex::new_id(arena, Id.0, Id.1))
+                Ok(Regex::new_id(ast, Id.0, Id.1))
             }
             pattern_Str!() => {
                 let r#Str = consume_Str!(input);
                 // semantic action 2
-                Ok(Regex::new_str(arena, Str.0, Str.1))
+                Ok(Regex::new_str(ast, Str.0, Str.1))
             }
             pattern_Predicate!() => {
                 let r#Predicate = consume_Predicate!(input);
                 // semantic action 3
-                Ok(Regex::new_predicate(arena, Predicate.0, Predicate.1))
+                Ok(Regex::new_predicate(ast, Predicate.0, Predicate.1))
             }
             pattern_Action!() => {
                 let r#Action = consume_Action!(input);
                 // semantic action 4
-                Ok(Regex::new_action(arena, Action.0, Action.1))
+                Ok(Regex::new_action(ast, Action.0, Action.1))
             }
             pattern_ErrorHandler!() => {
                 let r#ErrorHandler = consume_ErrorHandler!(input);
                 // semantic action 5
-                Ok(Regex::new_error_handler(arena, ErrorHandler.0, ErrorHandler.1))
+                Ok(Regex::new_error_handler(ast, ErrorHandler.0, ErrorHandler.1))
             }
             pattern_LPar!() => {
                 let r#LPar = consume_LPar!(input);
-                let r#regex = Self::r#regex(depth + 1, input, arena, diag)?;
+                let r#regex = Self::r#regex(depth + 1, input, ast, diag)?;
                 let r#RPar = consume_RPar!(input);
                 // semantic action 6
                 let range = Range::span(LPar, RPar);
-                Ok(Regex::new_paren(arena, regex, range))
+                Ok(Regex::new_paren(ast, regex, range))
             }
             pattern_LBrak!() => {
                 let r#LBrak = consume_LBrak!(input);
-                let r#regex = Self::r#regex(depth + 1, input, arena, diag)?;
+                let r#regex = Self::r#regex(depth + 1, input, ast, diag)?;
                 let r#RBrak = consume_RBrak!(input);
                 // semantic action 7
                 let range = Range::span(LBrak, RBrak);
-                Ok(Regex::new_option(arena, regex, range))
+                Ok(Regex::new_option(ast, regex, range))
             }
             _ => {
                 return err![default_LPar!(),

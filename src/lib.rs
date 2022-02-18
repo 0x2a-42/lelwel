@@ -4,7 +4,7 @@ pub mod ide;
 
 use crate::{
     backend::rust::*,
-    frontend::{ast::*, diag::*, lexer::*, sema::*},
+    frontend::{ast::*, diag::*, lexer::*, parser::*, sema::*, token::*},
 };
 
 #[derive(Clone, Copy)]
@@ -44,61 +44,54 @@ impl Config {
     }
 }
 
-pub fn llw_to_ast(
-    path: &str,
-) -> std::io::Result<(Ast<Lexer>, Diag)> {
-    let contents = std::fs::read_to_string(path)?;
+pub fn run_frontend<'a>(path: &str, contents: String, ast: &'a Ast<Module<'a>>) -> Diag {
     let mut diag = Diag::new(path, 100);
     let mut lexer = Lexer::new(contents, false);
-    let ast = Ast::new(&mut lexer, &mut diag);
-
+    match Parser::parse(&mut lexer, ast, &mut diag) {
+        Err(code) => {
+            diag.error(code, lexer.current().range);
+        }
+        _ => (),
+    }
     for (range, msg) in lexer.error_iter() {
         diag.error(Code::ParserError(msg), *range);
     }
     if let Some(root) = ast.root() {
         SemanticPass::run(root, &mut diag);
     }
-    Ok((ast, diag))
+    diag
 }
 
-pub fn ast_to_code(
+pub fn run_backend(
     config: Config,
-    ast: &Ast<Lexer>,
+    ast: &Ast<Module>,
     diag: &Diag,
     output: &str,
     version: &str,
 ) -> std::io::Result<()> {
-    if let Some(root) = ast.root() {
-        if !diag.has_errors() {
-            let path = std::path::Path::new(output);
-            match root.language.get() {
-                None => {
-                    output_rust(config, root, path, version)?;
-                }
-                Some(Element {
-                    kind: ElementKind::Language { name },
-                    ..
-                }) if name.as_str() == "rust" => {
-                    output_rust(config, root, path, version)?;
-                }
-                _ => {}
+    if !diag.has_errors() {
+        let path = std::path::Path::new(output);
+        let root = ast.root().unwrap();
+        match root.language.get() {
+            None => {
+                output_rust(config, root, path, version)?;
             }
+            Some(Element {
+                kind: ElementKind::Language { name },
+                ..
+            }) if name.as_str() == "rust" => {
+                output_rust(config, root, path, version)?;
+            }
+            _ => {}
         }
     }
     Ok(())
 }
 
-pub fn output_llw_skel(
-    config: Config,
-    input: &str,
-) -> std::io::Result<()> {
+pub fn output_llw_skel(config: Config, input: &str) -> std::io::Result<()> {
     let path = std::path::Path::new(input);
     if !path.exists() {
-        RustOutput::create_llw_skel(
-            path,
-            config.has_ast(),
-            config.has_diag(),
-        )?;
+        RustOutput::create_llw_skel(path, config.has_ast(), config.has_diag())?;
     }
     Ok(())
 }
@@ -117,7 +110,7 @@ pub fn output_rust(
     if config.has_symbol() {
         RustOutput::create_symbol(path)?;
     }
-    if config.has_diag() || config.has_ast() {
+    if config.has_diag() {
         RustOutput::create_diag(path)?;
     }
     if config.has_ast() {
@@ -126,19 +119,20 @@ pub fn output_rust(
     Ok(())
 }
 
-pub fn generate(
-    config: Config,
-    input: &str,
-    output: &str,
-) -> std::io::Result<()> {
+pub fn generate(config: Config, input: &str, output: &str) -> std::io::Result<()> {
     output_llw_skel(config, input)?;
-    let (ast, diag) = llw_to_ast(input)?;
-    ast_to_code(config, &ast, &diag, output, "")?;
+    let ast = Ast::new();
+    let contents = std::fs::read_to_string(input)?;
+    let diag = run_frontend(input, contents, &ast);
+    run_backend(config, &ast, &diag, output, "")?;
 
     if !diag.has_errors() {
         Ok(())
     } else {
         diag.print(false);
-        Err(std::io::Error::new(std::io::ErrorKind::Other, "invalid lelwel file"))
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "invalid lelwel file",
+        ))
     }
 }

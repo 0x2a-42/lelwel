@@ -22,7 +22,7 @@ token ErrorHandler{u64}='<error handler>';
 token _Comment{Symbol};
 
 /// Module consisting of tokens, grammar rules, actions and other definitions
-start{Module<'a>}:
+start:
   (
     #1 tokens
   | rule_or_action #2
@@ -75,35 +75,38 @@ preamble {
     use super::symbol::Symbol;
     use super::ast::*;
     use super::diag::*;
-    use bumpalo::{Bump, collections::Vec as BVec};
+    use bumpalo::collections::Vec as BVec;
 }
-parameters { arena: &'a Bump, diag: &mut Diag }
+parameters { ast: &'a Ast<Module<'a>>, diag: &mut Diag }
 error { Code }
 
 // semantic actions
 
 /// Create a vector for elements
-start#0 { let mut elements = BVec::new_in(arena); }
+start#0 { let mut elements = BVec::new_in(ast.arena()); }
 /// Bind the name `elements` for the parameter of `tokens`
 start#1 { let elements = &mut elements; }
 /// Push to `elements`
 start#2 { elements.push(rule_or_action); }
 /// Push to `elements`
-start#3 { elements.push(Element::new_preamble(arena, Code.0, Code.1)); }
+start#3 { elements.push(Element::new_preamble(ast, Code.0, Code.1)); }
 /// Push to `elements`
-start#4 { elements.push(Element::new_parameters(arena, Code.0, Code.1)); }
+start#4 { elements.push(Element::new_parameters(ast, Code.0, Code.1)); }
 /// Push to `elements`
-start#5 { elements.push(Element::new_language(arena, Id.0, Id.1)); }
+start#5 { elements.push(Element::new_language(ast, Id.0, Id.1)); }
 /// Push to `elements`
-start#6 { elements.push(Element::new_error_code(arena, Code.0, Code.1)); }
+start#6 { elements.push(Element::new_error_code(ast, Code.0, Code.1)); }
 /// Push to `elements`
-start#7 { elements.push(Element::new_limit(arena, Int.0, Int.1)); }
+start#7 { elements.push(Element::new_limit(ast, Int.0, Int.1)); }
 /// Create the module
-start#8 { Ok(Module::new(elements)) }
+start#8 {
+    ast.set_root(Module::new(elements));
+    Ok(())
+}
 /// Create diagnostic for error and invalid element
 start!1 {
     diag.error(error_code, error_range);
-    elements.push(Element::new_invalid(arena, error_range));
+    elements.push(Element::new_invalid(ast, error_range));
 }
 
 /// Save the last trivia token for the documentation comment
@@ -125,7 +128,7 @@ tokens#3 {
     range = Range::span(range, Str.1);
 }
 /// Create and push token definition
-tokens#4 { elements.push(Element::new_token(arena, Id.0, ty, sym, range, trivia.clone())); }
+tokens#4 { elements.push(Element::new_token(ast, Id.0, ty, sym, range, trivia.clone())); }
 /// Return successful
 tokens#5 { Ok(()) }
 /// Create diagnostic for error
@@ -166,11 +169,11 @@ rule_or_action#5 { rule_regex = Some(regex); }
 /// Create the rule
 rule_or_action#6 {
     let range = Range::span(range, Semi);
-    let regex = rule_regex.unwrap_or_else(|| Regex::new_empty(arena, range));
+    let regex = rule_regex.unwrap_or_else(|| Regex::new_empty(ast, range));
     if name == Symbol::START {
-        Ok(Element::new_start(arena, ret, pars, regex, range, trivia))
+        Ok(Element::new_start(ast, ret, pars, regex, range, trivia))
     } else {
-        Ok(Element::new_rule(arena, name, ret, pars, regex, range, trivia))
+        Ok(Element::new_rule(ast, name, ret, pars, regex, range, trivia))
     }
 }
 /// Set action number
@@ -192,19 +195,19 @@ rule_or_action#9 {
 rule_or_action#10 {
     let range = Range::span(range, Code.1);
     match elem_type {
-        ElemType::Action => Ok(Element::new_action(arena, name, num, Code.0, range, trivia)),
-        ElemType::Predicate => Ok(Element::new_predicate(arena, name, num, Code.0, range, trivia)),
-        ElemType::ErrorHandler => Ok(Element::new_error_handler(arena, name, num, Code.0, range, trivia)),
+        ElemType::Action => Ok(Element::new_action(ast, name, num, Code.0, range, trivia)),
+        ElemType::Predicate => Ok(Element::new_predicate(ast, name, num, Code.0, range, trivia)),
+        ElemType::ErrorHandler => Ok(Element::new_error_handler(ast, name, num, Code.0, range, trivia)),
     }
 }
 rule_or_action!1 {
-    rule_regex = Some(Regex::new_invalid(arena, range));
+    rule_regex = Some(Regex::new_invalid(ast, range));
     diag.error(error_code, error_range);
 }
 
 /// Create vector for operands
 regex#1 {
-    let mut regexes = BVec::new_in(arena);
+    let mut regexes = BVec::new_in(ast.arena());
     regexes.push(concat);
 }
 /// Push operand
@@ -213,21 +216,21 @@ regex#2 { regexes.push(concat); }
 regex#3 {
     let range = Range::span(regexes.first().unwrap().range(), regexes.last().unwrap().range());
     return if regexes.len() > 1 {
-        Ok(Regex::new_or(arena, regexes, range))
+        Ok(Regex::new_or(ast, regexes, range))
     } else {
         Ok(regexes[0])
     }
 }
 
 /// Create vector for operands
-concat#0 { let mut regexes = BVec::new_in(arena); }
+concat#0 { let mut regexes = BVec::new_in(ast.arena()); }
 /// Push operand
 concat#1 { regexes.push(postfix); }
 /// Create concatenation if there were more than one operands
 concat#2 {
     let range = Range::span(regexes.first().unwrap().range(), regexes.last().unwrap().range());
     if regexes.len() > 1 {
-        Ok(Regex::new_concat(arena, regexes, range))
+        Ok(Regex::new_concat(ast, regexes, range))
     } else {
         Ok(regexes[0])
     }
@@ -246,35 +249,35 @@ postfix#1 {
 /// Create star regex
 postfix#2 {
     range = Range::span(range, Star);
-    regex = Some(Regex::new_star(arena, regex.unwrap(), range));
+    regex = Some(Regex::new_star(ast, regex.unwrap(), range));
 }
 /// Create plus regex
 postfix#3 {
     range = Range::span(range, Plus);
-    regex = Some(Regex::new_plus(arena, regex.unwrap(), range));
+    regex = Some(Regex::new_plus(ast, regex.unwrap(), range));
 }
 /// Return result regex or invalid regex if parsing was not successful
-postfix#4 { Ok(regex.unwrap_or_else(|| Regex::new_invalid(arena, range))) }
+postfix#4 { Ok(regex.unwrap_or_else(|| Regex::new_invalid(ast, range))) }
 /// Create diagnostic for error, result will be the last successfully parsed regex
 postfix!1 { diag.error(error_code, error_range); }
 
 /// Create identifier
-atomic#1 { Ok(Regex::new_id(arena, Id.0, Id.1)) }
+atomic#1 { Ok(Regex::new_id(ast, Id.0, Id.1)) }
 /// Create string
-atomic#2 { Ok(Regex::new_str(arena, Str.0, Str.1)) }
+atomic#2 { Ok(Regex::new_str(ast, Str.0, Str.1)) }
 /// Create semantic predicate
-atomic#3 { Ok(Regex::new_predicate(arena, Predicate.0, Predicate.1)) }
+atomic#3 { Ok(Regex::new_predicate(ast, Predicate.0, Predicate.1)) }
 /// Create semantic action
-atomic#4 { Ok(Regex::new_action(arena, Action.0, Action.1)) }
+atomic#4 { Ok(Regex::new_action(ast, Action.0, Action.1)) }
 /// Create error handler
-atomic#5 { Ok(Regex::new_error_handler(arena, ErrorHandler.0, ErrorHandler.1)) }
+atomic#5 { Ok(Regex::new_error_handler(ast, ErrorHandler.0, ErrorHandler.1)) }
 /// Create parenthesized regex
 atomic#6 {
     let range = Range::span(LPar, RPar);
-    Ok(Regex::new_paren(arena, regex, range))
+    Ok(Regex::new_paren(ast, regex, range))
 }
 /// Create option regex
 atomic#7 {
     let range = Range::span(LBrak, RBrak);
-    Ok(Regex::new_option(arena, regex, range))
+    Ok(Regex::new_option(ast, regex, range))
 }

@@ -1,6 +1,6 @@
 use super::super::symbol::Symbol;
 use super::*;
-use bumpalo::{boxed::Box, collections::Vec as BVec, Bump};
+use bumpalo::{boxed::Box, collections::Vec as BVec};
 use std::cell::RefCell;
 use std::collections::BTreeSet;
 
@@ -78,12 +78,12 @@ pub struct RegexAttr<'a> {
 }
 
 impl<'a> RegexAttr<'a> {
-    pub fn new_in(arena: &'a Bump, range: Range) -> RegexAttr<'a> {
+    pub fn new_in(ast: &'a Ast<Module<'a>>, range: Range) -> RegexAttr<'a> {
         RegexAttr {
             range,
-            first: Box::new_in(RefCell::new(BTreeSet::new()), arena),
-            follow: Box::new_in(RefCell::new(BTreeSet::new()), arena),
-            cancel: Box::new_in(RefCell::new(BTreeSet::new()), arena),
+            first: Box::new_in(RefCell::new(BTreeSet::new()), ast.arena()),
+            follow: Box::new_in(RefCell::new(BTreeSet::new()), ast.arena()),
+            cancel: Box::new_in(RefCell::new(BTreeSet::new()), ast.arena()),
         }
     }
 }
@@ -155,14 +155,14 @@ pub enum ElementKind<'a> {
 
 impl<'a> Element<'a> {
     pub fn new_start(
-        arena: &'a Bump,
+        ast: &'a Ast<Module<'a>>,
         ret: Symbol,
         pars: Symbol,
         regex: &'a Regex<'a>,
         range: Range,
         doc: Option<Token>,
     ) -> &'a Element<'a> {
-        arena.alloc(Element {
+        ast.arena().alloc(Element {
             kind: ElementKind::Start {
                 ret,
                 pars,
@@ -173,7 +173,7 @@ impl<'a> Element<'a> {
         })
     }
     pub fn new_rule(
-        arena: &'a Bump,
+        ast: &'a Ast<Module<'a>>,
         name: Symbol,
         ret: Symbol,
         pars: Symbol,
@@ -181,7 +181,7 @@ impl<'a> Element<'a> {
         range: Range,
         doc: Option<Token>,
     ) -> &'a Element<'a> {
-        arena.alloc(Element {
+        ast.arena().alloc(Element {
             kind: ElementKind::Rule {
                 name,
                 ret,
@@ -193,89 +193,89 @@ impl<'a> Element<'a> {
         })
     }
     pub fn new_token(
-        arena: &'a Bump,
+        ast: &'a Ast<Module<'a>>,
         name: Symbol,
         ty: Symbol,
         sym: Symbol,
         range: Range,
         doc: Option<Token>,
     ) -> &'a Element<'a> {
-        arena.alloc(Element {
+        ast.arena().alloc(Element {
             kind: ElementKind::Token { name, ty, sym },
             attr: ElementAttr::new_with_doc(range, doc),
         })
     }
     pub fn new_action(
-        arena: &'a Bump,
+        ast: &'a Ast<Module<'a>>,
         name: Symbol,
         num: u64,
         code: Symbol,
         range: Range,
         doc: Option<Token>,
     ) -> &'a Element<'a> {
-        arena.alloc(Element {
+        ast.arena().alloc(Element {
             kind: ElementKind::Action { name, num, code },
             attr: ElementAttr::new_with_doc(range, doc),
         })
     }
     pub fn new_predicate(
-        arena: &'a Bump,
+        ast: &'a Ast<Module<'a>>,
         name: Symbol,
         num: u64,
         code: Symbol,
         range: Range,
         doc: Option<Token>,
     ) -> &'a Element<'a> {
-        arena.alloc(Element {
+        ast.arena().alloc(Element {
             kind: ElementKind::Predicate { name, num, code },
             attr: ElementAttr::new_with_doc(range, doc),
         })
     }
     pub fn new_error_handler(
-        arena: &'a Bump,
+        ast: &'a Ast<Module<'a>>,
         name: Symbol,
         num: u64,
         code: Symbol,
         range: Range,
         doc: Option<Token>,
     ) -> &'a Element<'a> {
-        arena.alloc(Element {
+        ast.arena().alloc(Element {
             kind: ElementKind::ErrorHandler { name, num, code },
             attr: ElementAttr::new_with_doc(range, doc),
         })
     }
-    pub fn new_preamble(arena: &'a Bump, code: Symbol, range: Range) -> &'a Element<'a> {
-        arena.alloc(Element {
+    pub fn new_preamble(ast: &'a Ast<Module<'a>>, code: Symbol, range: Range) -> &'a Element<'a> {
+        ast.arena().alloc(Element {
             kind: ElementKind::Preamble { code },
             attr: ElementAttr::new(range),
         })
     }
-    pub fn new_parameters(arena: &'a Bump, code: Symbol, range: Range) -> &'a Element<'a> {
-        arena.alloc(Element {
+    pub fn new_parameters(ast: &'a Ast<Module<'a>>, code: Symbol, range: Range) -> &'a Element<'a> {
+        ast.arena().alloc(Element {
             kind: ElementKind::Parameters { code },
             attr: ElementAttr::new(range),
         })
     }
-    pub fn new_error_code(arena: &'a Bump, code: Symbol, range: Range) -> &'a Element<'a> {
-        arena.alloc(Element {
+    pub fn new_error_code(ast: &'a Ast<Module<'a>>, code: Symbol, range: Range) -> &'a Element<'a> {
+        ast.arena().alloc(Element {
             kind: ElementKind::ErrorCode { code },
             attr: ElementAttr::new(range),
         })
     }
-    pub fn new_language(arena: &'a Bump, name: Symbol, range: Range) -> &'a Element<'a> {
-        arena.alloc(Element {
+    pub fn new_language(ast: &'a Ast<Module<'a>>, name: Symbol, range: Range) -> &'a Element<'a> {
+        ast.arena().alloc(Element {
             kind: ElementKind::Language { name },
             attr: ElementAttr::new(range),
         })
     }
-    pub fn new_limit(arena: &'a Bump, depth: u16, range: Range) -> &'a Element<'a> {
-        arena.alloc(Element {
+    pub fn new_limit(ast: &'a Ast<Module<'a>>, depth: u16, range: Range) -> &'a Element<'a> {
+        ast.arena().alloc(Element {
             kind: ElementKind::Limit { depth },
             attr: ElementAttr::new(range),
         })
     }
-    pub fn new_invalid(arena: &'a Bump, range: Range) -> &'a Element<'a> {
-        arena.alloc(Element {
+    pub fn new_invalid(ast: &'a Ast<Module<'a>>, range: Range) -> &'a Element<'a> {
+        ast.arena().alloc(Element {
             kind: ElementKind::Invalid,
             attr: ElementAttr::new(range),
         })
@@ -335,107 +335,111 @@ pub enum RegexKind<'a> {
 }
 
 impl<'a> Regex<'a> {
-    pub fn new_id(arena: &'a Bump, name: Symbol, range: Range) -> &'a Regex<'a> {
-        arena.alloc(Regex {
+    pub fn new_id(ast: &'a Ast<Module<'a>>, name: Symbol, range: Range) -> &'a Regex<'a> {
+        ast.arena().alloc(Regex {
             kind: RegexKind::Id {
                 name,
                 elem: Ref::new(None),
             },
-            attr: RegexAttr::new_in(arena, range),
+            attr: RegexAttr::new_in(ast, range),
         })
     }
     pub fn new_concat(
-        arena: &'a Bump,
+        ast: &'a Ast<Module<'a>>,
         ops: BVec<'a, &'a Regex<'a>>,
         range: Range,
     ) -> &'a Regex<'a> {
-        arena.alloc(Regex {
+        ast.arena().alloc(Regex {
             kind: RegexKind::Concat {
                 ops,
                 error: Ref::new(None),
             },
-            attr: RegexAttr::new_in(arena, range),
+            attr: RegexAttr::new_in(ast, range),
         })
     }
-    pub fn new_or(arena: &'a Bump, ops: BVec<'a, &'a Regex<'a>>, range: Range) -> &'a Regex<'a> {
-        arena.alloc(Regex {
+    pub fn new_or(
+        ast: &'a Ast<Module<'a>>,
+        ops: BVec<'a, &'a Regex<'a>>,
+        range: Range,
+    ) -> &'a Regex<'a> {
+        ast.arena().alloc(Regex {
             kind: RegexKind::Or {
                 ops,
                 error: Ref::new(None),
             },
-            attr: RegexAttr::new_in(arena, range),
+            attr: RegexAttr::new_in(ast, range),
         })
     }
-    pub fn new_star(arena: &'a Bump, op: &'a Regex<'a>, range: Range) -> &'a Regex<'a> {
-        arena.alloc(Regex {
+    pub fn new_star(ast: &'a Ast<Module<'a>>, op: &'a Regex<'a>, range: Range) -> &'a Regex<'a> {
+        ast.arena().alloc(Regex {
             kind: RegexKind::Star { op },
-            attr: RegexAttr::new_in(arena, range),
+            attr: RegexAttr::new_in(ast, range),
         })
     }
-    pub fn new_plus(arena: &'a Bump, op: &'a Regex<'a>, range: Range) -> &'a Regex<'a> {
-        arena.alloc(Regex {
+    pub fn new_plus(ast: &'a Ast<Module<'a>>, op: &'a Regex<'a>, range: Range) -> &'a Regex<'a> {
+        ast.arena().alloc(Regex {
             kind: RegexKind::Plus { op },
-            attr: RegexAttr::new_in(arena, range),
+            attr: RegexAttr::new_in(ast, range),
         })
     }
-    pub fn new_option(arena: &'a Bump, op: &'a Regex<'a>, range: Range) -> &'a Regex<'a> {
-        arena.alloc(Regex {
+    pub fn new_option(ast: &'a Ast<Module<'a>>, op: &'a Regex<'a>, range: Range) -> &'a Regex<'a> {
+        ast.arena().alloc(Regex {
             kind: RegexKind::Option { op },
-            attr: RegexAttr::new_in(arena, range),
+            attr: RegexAttr::new_in(ast, range),
         })
     }
-    pub fn new_paren(arena: &'a Bump, op: &'a Regex<'a>, range: Range) -> &'a Regex<'a> {
-        arena.alloc(Regex {
+    pub fn new_paren(ast: &'a Ast<Module<'a>>, op: &'a Regex<'a>, range: Range) -> &'a Regex<'a> {
+        ast.arena().alloc(Regex {
             kind: RegexKind::Paren { op },
-            attr: RegexAttr::new_in(arena, range),
+            attr: RegexAttr::new_in(ast, range),
         })
     }
-    pub fn new_str(arena: &'a Bump, val: Symbol, range: Range) -> &'a Regex<'a> {
-        arena.alloc(Regex {
+    pub fn new_str(ast: &'a Ast<Module<'a>>, val: Symbol, range: Range) -> &'a Regex<'a> {
+        ast.arena().alloc(Regex {
             kind: RegexKind::Str {
                 val,
                 elem: Ref::new(None),
             },
-            attr: RegexAttr::new_in(arena, range),
+            attr: RegexAttr::new_in(ast, range),
         })
     }
-    pub fn new_predicate(arena: &'a Bump, val: u64, range: Range) -> &'a Regex<'a> {
-        arena.alloc(Regex {
+    pub fn new_predicate(ast: &'a Ast<Module<'a>>, val: u64, range: Range) -> &'a Regex<'a> {
+        ast.arena().alloc(Regex {
             kind: RegexKind::Predicate {
                 val,
                 elem: Ref::new(None),
             },
-            attr: RegexAttr::new_in(arena, range),
+            attr: RegexAttr::new_in(ast, range),
         })
     }
-    pub fn new_action(arena: &'a Bump, val: u64, range: Range) -> &'a Regex<'a> {
-        arena.alloc(Regex {
+    pub fn new_action(ast: &'a Ast<Module<'a>>, val: u64, range: Range) -> &'a Regex<'a> {
+        ast.arena().alloc(Regex {
             kind: RegexKind::Action {
                 val,
                 elem: Ref::new(None),
             },
-            attr: RegexAttr::new_in(arena, range),
+            attr: RegexAttr::new_in(ast, range),
         })
     }
-    pub fn new_error_handler(arena: &'a Bump, val: u64, range: Range) -> &'a Regex<'a> {
-        arena.alloc(Regex {
+    pub fn new_error_handler(ast: &'a Ast<Module<'a>>, val: u64, range: Range) -> &'a Regex<'a> {
+        ast.arena().alloc(Regex {
             kind: RegexKind::ErrorHandler {
                 val,
                 elem: Ref::new(None),
             },
-            attr: RegexAttr::new_in(arena, range),
+            attr: RegexAttr::new_in(ast, range),
         })
     }
-    pub fn new_empty(arena: &'a Bump, range: Range) -> &'a Regex<'a> {
-        arena.alloc(Regex {
+    pub fn new_empty(ast: &'a Ast<Module<'a>>, range: Range) -> &'a Regex<'a> {
+        ast.arena().alloc(Regex {
             kind: RegexKind::Empty,
-            attr: RegexAttr::new_in(arena, range),
+            attr: RegexAttr::new_in(ast, range),
         })
     }
-    pub fn new_invalid(arena: &'a Bump, range: Range) -> &'a Regex<'a> {
-        arena.alloc(Regex {
+    pub fn new_invalid(ast: &'a Ast<Module<'a>>, range: Range) -> &'a Regex<'a> {
+        ast.arena().alloc(Regex {
             kind: RegexKind::Invalid,
-            attr: RegexAttr::new_in(arena, range),
+            attr: RegexAttr::new_in(ast, range),
         })
     }
 

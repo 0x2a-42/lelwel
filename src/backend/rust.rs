@@ -1035,28 +1035,17 @@ impl RustOutput {
         }
         output.write_all(
             format!(
-                "pub trait Parsing<'a, Input: TokenStream> {{\
-               \n    type Output;\
+                "pub struct Parser;\
                \n\
-               \n    fn parse(input: &mut Input{0}{1}) -> Result<Self::Output, {4}>;\
-               \n}}\
-               \n\
-               \nimpl<'a, Input: TokenStream> Parsing<'a, Input> for Parser {{\
-               \n    type Output = {2};\
-               \n\
-               \n    fn parse(input: &mut Input{0}{1}) -> Result<Self::Output, {4}> {{\
+               \nimpl<'a> Parser {{\
+               \n    pub fn parse<Input: TokenStream>(input: &mut Input{0}{1}) -> Result<{2}, {4}> {{\
                \n        input.advance();\
                \n        let out = Self::start(0, input{3})?;\
                \n        if input.current().kind != TokenKind::EOF {{\
                \n            return err![default_EOF!()]\
                \n        }}\
                \n        Ok(out)\
-               \n    }}\
-               \n}}\
-               \n\
-               \npub struct Parser;\
-               \n\
-               \nimpl<'a> Parser {{\n",
+               \n    }}\n",
                 common_pars, start_pars, start_ret, common_args, error_type
             )
             .as_bytes(),

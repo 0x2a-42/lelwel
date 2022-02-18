@@ -1,10 +1,10 @@
 #![cfg(feature = "cli")]
 
 use atty::Stream;
-use clap::{crate_name, crate_version, arg, App, ArgMatches};
+use clap::{arg, crate_name, crate_version, App, ArgMatches};
 use lelwel::{
     backend::graphviz::*,
-    frontend::{diag::*, printer::*},
+    frontend::{ast::*, diag::*, printer::*},
 };
 
 fn translate(matches: ArgMatches) -> std::io::Result<()> {
@@ -24,7 +24,9 @@ fn translate(matches: ArgMatches) -> std::io::Result<()> {
         }
         let output = matches.value_of("output").unwrap_or(".");
         lelwel::output_llw_skel(config, input)?;
-        let (ast, diag) = lelwel::llw_to_ast(input)?;
+        let ast = Ast::new();
+        let contents = std::fs::read_to_string(input)?;
+        let diag = lelwel::run_frontend(input, contents, &ast);
 
         if let Some(root) = ast.root() {
             if matches.is_present("verbose") {
@@ -39,7 +41,7 @@ fn translate(matches: ArgMatches) -> std::io::Result<()> {
         }
 
         if !matches.is_present("check") {
-            lelwel::ast_to_code(config, &ast, &diag, output, crate_version!())?;
+            lelwel::run_backend(config, &ast, &diag, output, crate_version!())?;
         }
 
         diag.print(atty::is(Stream::Stderr));
@@ -61,7 +63,7 @@ fn main() {
         .arg(arg!(-l --lexer         "Generate a lexer skeleton"))
         .arg(arg!(-s --symbol        "Generate a symbol handling skeleton"))
         .arg(arg!(-d --diag          "Generate a diagnostic handling skeleton"))
-        .arg(arg!(-a --ast           "Generate an AST skeleton (implies -d)"))
+        .arg(arg!(-a --ast           "Generate an AST skeleton"))
         .arg(arg!(-g --graph         "Output a graphviz file for the grammar"))
         .arg(arg!(<INPUT>            "Sets the input file to use"))
         .arg(arg!(-v --verbose       "Sets the level of verbosity"))
