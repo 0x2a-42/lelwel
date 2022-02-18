@@ -13,9 +13,9 @@ dependencies = [
 
 [[package]]
 name = "bumpalo"
-version = "3.7.0"
+version = "3.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c59e7af012c713f529e7a3ee57ce9b31ddd858d4b512923602f74608b009631"
+checksum = "a4a45a46ab1f2412e53d3a0ade76ffad2025804294569aae387231a0cd6e0899"
 
 [[package]]
 name = "cc"
@@ -36,7 +36,7 @@ dependencies = [
 
 [[package]]
 name = "lelwel"
-version = "0.2.2"
+version = "0.4.2"
 dependencies = [
  "bumpalo",
 ]
