@@ -49,17 +49,16 @@ impl Lexer {
     }
     fn state_id(&mut self) -> Transition {
         self.accept_star(|c| c.is_alphanumeric() || c == '_');
-        let sym = self.get(0, 0).into_symbol();
-        match sym {
-            Symbol::START => self.emit(TokenKind::Start),
-            Symbol::PREAMBLE => self.emit(TokenKind::Preamble),
-            Symbol::ERROR => self.emit(TokenKind::Error),
-            Symbol::TOKEN => self.emit(TokenKind::Token),
-            Symbol::LANGUGAE => self.emit(TokenKind::Language),
-            Symbol::PARAMETERS => self.emit(TokenKind::Pars),
-            Symbol::LIMIT => self.emit(TokenKind::Limit),
-            _ => self.emit(TokenKind::Id(sym)),
-        }
+        self.emit(match self.get(0, 0) {
+            "start" => TokenKind::Start,
+            "preamble" => TokenKind::Preamble,
+            "error" => TokenKind::Error,
+            "token" => TokenKind::Token,
+            "language" => TokenKind::Language,
+            "parameters" => TokenKind::Pars,
+            "limit" => TokenKind::Limit,
+            s => TokenKind::Id(s.into_symbol()),
+        })
     }
     fn state_int(&mut self) -> Transition {
         self.accept_star(|c| c.is_ascii_digit());

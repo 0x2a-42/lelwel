@@ -25,12 +25,6 @@ macro_rules! predefine {
 
 predefine! {
     [START,      "start"],
-    [PREAMBLE,   "preamble"],
-    [ERROR,      "error"],
-    [TOKEN,      "token"],
-    [LANGUGAE,   "language"],
-    [PARAMETERS, "parameters"],
     [EOF,        "EOF"],
     [RUST,       "rust"],
-    [LIMIT,      "limit"],
 }

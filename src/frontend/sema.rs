@@ -29,6 +29,11 @@ pub enum Binding {
     Action(Symbol, u64),
     Predicate(Symbol, u64),
     ErrorHandler(Symbol, u64),
+    Preamble,
+    Parameters,
+    Error,
+    Limit,
+    Language,
 }
 
 impl std::fmt::Display for Binding {
@@ -39,6 +44,11 @@ impl std::fmt::Display for Binding {
             Self::Action(name, num) => write!(f, "action '{}#{}'", name, num),
             Self::Predicate(name, num) => write!(f, "predicate '{}?{}'", name, num),
             Self::ErrorHandler(name, num) => write!(f, "error handler '{}!{}'", name, num),
+            Self::Preamble => write!(f, "preamble section"),
+            Self::Parameters => write!(f, "parameters section"),
+            Self::Error => write!(f, "error section"),
+            Self::Limit => write!(f, "limit"),
+            Self::Language => write!(f, "language"),
         }
     }
 }
@@ -53,23 +63,23 @@ impl<'a, 'b> GeneralValidator {
             diag.error(Code::MissingStart, Range::default());
         }
 
-        if let Some(preamble) = bindings.get(&Binding::Term(Symbol::PREAMBLE)) {
+        if let Some(preamble) = bindings.get(&Binding::Preamble) {
             module.preamble.set(Some(*preamble));
         }
-        if let Some(parameters) = bindings.get(&Binding::Term(Symbol::PARAMETERS)) {
+        if let Some(parameters) = bindings.get(&Binding::Parameters) {
             module.parameters.set(Some(*parameters));
         }
-        if let Some(error) = bindings.get(&Binding::Term(Symbol::ERROR)) {
+        if let Some(error) = bindings.get(&Binding::Error) {
             module.error.set(Some(*error));
         }
-        if let Some(limit) = bindings.get(&Binding::Term(Symbol::LIMIT)) {
+        if let Some(limit) = bindings.get(&Binding::Limit) {
             module.limit.set(Some(*limit));
         }
-        if let Some(language) = bindings.get(&Binding::Term(Symbol::LANGUGAE)) {
+        if let Some(language) = bindings.get(&Binding::Language) {
             module.language.set(Some(*language));
             if let ElementKind::Language { name } = language.kind {
-                match name.as_str() {
-                    "rust" => {}
+                match name {
+                    Symbol::RUST => {}
                     _ => {
                         diag.error(Code::InvalidLang(name), language.range());
                     }
@@ -134,7 +144,7 @@ impl<'a, 'b> GeneralValidator {
                 }
                 ElementKind::Preamble { .. } => {
                     Self::bind(
-                        Binding::Term(Symbol::PREAMBLE),
+                        Binding::Preamble,
                         element,
                         &mut bindings,
                         diag,
@@ -142,21 +152,21 @@ impl<'a, 'b> GeneralValidator {
                 }
                 ElementKind::Parameters { .. } => {
                     Self::bind(
-                        Binding::Term(Symbol::PARAMETERS),
+                        Binding::Parameters,
                         element,
                         &mut bindings,
                         diag,
                     );
                 }
                 ElementKind::ErrorCode { .. } => {
-                    Self::bind(Binding::Term(Symbol::ERROR), element, &mut bindings, diag);
+                    Self::bind(Binding::Error, element, &mut bindings, diag);
                 }
                 ElementKind::Limit { .. } => {
-                    Self::bind(Binding::Term(Symbol::LIMIT), element, &mut bindings, diag);
+                    Self::bind(Binding::Limit, element, &mut bindings, diag);
                 }
                 ElementKind::Language { .. } => {
                     Self::bind(
-                        Binding::Term(Symbol::LANGUGAE),
+                        Binding::Language,
                         element,
                         &mut bindings,
                         diag,
