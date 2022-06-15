@@ -143,20 +143,10 @@ impl<'a, 'b> GeneralValidator {
                     );
                 }
                 ElementKind::Preamble { .. } => {
-                    Self::bind(
-                        Binding::Preamble,
-                        element,
-                        &mut bindings,
-                        diag,
-                    );
+                    Self::bind(Binding::Preamble, element, &mut bindings, diag);
                 }
                 ElementKind::Parameters { .. } => {
-                    Self::bind(
-                        Binding::Parameters,
-                        element,
-                        &mut bindings,
-                        diag,
-                    );
+                    Self::bind(Binding::Parameters, element, &mut bindings, diag);
                 }
                 ElementKind::ErrorCode { .. } => {
                     Self::bind(Binding::Error, element, &mut bindings, diag);
@@ -165,12 +155,7 @@ impl<'a, 'b> GeneralValidator {
                     Self::bind(Binding::Limit, element, &mut bindings, diag);
                 }
                 ElementKind::Language { .. } => {
-                    Self::bind(
-                        Binding::Language,
-                        element,
-                        &mut bindings,
-                        diag,
-                    );
+                    Self::bind(Binding::Language, element, &mut bindings, diag);
                 }
                 _ => {}
             }

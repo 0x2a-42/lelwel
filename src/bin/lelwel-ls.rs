@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use lsp_server::{Connection, Message, Notification, Request, RequestId, Response, ExtractError};
+use lsp_server::{Connection, ExtractError, Message, Notification, Request, RequestId, Response};
 use lsp_types::{
     notification::{
         DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, PublishDiagnostics,
