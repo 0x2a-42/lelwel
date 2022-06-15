@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use lsp_server::{Connection, Message, Notification, Request, RequestId, Response};
+use lsp_server::{Connection, Message, Notification, Request, RequestId, Response, ExtractError};
 use lsp_types::{
     notification::{
         DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, PublishDiagnostics,
@@ -22,7 +22,8 @@ macro_rules! request_match {
                 $connection.sender.send(Message::Response(resp))?;
                 continue;
             }
-            Err(req) => req,
+            Err(ExtractError::MethodMismatch(req)) => req,
+            Err(err @ ExtractError::JsonError { .. }) => panic!("{:?}", err),
         }
     };
 }
@@ -36,7 +37,8 @@ macro_rules! notification_match {
                 }
                 continue;
             }
-            Err(noti) => noti,
+            Err(ExtractError::MethodMismatch(noti)) => noti,
+            Err(err @ ExtractError::JsonError { .. }) => panic!("{:?}", err),
         }
     };
 }
@@ -240,7 +242,7 @@ fn generate_diagnostics(url: Url, diag: diag::Diag) -> Notification {
     Notification { method, params }
 }
 
-fn cast_request<R>(r: Request) -> Result<(RequestId, R::Params), Request>
+fn cast_request<R>(r: Request) -> Result<(RequestId, R::Params), ExtractError<Request>>
 where
     R: lsp_types::request::Request,
     R::Params: serde::de::DeserializeOwned,
@@ -248,7 +250,7 @@ where
     r.extract(R::METHOD)
 }
 
-fn cast_notification<N>(n: Notification) -> Result<N::Params, Notification>
+fn cast_notification<N>(n: Notification) -> Result<N::Params, ExtractError<Notification>>
 where
     N: lsp_types::notification::Notification,
     N::Params: serde::de::DeserializeOwned,
