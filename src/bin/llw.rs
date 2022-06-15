@@ -33,10 +33,8 @@ fn translate(matches: ArgMatches) -> std::io::Result<()> {
                 let mut printer = DebugPrinter::new();
                 printer.visit(root);
             }
-            if !diag.has_errors() {
-                if matches.is_present("graph") {
-                    GraphvizOutput::visit(root)?;
-                }
+            if !diag.has_errors() && matches.is_present("graph") {
+                GraphvizOutput::visit(root)?;
             }
         }
 

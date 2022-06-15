@@ -80,7 +80,7 @@ impl Lexer {
                 }
                 '\'' => {
                     if valid {
-                        let sym = self.get(1, 1).replace("\\", "").into_symbol();
+                        let sym = self.get(1, 1).replace('\\', "").into_symbol();
                         return self.emit(TokenKind::Str(sym));
                     } else {
                         self.error("invalid string literal");
