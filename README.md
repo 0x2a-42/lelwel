@@ -2,7 +2,7 @@
 [![Crates.io](https://img.shields.io/crates/v/lelwel)](https://crates.io/crates/lelwel)
 [![MIT/Apache 2.0](https://img.shields.io/crates/l/lelwel)](./LICENSE-MIT)
 [![Crates.io](https://img.shields.io/crates/d/lelwel)](https://crates.io/crates/lelwel)
-[![Rust](https://img.shields.io/github/workflow/status/0x2a-42/lelwel/Tests)](https://github.com/0x2a-42/lelwel/actions)
+[![Rust](https://img.shields.io/github/actions/workflow/status/0x2a-42/lelwel/rust.yml)](https://github.com/0x2a-42/lelwel/actions)
 
 [Lelwel](https://en.wikipedia.org/wiki/Lelwel_hartebeest) generates recursive descent parsers for Rust using [LL(1) grammars](https://en.wikipedia.org/wiki/LL_grammar).
 Conflicts are resolved with semantic predicates.
