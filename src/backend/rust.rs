@@ -938,6 +938,7 @@ impl RustOutput {
         output.write_all(
             b"use std::fmt;\n\
               impl fmt::Display for TokenKind {\
+            \n    #[allow(clippy::write_literal)]\
             \n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\
             \n        match self {\
             \n            pattern_EOF!() => write!(f, \"end of file\"),\n",
@@ -1008,6 +1009,7 @@ impl RustOutput {
             format!(
                 "pub struct Parser;\
                \n\
+               \n#[allow(clippy::needless_return, clippy::let_unit_value)]\
                \nimpl<'a> Parser {{\
                \n    pub fn parse<Input: TokenStream>(input: &mut Input{0}{1}) -> Result<{2}, {4}> {{\
                \n        input.advance();\

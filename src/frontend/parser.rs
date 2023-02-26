@@ -373,6 +373,7 @@ macro_rules! consume_ErrorHandler {
 
 use std::fmt;
 impl fmt::Display for TokenKind {
+    #[allow(clippy::write_literal)]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             pattern_EOF!() => write!(f, "end of file"),
@@ -407,6 +408,7 @@ impl fmt::Display for TokenKind {
 
 pub struct Parser;
 
+#[allow(clippy::needless_return, clippy::let_unit_value)]
 impl<'a> Parser {
     pub fn parse<Input: TokenStream>(input: &mut Input, ast: &'a Ast<Module<'a>>, diag: &mut Diag) -> Result<(), Code> {
         input.advance();

@@ -2,7 +2,7 @@ use std::process::Command;
 
 fn main() {
     if let Ok(cmd) = Command::new("llw")
-        .args(&["-o", "src/frontend", "src/frontend/lelwel.llw"])
+        .args(["-o", "src/frontend", "src/frontend/lelwel.llw"])
         .status()
     {
         if !cmd.success() {
