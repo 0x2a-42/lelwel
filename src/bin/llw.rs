@@ -8,37 +8,37 @@ use lelwel::{
 };
 
 fn translate(matches: ArgMatches) -> std::io::Result<()> {
-    if let Some(input) = matches.value_of("INPUT") {
+    if let Some(input) = matches.get_one::<String>("INPUT") {
         let mut config = lelwel::Config::new();
-        if matches.is_present("lexer") {
+        if matches.get_flag("lexer") {
             config.use_lexer();
         }
-        if matches.is_present("symbol") {
+        if matches.get_flag("symbol") {
             config.use_symbol();
         }
-        if matches.is_present("diag") {
+        if matches.get_flag("diag") {
             config.use_diag();
         }
-        if matches.is_present("ast") {
+        if matches.get_flag("ast") {
             config.use_ast();
         }
-        let output = matches.value_of("output").unwrap_or(".");
+        let output = matches.get_one::<String>("output").unwrap();
         lelwel::output_llw_skel(input)?;
         let ast = Ast::new();
         let contents = std::fs::read_to_string(input)?;
         let diag = lelwel::run_frontend(input, contents, &ast);
 
         if let Some(root) = ast.root() {
-            if matches.is_present("verbose") {
+            if matches.get_flag("verbose") {
                 let mut printer = DebugPrinter::new();
                 printer.visit(root);
             }
-            if !diag.has_errors() && matches.is_present("graph") {
+            if !diag.has_errors() && matches.get_flag("graph") {
                 GraphvizOutput::visit(root)?;
             }
         }
 
-        if !matches.is_present("check") {
+        if !matches.get_flag("check") {
             lelwel::run_backend(config, &ast, &diag, output, crate_version!())?;
         }
 
@@ -65,7 +65,7 @@ fn main() {
         .arg(arg!(-g --graph         "Output a graphviz file for the grammar"))
         .arg(arg!(<INPUT>            "Sets the input file to use"))
         .arg(arg!(-v --verbose       "Sets the level of verbosity"))
-        .arg(arg!(-o --output <FILE> "Sets the output directory").required(false))
+        .arg(arg!(-o --output <FILE> "Sets the output directory").default_value(".").required(false))
         .after_help("Report bugs to <https://github.com/0x2a-42/lelwel>.")
         .get_matches();
 
