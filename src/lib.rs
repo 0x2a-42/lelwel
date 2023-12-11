@@ -1,141 +1,106 @@
+use std::fs::File;
+use std::io::Write;
+use std::path::Path;
+
+use codespan_reporting::diagnostic::Severity;
+use codespan_reporting::files::SimpleFile;
+use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
+use codespan_reporting::term::{self, DisplayStyle};
+use logos::Logos;
+
+use backend::rust::RustOutput;
+use frontend::parser::*;
+use frontend::printer::DebugPrinter;
+use frontend::sema::*;
+use frontend::symbols::StringInterner;
+
+use self::backend::graphviz::GraphvizOutput;
+
 pub mod backend;
 pub mod frontend;
 pub mod ide;
 
-use crate::{
-    backend::rust::*,
-    frontend::{ast::*, diag::*, lexer::*, parser::*, sema::*, token::*},
-};
+const VERSION: &str = "0.5.0";
 
-#[derive(Clone, Copy)]
-pub struct Config(usize);
-
-impl Config {
-    pub fn new() -> Self {
-        Self(0)
+pub fn build(path: &str) {
+    let res = compile(
+        path,
+        &std::env::var("OUT_DIR").unwrap(),
+        false,
+        false,
+        false,
+        false,
+    );
+    match res {
+        Err(err) => {
+            eprintln!("{err}");
+            std::process::exit(1);
+        }
+        Ok(false) => std::process::exit(1),
+        Ok(true) => {}
     }
-    pub fn use_lexer(&mut self) -> Self {
-        self.0 |= 1;
-        *self
-    }
-    pub fn use_symbol(&mut self) -> Self {
-        self.0 |= 2;
-        *self
-    }
-    pub fn use_diag(&mut self) -> Self {
-        self.0 |= 4;
-        *self
-    }
-    pub fn use_ast(&mut self) -> Self {
-        self.0 |= 8;
-        *self
-    }
-    fn has_lexer(&self) -> bool {
-        self.0 & 1 != 0
-    }
-    fn has_symbol(&self) -> bool {
-        self.0 & 2 != 0
-    }
-    fn has_diag(&self) -> bool {
-        self.0 & 4 != 0
-    }
-    fn has_ast(&self) -> bool {
-        self.0 & 8 != 0
-    }
+    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed={path}");
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        Self::new()
-    }
+fn create_new_llw(path: &Path) -> std::io::Result<()> {
+    let mut file = File::create(path)?;
+    file.write_all(
+        b"start:\
+        \n  #1\
+        \n;\
+        \n\
+        \nstart#1 {\
+        \n    Ok(())\
+        \n}",
+    )
 }
 
-pub fn run_frontend<'a>(path: &str, contents: String, ast: &'a Ast<Module<'a>>) -> Diag {
-    let mut diag = Diag::new(path, 100);
-    let mut lexer = Lexer::new(contents, false);
-    if let Err(code) = Parser::parse(&mut lexer, ast, &mut diag) {
-        diag.error(code, lexer.current().range);
-    }
-    for (range, msg) in lexer.error_iter() {
-        diag.error(Code::ParserError(msg), *range);
-    }
-    if let Some(root) = ast.root() {
-        SemanticPass::run(root, &mut diag);
-    }
-    diag
-}
-
-pub fn run_backend(
-    config: Config,
-    ast: &Ast<Module>,
-    diag: &Diag,
+pub fn compile(
+    input: &str,
     output: &str,
-    version: &str,
-) -> std::io::Result<()> {
-    if !diag.has_errors() {
-        let path = std::path::Path::new(output);
-        let root = ast.root().unwrap();
-        match root.language.get() {
-            None => {
-                output_rust(config, root, path, version)?;
+    check: bool,
+    verbose: bool,
+    graph: bool,
+    short: bool,
+) -> std::io::Result<bool> {
+    let input_path = Path::new(input);
+    if !check && !input_path.exists() {
+        create_new_llw(input_path)?;
+    }
+
+    let content = std::fs::read_to_string(input)?;
+    let mut tokens = TokenStream::new(Token::lexer(&content), input);
+
+    let file = SimpleFile::new(input, &content);
+
+    let mut diags = vec![];
+    let mut interner = StringInterner::new();
+
+    if let Some(mut module) = Parser::parse(&mut tokens, &mut diags, &mut interner) {
+        SemanticPass::run(&mut module, &mut diags);
+        if verbose {
+            DebugPrinter::new().visit(&module);
+        }
+        if !diags.iter().any(|d| d.severity == Severity::Error) {
+            if graph {
+                GraphvizOutput::visit(&module)?;
             }
-            Some(Element {
-                kind: ElementKind::Language { name },
-                ..
-            }) if name.as_str() == "rust" => {
-                output_rust(config, root, path, version)?;
+            if !check {
+                RustOutput::create(&module, input_path, Path::new(output))?;
             }
-            _ => {}
         }
     }
-    Ok(())
-}
 
-pub fn output_llw_skel(input: &str) -> std::io::Result<()> {
-    let path = std::path::Path::new(input);
-    if !path.exists() {
-        RustOutput::create_llw_skel(path)?;
+    let mut success = true;
+    let writer = StandardStream::stderr(ColorChoice::Auto);
+    let mut config = codespan_reporting::term::Config::default();
+    if short {
+        config.display_style = DisplayStyle::Short;
     }
-    Ok(())
-}
-
-pub fn output_rust(
-    config: Config,
-    root: &Module,
-    path: &std::path::Path,
-    version: &str,
-) -> std::io::Result<()> {
-    RustOutput::create_parser(root, path, version)?;
-    RustOutput::create_token(path)?;
-    if config.has_lexer() {
-        RustOutput::create_lexer(path)?;
+    for diag in diags {
+        term::emit(&mut writer.lock(), &config, &file, &diag).unwrap();
+        success &= diag.severity != Severity::Error;
     }
-    if config.has_symbol() {
-        RustOutput::create_symbol(path)?;
-    }
-    if config.has_diag() {
-        RustOutput::create_diag(path)?;
-    }
-    if config.has_ast() {
-        RustOutput::create_ast(path)?;
-    }
-    Ok(())
-}
-
-pub fn generate(config: Config, input: &str, output: &str) -> std::io::Result<()> {
-    output_llw_skel(input)?;
-    let ast = Ast::new();
-    let contents = std::fs::read_to_string(input)?;
-    let diag = run_frontend(input, contents, &ast);
-    run_backend(config, &ast, &diag, output, "")?;
-
-    if !diag.has_errors() {
-        Ok(())
-    } else {
-        diag.print(false);
-        Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "invalid lelwel file",
-        ))
-    }
+    Ok(success)
 }

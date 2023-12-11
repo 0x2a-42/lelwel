@@ -1,213 +1,323 @@
-use super::ast::*;
-use super::diag::*;
-use super::symbol::*;
-use super::token::*;
+use codespan_reporting::diagnostic::Severity;
 use std::collections::{BTreeSet, HashMap, HashSet};
-use std::iter::FromIterator;
+
+use super::ast::*;
+use super::diag::LanguageErrors;
+use super::parser::*;
+use super::symbols;
+use super::symbols::Symbol;
 
 pub struct SemanticPass {}
 
-impl<'a> SemanticPass {
-    pub fn run(module: &'a Module<'a>, diag: &mut Diag) {
-        GeneralValidator::run(module, diag);
-        if diag.has_errors() {
+impl SemanticPass {
+    pub fn run(module: &mut Module, diags: &mut Vec<Diagnostic>) {
+        GeneralValidator::run(module, diags);
+        if diags.iter().any(|d| d.severity == Severity::Error) {
             return;
         }
-        UsageValidator::run(module, diag);
-        LL1Validator::run(module, diag);
+        UsageValidator::run(module, diags);
+        LL1Validator::run(module, diags);
         CancelSetGenerator::new().run(module);
     }
 }
 
 /// general validation of the AST
-struct GeneralValidator {}
+struct GeneralValidator;
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
-pub enum Binding {
-    Term(Symbol),
-    Token(Symbol),
-    Action(Symbol, u64),
-    Predicate(Symbol, u64),
-    ErrorHandler(Symbol, u64),
-    Preamble,
+pub enum Binding<'a> {
+    Term(Symbol<'a>),
+    Token(Symbol<'a>),
+    Action(Symbol<'a>, u64),
+    Predicate(Symbol<'a>, u64),
+    ErrorHandler(Symbol<'a>, u64),
     Parameters,
-    Error,
-    Limit,
-    Language,
 }
 
-impl std::fmt::Display for Binding {
+impl<'a> Symbol<'a> {
+    fn get_element_kind(self) -> &'static str {
+        if self.0.starts_with(|c: char| c.is_uppercase()) {
+            "token"
+        } else {
+            "rule"
+        }
+    }
+}
+
+impl<'a> std::fmt::Display for Binding<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Term(name) => write!(f, "element '{}'", name),
-            Self::Token(name) => write!(f, "token string '{}'", name),
-            Self::Action(name, num) => write!(f, "action '{}#{}'", name, num),
-            Self::Predicate(name, num) => write!(f, "predicate '{}?{}'", name, num),
-            Self::ErrorHandler(name, num) => write!(f, "error handler '{}!{}'", name, num),
-            Self::Preamble => write!(f, "preamble section"),
+            Self::Term(name) => write!(f, "{} `{}`", name.get_element_kind(), name),
+            Self::Token(name) => write!(f, "token string `{}`", name),
+            Self::Action(name, num) => write!(f, "action `{}#{}`", name, num),
+            Self::Predicate(name, num) => write!(f, "predicate `{}?{}`", name, num),
+            Self::ErrorHandler(name, num) => write!(f, "error handler `{}!{}`", name, num),
             Self::Parameters => write!(f, "parameters section"),
-            Self::Error => write!(f, "error section"),
-            Self::Limit => write!(f, "limit"),
-            Self::Language => write!(f, "language"),
         }
     }
 }
 
-impl<'a, 'b> GeneralValidator {
-    fn run(module: &'a Module<'b>, diag: &mut Diag) {
+impl<'a> GeneralValidator {
+    fn run(module: &mut Module<'a>, diags: &mut Vec<Diagnostic>) {
         // bind rule names to corresponding elements
-        let bindings = Self::bind_elements(module, diag);
-
-        // check if there is a start rule
-        if !bindings.contains_key(&Binding::Term(Symbol::START)) {
-            diag.error(Code::MissingStart, Range::default());
-        }
-
-        if let Some(preamble) = bindings.get(&Binding::Preamble) {
-            module.preamble.set(Some(*preamble));
-        }
-        if let Some(parameters) = bindings.get(&Binding::Parameters) {
-            module.parameters.set(Some(*parameters));
-        }
-        if let Some(error) = bindings.get(&Binding::Error) {
-            module.error.set(Some(*error));
-        }
-        if let Some(limit) = bindings.get(&Binding::Limit) {
-            module.limit.set(Some(*limit));
-        }
-        if let Some(language) = bindings.get(&Binding::Language) {
-            module.language.set(Some(*language));
-            if let ElementKind::Language { name } = language.kind {
-                match name {
-                    Symbol::RUST => {}
-                    _ => {
-                        diag.error(Code::InvalidLang(name), language.range());
-                    }
-                }
-            }
-        }
+        Self::bind_elements(module, diags);
 
         // check elements
-        for element in module.elements.iter() {
-            Self::check_element(element, diag, &bindings);
+        for index in 0..module.elements.len() {
+            let element_ref = ElementRef::from(index);
+            Self::check_element(module, element_ref, diags);
         }
     }
 
-    fn bind(
-        binding: Binding,
-        element: &'b Element<'b>,
-        bindings: &mut HashMap<Binding, &'b Element<'b>>,
-        diag: &mut Diag,
-    ) {
-        if let Some(old) = bindings.insert(binding, element) {
-            diag.error_with_related(
-                Code::Redefinition(binding),
-                element.range(),
-                vec![(old.range(), "from here".to_string())],
-            );
-        }
-    }
-
-    fn bind_elements(module: &'a Module<'b>, diag: &mut Diag) -> HashMap<Binding, &'b Element<'b>> {
-        let mut bindings = HashMap::new();
-        for element in module.elements.iter() {
-            match element.kind {
-                ElementKind::Start { .. } => {
-                    Self::bind(Binding::Term(Symbol::START), element, &mut bindings, diag);
+    /// maps error handlers to their associated regex
+    fn map_error_handlers(
+        module: &Module<'a>,
+        regex: RegexRef,
+        diags: &mut Vec<Diagnostic>,
+        map: &mut Vec<RegexRef>,
+    ) -> Option<RegexRef> {
+        let obj = module.get_regex(regex).unwrap();
+        match obj.kind {
+            RegexKind::Concat { ref ops, .. } => {
+                if ops.len() == 1 {
+                    Self::map_error_handlers(module, ops[0], diags, map)
+                } else {
+                    let mut found = None;
+                    for (i, op) in ops.iter().enumerate() {
+                        found = Self::map_error_handlers(module, *op, diags, map);
+                        if found.is_some() && i != ops.len() - 1 {
+                            // only allow error handler as last term in concatenation
+                            diags.push(Diagnostic::invalid_error_handler_pos(
+                                &module.get_regex(*op).unwrap().span,
+                                &module.get_regex(*ops.last().unwrap()).unwrap().span,
+                            ));
+                        }
+                    }
+                    if let Some(found) = found {
+                        map[regex.0] = found;
+                    }
+                    None
                 }
-                ElementKind::Rule { name, .. } => {
-                    Self::bind(Binding::Term(name), element, &mut bindings, diag);
+            }
+            RegexKind::Or { ref ops, .. } => {
+                let mut found = None;
+                for op in ops {
+                    let last_found = found;
+                    found = Self::map_error_handlers(module, *op, diags, map);
+                    if let (Some(found), Some(last_found)) = (found, last_found) {
+                        // only allow single error handler associated with alternative
+                        diags.push(Diagnostic::multiple_error_handler_alt(
+                            &module.get_regex(found).unwrap().span,
+                            &module.get_regex(last_found).unwrap().span,
+                            &obj.span,
+                        ));
+                    }
+                }
+                if let Some(found) = found {
+                    map[regex.0] = found;
+                }
+                None
+            }
+            RegexKind::Star { op } | RegexKind::Plus { op } | RegexKind::Option { op } => {
+                Self::map_error_handlers(module, op, diags, map);
+                // don't propagate error handler association from here
+                None
+            }
+            RegexKind::Paren { op } => Self::map_error_handlers(module, op, diags, map),
+            RegexKind::ErrorHandler { .. } => Some(regex),
+            _ => None,
+        }
+    }
+
+    fn bind_elements(module: &mut Module<'a>, diags: &mut Vec<Diagnostic>) {
+        let mut bindings = HashMap::new();
+        let mut bind = |binding, element, diags: &mut Vec<Diagnostic>, span| {
+            if let Some(old) = bindings.insert(binding, element) {
+                let old_span = &module.get_element(old).unwrap().span;
+                diags.push(Diagnostic::redefinition(span, binding, old_span));
+            }
+        };
+
+        let mut error_handler_map = vec![RegexRef::INVALID; module.regexes.len()];
+
+        for (index, element) in module.elements.iter().enumerate() {
+            let element_ref = ElementRef::from(index);
+            let span = &element.span;
+            match element.kind {
+                ElementKind::Start { regex, .. } => {
+                    bind(Binding::Term(symbols::START), element_ref, diags, span);
+                    Self::map_error_handlers(module, regex, diags, &mut error_handler_map);
+                }
+                ElementKind::Rule { name, regex, .. } => {
+                    bind(Binding::Term(name), element_ref, diags, span);
+                    Self::map_error_handlers(module, regex, diags, &mut error_handler_map);
                 }
                 ElementKind::Token { name, sym, .. } => {
-                    if name == Symbol::EOF {
-                        diag.error(Code::PredefToken, element.range());
+                    if name == symbols::EOF {
+                        diags.push(Diagnostic::predefined_token_name(span));
                         continue;
                     }
-                    Self::bind(Binding::Term(name), element, &mut bindings, diag);
-                    if sym != Symbol::EMPTY {
-                        Self::bind(Binding::Token(sym), element, &mut bindings, diag);
+                    bind(Binding::Term(name), element_ref, diags, span);
+                    if sym != symbols::EMPTY {
+                        bind(Binding::Token(sym), element_ref, diags, span);
                     }
                 }
                 ElementKind::Action { name, num, .. } => {
-                    Self::bind(Binding::Action(name, num), element, &mut bindings, diag);
+                    bind(Binding::Action(name, num), element_ref, diags, span);
                 }
                 ElementKind::Predicate { name, num, .. } => {
-                    Self::bind(Binding::Predicate(name, num), element, &mut bindings, diag);
+                    bind(Binding::Predicate(name, num), element_ref, diags, span);
                 }
                 ElementKind::ErrorHandler { name, num, .. } => {
-                    Self::bind(
-                        Binding::ErrorHandler(name, num),
-                        element,
-                        &mut bindings,
-                        diag,
-                    );
-                }
-                ElementKind::Preamble { .. } => {
-                    Self::bind(Binding::Preamble, element, &mut bindings, diag);
+                    bind(Binding::ErrorHandler(name, num), element_ref, diags, span);
                 }
                 ElementKind::Parameters { .. } => {
-                    Self::bind(Binding::Parameters, element, &mut bindings, diag);
+                    bind(Binding::Parameters, element_ref, diags, span)
                 }
-                ElementKind::ErrorCode { .. } => {
-                    Self::bind(Binding::Error, element, &mut bindings, diag);
+                ElementKind::Invalid => {}
+            }
+        }
+
+        // check if there is a start rule
+        if !bindings.contains_key(&Binding::Term(symbols::START)) {
+            diags.push(Diagnostic::missing_start_rule());
+        }
+
+        Self::update_ast(module, bindings, error_handler_map, diags);
+    }
+
+    fn update_ast(
+        module: &mut Module<'a>,
+        bindings: HashMap<Binding, ElementRef>,
+        error_handler_map: Vec<RegexRef>,
+        diags: &mut Vec<Diagnostic>,
+    ) {
+        for element in module.elements.iter_mut() {
+            match element.kind {
+                ElementKind::Start { ref mut action, .. } => {
+                    if let Some(e) = bindings.get(&Binding::Action(symbols::START, 0)) {
+                        *action = *e;
+                    }
                 }
-                ElementKind::Limit { .. } => {
-                    Self::bind(Binding::Limit, element, &mut bindings, diag);
+                ElementKind::Rule {
+                    name,
+                    ref mut action,
+                    ..
+                } => {
+                    if let Some(e) = bindings.get(&Binding::Action(name, 0)) {
+                        *action = *e;
+                    }
                 }
-                ElementKind::Language { .. } => {
-                    Self::bind(Binding::Language, element, &mut bindings, diag);
+                ElementKind::Action {
+                    name,
+                    ref name_span,
+                    ..
+                }
+                | ElementKind::Predicate {
+                    name,
+                    ref name_span,
+                    ..
+                } => {
+                    if !bindings.contains_key(&Binding::Term(name)) {
+                        diags.push(Diagnostic::undefined_rule(name_span, name, &element.span));
+                    }
                 }
                 _ => {}
             }
         }
-        bindings
+        for (i, regex) in module.regexes.iter_mut().enumerate() {
+            match regex.kind {
+                RegexKind::Id {
+                    name, ref mut elem, ..
+                } => match bindings.get(&Binding::Term(name)) {
+                    Some(e) => *elem = *e,
+                    None => diags.push(Diagnostic::missing_definition(
+                        &regex.span,
+                        name.get_element_kind(),
+                        name,
+                    )),
+                },
+                RegexKind::Str { val, ref mut elem } => match bindings.get(&Binding::Token(val)) {
+                    Some(e) => *elem = *e,
+                    None => diags.push(Diagnostic::missing_definition(&regex.span, "token", val)),
+                },
+                RegexKind::Concat { ref mut error, .. } => {
+                    *error = error_handler_map[i];
+                }
+                RegexKind::Or { ref mut error, .. } => {
+                    *error = error_handler_map[i];
+                }
+                RegexKind::Action {
+                    rule_name,
+                    val,
+                    ref mut elem,
+                } => match bindings.get(&Binding::Action(rule_name, val)) {
+                    Some(e) => *elem = *e,
+                    None => diags.push(Diagnostic::missing_definition_warning(
+                        &regex.span,
+                        "action",
+                        rule_name,
+                        "#",
+                        val,
+                    )),
+                },
+                RegexKind::Predicate {
+                    rule_name,
+                    val,
+                    ref mut elem,
+                } => match bindings.get(&Binding::Predicate(rule_name, val)) {
+                    Some(e) => *elem = *e,
+                    None => diags.push(Diagnostic::missing_definition_warning(
+                        &regex.span,
+                        "predicate",
+                        rule_name,
+                        "?",
+                        val,
+                    )),
+                },
+                RegexKind::ErrorHandler {
+                    rule_name,
+                    val,
+                    ref mut elem,
+                    ..
+                } => match bindings.get(&Binding::ErrorHandler(rule_name, val)) {
+                    Some(e) => *elem = *e,
+                    None => diags.push(Diagnostic::missing_definition_warning(
+                        &regex.span,
+                        "error handler",
+                        rule_name,
+                        "!",
+                        val,
+                    )),
+                },
+                _ => {}
+            }
+        }
     }
 
-    fn check_element(
-        element: &'b Element<'b>,
-        diag: &mut Diag,
-        bindings: &HashMap<Binding, &'b Element<'b>>,
-    ) {
-        match &element.kind {
-            ElementKind::Start { regex, action, .. } => {
-                if let Some(e) = bindings.get(&Binding::Action(Symbol::START, 0)) {
-                    action.set(e)
-                }
+    fn check_element(module: &Module<'a>, element: ElementRef, diags: &mut Vec<Diagnostic>) {
+        let obj = module.get_element(element).unwrap();
+        match obj.kind {
+            ElementKind::Start { regex, .. } => {
                 let mut num = (1, 1, 1);
-                Self::check_regex(regex, diag, Symbol::START, &mut num, None, false, bindings);
+                Self::check_regex(module, regex, diags, &mut num, false, false);
             }
             ElementKind::Rule {
                 name,
+                ref name_span,
                 regex,
-                action,
                 ..
             } => {
-                if name
-                    .as_str()
-                    .trim_start_matches('_')
-                    .starts_with(|c: char| c.is_uppercase())
-                {
-                    diag.error(Code::UppercaseRule(*name), element.range());
-                }
-                if let Some(e) = bindings.get(&Binding::Action(*name, 0)) {
-                    action.set(e)
+                if name.0.starts_with(|c: char| c.is_uppercase()) {
+                    diags.push(Diagnostic::uppercase_rule(name_span, name));
                 }
                 let mut num = (1, 1, 1);
-                Self::check_regex(regex, diag, *name, &mut num, None, false, bindings);
+                Self::check_regex(module, regex, diags, &mut num, false, false);
             }
             ElementKind::Token { name, .. } => {
                 // check if token name starts with uppercase letter
-                if name
-                    .as_str()
-                    .trim_start_matches('_')
-                    .starts_with(|c: char| c.is_lowercase())
-                {
-                    diag.error(Code::LowercaseToken(*name), element.range());
-                }
-            }
-            ElementKind::Action { name, .. } | ElementKind::Predicate { name, .. } => {
-                if !bindings.contains_key(&Binding::Term(*name)) {
-                    diag.error(Code::UndefinedElement(*name), element.range());
+                if name.0.starts_with(|c: char| c.is_lowercase()) {
+                    diags.push(Diagnostic::lowercase_token(&obj.span, name));
                 }
             }
             _ => {}
@@ -215,95 +325,67 @@ impl<'a, 'b> GeneralValidator {
     }
 
     fn check_regex(
-        regex: &'b Regex<'b>,
-        diag: &mut Diag,
-        name: Symbol,
+        module: &Module<'a>,
+        regex: RegexRef,
+        diags: &mut Vec<Diagnostic>,
         num: &mut (u64, u64, u64),
-        alt: Option<&'b Regex<'b>>,
+        in_alt: bool,
         in_loop: bool,
-        bindings: &HashMap<Binding, &'b Element<'b>>,
     ) {
-        match &regex.kind {
-            RegexKind::Id { name, elem, .. } => match bindings.get(&Binding::Term(*name)) {
-                Some(e) => elem.set(e),
-                None => diag.error(Code::UndefinedElement(*name), regex.range()),
-            },
-            RegexKind::Str { val, elem } => match bindings.get(&Binding::Token(*val)) {
-                Some(e) => elem.set(e),
-                None => diag.error(Code::UndefinedElement(*val), regex.range()),
-            },
-            RegexKind::Concat { ops, error } => {
-                let mut alt = alt;
+        let obj = module.get_regex(regex).unwrap();
+        match obj.kind {
+            RegexKind::Concat { ref ops, .. } => {
+                let mut in_alt = in_alt;
                 let mut in_loop = in_loop;
-                for (i, op) in ops.iter().enumerate() {
-                    if let RegexKind::ErrorHandler { .. } = op.kind {
-                        if i != ops.len() - 1 {
-                            // only allow error handler as last term in concatenation
-                            diag.error(Code::ErrorSyntax, regex.range());
-                        } else {
-                            error.set(op);
-                        }
-                    }
-                    Self::check_regex(op, diag, name, num, alt, in_loop, bindings);
-                    alt = None;
+                for op in ops {
+                    Self::check_regex(module, *op, diags, num, in_alt, in_loop);
+                    in_alt = false;
                     in_loop = false;
                 }
             }
-            RegexKind::Or { ops, .. } => {
+            RegexKind::Or { ref ops, .. } => {
                 for op in ops {
-                    Self::check_regex(op, diag, name, num, Some(regex), false, bindings);
+                    Self::check_regex(module, *op, diags, num, true, false);
                 }
             }
             RegexKind::Star { op } | RegexKind::Plus { op } | RegexKind::Option { op } => {
-                Self::check_regex(op, diag, name, num, None, true, bindings);
+                Self::check_regex(module, op, diags, num, false, true);
             }
             RegexKind::Paren { op } => {
-                Self::check_regex(op, diag, name, num, None, in_loop, bindings);
+                Self::check_regex(module, op, diags, num, false, in_loop);
             }
-            RegexKind::Action { val, elem } => {
-                match bindings.get(&Binding::Action(name, *val)) {
-                    Some(e) => elem.set(e),
-                    None => diag.warning(Code::UndefinedAction, regex.range()),
-                }
-                if num.0 == *val && num.0 < u64::MAX {
+            RegexKind::Action { val, .. } => {
+                if num.0 == val && num.0 < u64::MAX {
                     num.0 += 1;
-                } else if num.0 - 1 != *val {
-                    diag.error(Code::ExpectedAction(num.0), regex.range());
+                } else if num.0 - 1 != val {
+                    diags.push(Diagnostic::invalid_number(&obj.span, "action", "#", num.0));
                 }
             }
-            RegexKind::Predicate { val, elem } => {
-                if alt.is_none() && !in_loop {
-                    diag.error(Code::PredPosition, regex.range());
+            RegexKind::Predicate { val, .. } => {
+                if !in_alt && !in_loop {
+                    diags.push(Diagnostic::invalid_predicate_pos(&obj.span));
                 }
-                match bindings.get(&Binding::Predicate(name, *val)) {
-                    Some(e) => elem.set(e),
-                    None => diag.warning(Code::UndefinedPredicate, regex.range()),
-                }
-                if num.1 == *val && num.1 < u64::MAX {
+                if num.1 == val && num.1 < u64::MAX {
                     num.1 += 1;
-                } else if num.1 - 1 != *val || *val == 0 {
-                    diag.error(Code::ExpectedPredicate(num.1), regex.range());
+                } else if num.1 - 1 != val || val == 0 {
+                    diags.push(Diagnostic::invalid_number(
+                        &obj.span,
+                        "predicate",
+                        "?",
+                        num.1,
+                    ));
                 }
             }
-            RegexKind::ErrorHandler { val, elem, .. } => {
-                match bindings.get(&Binding::ErrorHandler(name, *val)) {
-                    Some(e) => elem.set(e),
-                    None => diag.warning(Code::UndefinedErrorHandler, regex.range()),
-                }
-                if let Some(Regex {
-                    kind: RegexKind::Or { error, .. },
-                    ..
-                }) = alt
-                {
-                    if error.get().is_some() {
-                        diag.error(Code::ErrorCount, regex.range());
-                    }
-                    error.set(regex);
-                }
-                if num.2 == *val && num.2 < u64::MAX {
+            RegexKind::ErrorHandler { val, .. } => {
+                if num.2 == val && num.2 < u64::MAX {
                     num.2 += 1;
-                } else if num.2 - 1 != *val || *val == 0 {
-                    diag.error(Code::ExpectedErrorHandler(num.2), regex.range());
+                } else if num.2 - 1 != val || val == 0 {
+                    diags.push(Diagnostic::invalid_number(
+                        &obj.span,
+                        "error handler",
+                        "!",
+                        num.2,
+                    ));
                 }
             }
             _ => {}
@@ -311,18 +393,24 @@ impl<'a, 'b> GeneralValidator {
     }
 }
 
-struct LL1Validator {}
+struct LL1Validator;
 
 impl<'a> LL1Validator {
     /// Validates that the grammar is an LL(1) grammar.
-    fn run(module: &Module, diag: &mut Diag) {
-        Self::calc_first_elements(module);
-        Self::calc_follow_elements(module);
-        Self::check_elements(module, diag);
+    fn run(module: &mut Module, diags: &mut Vec<Diagnostic>) {
+        let mut first_sets = vec![BTreeSet::<Symbol>::new(); module.regexes.len()];
+        let mut follow_sets = vec![BTreeSet::<Symbol>::new(); module.regexes.len()];
+        Self::calc_first(module, &mut first_sets);
+        Self::calc_follow(module, &first_sets, &mut follow_sets);
+        for (i, regex) in module.regexes.iter_mut().enumerate() {
+            std::mem::swap(&mut regex.first, &mut first_sets[i]);
+            std::mem::swap(&mut regex.follow, &mut follow_sets[i]);
+        }
+        Self::check(module, diags);
     }
 
     /// Calculates the first set for each grammar rule.
-    fn calc_first_elements(module: &Module) {
+    fn calc_first(module: &mut Module<'a>, first_sets: &mut [BTreeSet<Symbol<'a>>]) {
         // Iterates until there are no more changes in the first sets
         let mut change = true;
         while change {
@@ -330,7 +418,7 @@ impl<'a> LL1Validator {
             for element in module.elements.iter() {
                 match element.kind {
                     ElementKind::Start { regex, .. } | ElementKind::Rule { regex, .. } => {
-                        Self::calc_first_regex(regex, &mut change);
+                        Self::calc_first_regex(regex, first_sets, module, &mut change);
                     }
                     _ => {}
                 }
@@ -339,82 +427,104 @@ impl<'a> LL1Validator {
     }
 
     /// Calculates the first set for each regular expression within a rule.
-    fn calc_first_regex(regex: &'a Regex<'a>, change: &mut bool) {
-        let size = regex.first().len();
-        match &regex.kind {
-            RegexKind::Id { elem, .. } => match elem.get().unwrap().kind {
+    fn calc_first_regex(
+        regex_ref: RegexRef,
+        first_sets: &mut [BTreeSet<Symbol<'a>>],
+        module: &Module<'a>,
+        change: &mut bool,
+    ) {
+        let size = first_sets[regex_ref.0].len();
+        match module.get_regex(regex_ref).unwrap().kind {
+            RegexKind::Id { elem, .. } => match module.get_element(elem).unwrap().kind {
                 ElementKind::Rule {
                     regex: rule_regex, ..
                 } => {
-                    let first = rule_regex.first().clone();
-                    regex.first_mut().extend(first.into_iter());
+                    let first = first_sets[rule_regex.0].clone();
+                    first_sets[regex_ref.0].extend(first);
                 }
                 ElementKind::Token { name, .. } => {
-                    regex.first_mut().insert(name);
+                    first_sets[regex_ref.0].insert(name);
                 }
                 _ => unreachable!(),
             },
-            RegexKind::Concat { ops, .. } => {
+            RegexKind::Concat { ref ops, .. } => {
                 let mut use_next = true;
                 for op in ops {
-                    Self::calc_first_regex(op, change);
+                    Self::calc_first_regex(*op, first_sets, module, change);
                     // only add next first set if there was an epsilon
                     if use_next {
-                        use_next = op.first().contains(&Symbol::EMPTY);
-                        regex.first_mut().extend(op.first().iter());
-                        regex.first_mut().remove(&Symbol::EMPTY);
+                        let op_first = first_sets[op.0].clone();
+                        use_next = op_first.contains(&symbols::EMPTY);
+                        first_sets[regex_ref.0].extend(op_first.into_iter());
+                        first_sets[regex_ref.0].remove(&symbols::EMPTY);
                     }
                 }
                 if use_next {
-                    regex.first_mut().insert(Symbol::EMPTY);
+                    first_sets[regex_ref.0].insert(symbols::EMPTY);
                 }
             }
-            RegexKind::Or { ops, .. } => {
+            RegexKind::Or { ref ops, .. } => {
                 for op in ops {
-                    if let RegexKind::ErrorHandler { .. } = op.kind {
+                    if let RegexKind::ErrorHandler { .. } = module.get_regex(*op).unwrap().kind {
                         // error handler in alternation has empty first set to avoid conflicts
                     } else {
-                        Self::calc_first_regex(op, change);
-                        regex.first_mut().extend(op.first().iter());
+                        Self::calc_first_regex(*op, first_sets, module, change);
+                        let op_first = first_sets[op.0].clone();
+                        first_sets[regex_ref.0].extend(op_first.into_iter());
                     }
                 }
             }
             RegexKind::Star { op } | RegexKind::Option { op } => {
-                Self::calc_first_regex(op, change);
-                regex.first_mut().extend(op.first().iter());
-                regex.first_mut().insert(Symbol::EMPTY);
+                Self::calc_first_regex(op, first_sets, module, change);
+                let op_first = first_sets[op.0].clone();
+                let first = &mut first_sets[regex_ref.0];
+                first.extend(op_first);
+                first.insert(symbols::EMPTY);
             }
             RegexKind::Plus { op } | RegexKind::Paren { op } => {
-                Self::calc_first_regex(op, change);
-                regex.first_mut().extend(op.first().iter());
+                Self::calc_first_regex(op, first_sets, module, change);
+                let op_first = first_sets[op.0].clone();
+                first_sets[regex_ref.0].extend(op_first);
             }
-            RegexKind::Str { elem, .. } => match elem.get().unwrap().kind {
+            RegexKind::Str { elem, .. } => match module.get_element(elem).unwrap().kind {
                 ElementKind::Token { name, .. } => {
-                    regex.first_mut().insert(name);
+                    first_sets[regex_ref.0].insert(name);
                 }
                 _ => unreachable!(),
             },
             _ => {
-                regex.first_mut().insert(Symbol::EMPTY);
+                first_sets[regex_ref.0].insert(symbols::EMPTY);
             }
         };
-        *change |= regex.first().len() != size;
+        *change |= first_sets[regex_ref.0].len() != size;
     }
 
     /// Calculates the follow set for each grammar rule.
-    fn calc_follow_elements(module: &Module) {
+    fn calc_follow(
+        module: &Module<'a>,
+        first_sets: &[BTreeSet<Symbol<'a>>],
+        follow_sets: &mut [BTreeSet<Symbol<'a>>],
+    ) {
+        for element in module.elements.iter() {
+            if let ElementKind::Start { regex, .. } = element.kind {
+                follow_sets[regex.0].insert(symbols::EOF);
+                break;
+            }
+        }
         // Iterates until there are no more changes in the follow sets
         let mut change = true;
         while change {
             change = false;
             for element in module.elements.iter() {
                 match element.kind {
-                    ElementKind::Start { regex, .. } => {
-                        regex.follow_mut().insert(Symbol::EOF);
-                        Self::calc_follow_regex(regex, &mut change);
-                    }
-                    ElementKind::Rule { regex, .. } => {
-                        Self::calc_follow_regex(regex, &mut change);
+                    ElementKind::Start { regex, .. } | ElementKind::Rule { regex, .. } => {
+                        Self::calc_follow_regex(
+                            regex,
+                            first_sets,
+                            follow_sets,
+                            module,
+                            &mut change,
+                        );
                     }
                     _ => {}
                 }
@@ -423,133 +533,138 @@ impl<'a> LL1Validator {
     }
 
     /// Calculates the follow set for each regular expression within a rule.
-    fn calc_follow_regex(regex: &'a Regex<'a>, change: &mut bool) {
-        match &regex.kind {
+    fn calc_follow_regex(
+        regex_ref: RegexRef,
+        first_sets: &[BTreeSet<Symbol<'a>>],
+        follow_sets: &mut [BTreeSet<Symbol<'a>>],
+        module: &Module<'a>,
+        change: &mut bool,
+    ) {
+        match module.get_regex(regex_ref).unwrap().kind {
             RegexKind::Id { elem, .. } => {
                 if let ElementKind::Rule {
                     regex: rule_regex, ..
-                } = elem.get().unwrap().kind
+                } = module.get_element(elem).unwrap().kind
                 {
-                    let size = rule_regex.follow().len();
-                    let follow = regex.follow().clone();
-                    rule_regex.follow_mut().extend(follow.into_iter());
-                    *change |= size != rule_regex.follow().len();
+                    let size = follow_sets[rule_regex.0].len();
+                    let follow = follow_sets[regex_ref.0].clone();
+                    follow_sets[rule_regex.0].extend(follow);
+                    *change |= size != follow_sets[rule_regex.0].len();
                 }
             }
-            RegexKind::Concat { ops, .. } => {
-                let mut follow = regex.follow().clone();
+            RegexKind::Concat { ref ops, .. } => {
+                let mut follow = follow_sets[regex_ref.0].clone();
                 for op in ops.iter().rev() {
-                    op.follow_mut().extend(follow.iter());
-                    if op.first().contains(&Symbol::EMPTY) {
-                        follow.extend(op.first().iter());
-                        follow.remove(&Symbol::EMPTY);
+                    follow_sets[op.0].extend(follow.iter());
+                    let op_first = &first_sets[op.0];
+                    if op_first.contains(&symbols::EMPTY) {
+                        follow.extend(op_first.iter());
+                        follow.remove(&symbols::EMPTY);
                     } else {
-                        follow.clone_from(&op.first());
+                        follow.clone_from(op_first);
                     }
-                    Self::calc_follow_regex(op, change);
+                    Self::calc_follow_regex(*op, first_sets, follow_sets, module, change);
                 }
             }
-            RegexKind::Or { ops, .. } => {
+            RegexKind::Or { ref ops, .. } => {
+                let follow = follow_sets[regex_ref.0].clone();
                 for op in ops {
-                    op.follow_mut().extend(regex.follow().iter());
-                    Self::calc_follow_regex(op, change);
+                    follow_sets[op.0].extend(follow.iter());
+                    Self::calc_follow_regex(*op, first_sets, follow_sets, module, change);
                 }
             }
             RegexKind::Star { op } => {
-                op.follow_mut().extend(regex.first().iter());
-                op.follow_mut().remove(&Symbol::EMPTY);
-                op.follow_mut().extend(regex.follow().iter());
-                Self::calc_follow_regex(op, change);
+                let follow = follow_sets[regex_ref.0].clone();
+                let op_first = &first_sets[op.0];
+                let op_follow = &mut follow_sets[op.0];
+                op_follow.extend(op_first.iter());
+                op_follow.remove(&symbols::EMPTY);
+                op_follow.extend(follow);
+                Self::calc_follow_regex(op, first_sets, follow_sets, module, change);
             }
             RegexKind::Plus { op } => {
-                op.follow_mut().extend(regex.first().iter());
-                op.follow_mut().extend(regex.follow().iter());
-                Self::calc_follow_regex(op, change);
+                let first = &first_sets[regex_ref.0];
+                let follow = follow_sets[regex_ref.0].clone();
+                let op_follow = &mut follow_sets[op.0];
+                op_follow.extend(first.iter());
+                op_follow.extend(follow);
+                Self::calc_follow_regex(op, first_sets, follow_sets, module, change);
             }
             RegexKind::Option { op } | RegexKind::Paren { op } => {
-                op.follow_mut().extend(regex.follow().iter());
-                Self::calc_follow_regex(op, change);
+                let follow = follow_sets[regex_ref.0].clone();
+                follow_sets[op.0].extend(follow);
+                Self::calc_follow_regex(op, first_sets, follow_sets, module, change);
             }
             _ => {}
         };
     }
 
-    /// Checks if LL(1) condition holds for the element regex.
-    fn check_elements(module: &Module, diag: &mut Diag) {
-        for element in module.elements.iter() {
-            match element.kind {
-                ElementKind::Start { regex, .. } => {
-                    Self::check_regex(regex, diag);
-                }
-                ElementKind::Rule { regex, .. } => {
-                    Self::check_regex(regex, diag);
-                }
-                _ => {}
-            }
+    /// Checks if LL(1) condition holds for the all regexes.
+    fn check(module: &Module, diags: &mut Vec<Diagnostic>) {
+        for index in 0..module.regexes.len() {
+            let regex_ref = RegexRef::from(index);
+            Self::check_regex(regex_ref, module, diags);
         }
     }
 
-    fn has_predicate(regex: &'a Regex<'a>) -> bool {
-        match &regex.kind {
-            RegexKind::Concat { ops, .. } => matches!(&ops[0].kind, RegexKind::Predicate { .. }),
-            RegexKind::Paren { op } => Self::has_predicate(op),
+    fn has_predicate(regex_ref: RegexRef, module: &Module<'a>) -> bool {
+        match module.get_regex(regex_ref).unwrap().kind {
+            RegexKind::Concat { ref ops, .. } => matches!(
+                module.get_regex(ops[0]).unwrap().kind,
+                RegexKind::Predicate { .. }
+            ),
+            RegexKind::Paren { op } => Self::has_predicate(op, module),
             _ => false,
         }
     }
 
     /// Checks if LL(1) condition holds for the regex.
-    fn check_regex(regex: &'a Regex<'a>, diag: &mut Diag) {
-        match &regex.kind {
-            RegexKind::Concat { ops, .. } => {
-                for op in ops {
-                    Self::check_regex(op, diag);
-                }
-            }
-            RegexKind::Or { ops, .. } => {
+    fn check_regex(regex_ref: RegexRef, module: &Module<'a>, diags: &mut Vec<Diagnostic>) {
+        let regex = module.get_regex(regex_ref).unwrap();
+        match regex.kind {
+            RegexKind::Or { ref ops, .. } => {
                 for i in 0..ops.len() {
-                    let prediction = ops[i].predict();
-                    if Self::has_predicate(ops[i]) {
+                    let op = module.get_regex(ops[i]).unwrap();
+                    let prediction = op.predict();
+                    if Self::has_predicate(ops[i], module) {
                         continue;
                     }
                     let mut related = vec![];
-                    for j in i + 1..ops.len() {
+                    for op in ops.iter().skip(i + 1) {
                         let intersection = prediction
-                            .intersection(&ops[j].predict())
+                            .intersection(&module.get_regex(*op).unwrap().predict())
                             .copied()
                             .collect::<BTreeSet<_>>();
                         if !intersection.is_empty() {
                             let set = format!("with token set: {:?}", intersection);
-                            related.push((ops[j].range(), set));
+                            related.push((module.get_regex(*op).unwrap().span.clone(), set));
                         }
                     }
                     if !related.is_empty() {
-                        diag.error_with_related(Code::LL1Conflict, ops[i].range(), related);
+                        diags.push(Diagnostic::ll1_conflict_alt(&op.span, related));
                     }
-                    Self::check_regex(ops[i], diag);
                 }
             }
             RegexKind::Star { op } | RegexKind::Plus { op } | RegexKind::Option { op } => {
-                let intersection = regex
-                    .follow()
-                    .intersection(&op.predict())
+                let intersection = module
+                    .get_regex(regex_ref)
+                    .unwrap()
+                    .follow
+                    .intersection(&module.get_regex(op).unwrap().predict())
                     .copied()
                     .collect::<BTreeSet<_>>();
-                if !Self::has_predicate(op) && !intersection.is_empty() {
+                if !Self::has_predicate(op, module) && !intersection.is_empty() {
                     let set = format!("with token set: {:?}", intersection);
-                    diag.error_with_related(
-                        Code::LL1Conflict,
-                        op.range(),
-                        vec![(regex.range(), set)],
-                    );
+                    diags.push(if matches!(regex.kind, RegexKind::Option { .. }) {
+                        Diagnostic::ll1_conflict_opt(&regex.span, set)
+                    } else {
+                        Diagnostic::ll1_conflict_rep(&regex.span, set)
+                    });
                 }
-                Self::check_regex(op, diag);
-            }
-            RegexKind::Paren { op } => {
-                Self::check_regex(op, diag);
             }
             RegexKind::Id { .. } => {
-                if regex.first().is_empty() {
-                    diag.error(Code::ConsumeTokens, regex.range());
+                if module.get_regex(regex_ref).unwrap().first.is_empty() {
+                    diags.push(Diagnostic::consume_tokens(&regex.span));
                 }
             }
             _ => {}
@@ -557,72 +672,75 @@ impl<'a> LL1Validator {
     }
 }
 
-struct UsageValidator {}
+struct UsageValidator;
 
 impl UsageValidator {
-    fn run(module: &Module, diag: &mut Diag) {
+    fn run(module: &mut Module, diags: &mut Vec<Diagnostic>) {
+        let mut used = vec![false; module.elements.len()];
         let mut change = true;
         while change {
             change = false;
-            for element in module.elements.iter() {
+            for (index, element) in module.elements.iter().enumerate() {
                 match &element.kind {
                     ElementKind::Start { regex, .. } => {
-                        element.attr.used.set(true);
-                        Self::check_regex(regex, &mut change);
+                        used[index] = true;
+                        Self::check_regex(module, *regex, &mut change, &mut used);
                     }
                     ElementKind::Rule { regex, name, .. } => {
-                        if name.as_str().starts_with('_') {
-                            element.attr.used.set(true)
+                        if name.0.starts_with('_') {
+                            used[index] = true;
                         }
-                        if element.attr.used.get() {
-                            Self::check_regex(regex, &mut change);
+                        if used[index] {
+                            Self::check_regex(module, *regex, &mut change, &mut used);
                         }
                     }
                     ElementKind::Token { name, .. } => {
-                        if name.as_str().starts_with('_') {
-                            element.attr.used.set(true)
+                        if name.0.starts_with('_') {
+                            used[index] = true;
                         }
                     }
                     ElementKind::Action { num, .. }
                     | ElementKind::Predicate { num, .. }
                     | ElementKind::ErrorHandler { num, .. }
                         if *num != 0 => {}
-                    _ => element.attr.used.set(true),
+                    _ => used[index] = true,
                 };
             }
         }
-        for element in module.elements.iter() {
-            if !element.attr.used.get() {
-                diag.warning(Code::UnusedElement, element.range());
+        for (index, element) in module.elements.iter_mut().enumerate() {
+            if used[index] {
+                element.used = true;
+            } else {
+                diags.push(Diagnostic::unused_element(&element.span));
             }
         }
     }
 
-    fn check_regex(regex: &Regex, change: &mut bool) {
-        match &regex.kind {
+    fn check_regex(module: &Module, regex: RegexRef, change: &mut bool, used: &mut [bool]) {
+        match module.get_regex(regex).unwrap().kind {
             RegexKind::Id { elem, .. } | RegexKind::Str { elem, .. } => {
-                if let Some(elem) = elem.get() {
-                    *change |= !elem.attr.used.get();
-                    elem.attr.used.set(true);
+                if elem.is_valid() {
+                    *change |= !used[elem.0];
+                    used[elem.0] = true;
                 }
             }
-            RegexKind::Concat { ops, .. } | RegexKind::Or { ops, .. } => {
+            RegexKind::Concat { ref ops, .. } | RegexKind::Or { ref ops, .. } => {
                 for op in ops {
-                    Self::check_regex(op, change);
+                    Self::check_regex(module, *op, change, used);
                 }
             }
             RegexKind::Star { op }
             | RegexKind::Plus { op }
             | RegexKind::Option { op }
             | RegexKind::Paren { op } => {
-                Self::check_regex(op, change);
+                Self::check_regex(module, op, change, used);
             }
             RegexKind::Action { elem, .. }
             | RegexKind::Predicate { elem, .. }
             | RegexKind::ErrorHandler { elem, .. } => {
-                if let Some(elem) = elem.get() {
-                    *change |= !elem.attr.used.get();
-                    elem.attr.used.set(true);
+                if elem.is_valid() {
+                    *change |= !used[elem.0];
+                    used[elem.0] = true;
                 }
             }
             _ => {}
@@ -630,42 +748,34 @@ impl UsageValidator {
     }
 }
 
-impl<'a> std::hash::Hash for Regex<'a> {
+impl std::hash::Hash for RegexRef {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        (self as *const Self).hash(state)
+        self.0.hash(state)
     }
 }
-
-impl<'a> PartialEq<Regex<'a>> for Regex<'a> {
-    fn eq(&self, other: &Regex<'a>) -> bool {
-        std::ptr::eq(self, other)
-    }
-}
-
-impl<'a> Eq for Regex<'a> {}
 
 #[derive(Default)]
-struct CancelSetGenerator<'a> {
-    dom: HashMap<&'a Regex<'a>, HashSet<&'a Regex<'a>>>,
-    pred: HashMap<&'a Regex<'a>, HashSet<&'a Regex<'a>>>,
+struct CancelSetGenerator {
+    dom: HashMap<RegexRef, HashSet<RegexRef>>,
+    pred: HashMap<RegexRef, HashSet<RegexRef>>,
 }
 
 #[allow(clippy::mutable_key_type)]
-impl<'a> CancelSetGenerator<'a> {
+impl CancelSetGenerator {
     fn new() -> Self {
         Self::default()
     }
-    fn run(&mut self, module: &'a Module<'a>) {
+    fn run(&mut self, module: &mut Module) {
         let mut start = None;
         for element in module.elements.iter() {
-            match &element.kind {
+            match element.kind {
                 ElementKind::Start { regex, .. } => {
-                    start = Some(*regex);
-                    self.set_regex_pred(regex);
+                    start = Some(regex);
+                    self.set_regex_pred(module, regex);
                 }
                 ElementKind::Rule { regex, .. } => {
-                    if element.attr.used.get() {
-                        self.set_regex_pred(regex);
+                    if element.used {
+                        self.set_regex_pred(module, regex);
                     }
                 }
                 _ => {}
@@ -706,34 +816,37 @@ impl<'a> CancelSetGenerator<'a> {
             }
         }
         // extract the error handler of the regex if there is one
-        let get_error_handler = |regex: &'a Regex<'a>| -> Option<&'a Regex<'a>> {
-            match &regex.kind {
+        let get_error_handler = |regex: RegexRef| -> Option<RegexRef> {
+            match module.get_regex(regex).unwrap().kind {
                 RegexKind::Concat { error, .. } | RegexKind::Or { error, .. }
-                    if error.get().is_some() =>
+                    if error.is_valid() =>
                 {
-                    error.get()
+                    Some(error)
                 }
                 _ => None,
             }
         };
         // calculate cancel set for error handlers
+        let mut cancel_sets = vec![BTreeSet::<Symbol>::new(); module.regexes.len()];
         for regex in nodes_no_start.iter() {
-            if let Some(error) = get_error_handler(regex) {
-                let mut cancel = error.cancel_mut();
+            if let Some(error) = get_error_handler(*regex) {
                 for dom in self.dom[regex].iter() {
-                    if get_error_handler(dom).is_none() && *dom != start {
+                    if get_error_handler(*dom).is_none() && *dom != start {
                         continue;
                     }
-                    cancel.extend(dom.follow().iter());
+                    cancel_sets[error.0].extend(module.get_regex(*dom).unwrap().follow.iter());
                 }
-                for sym in regex.follow().iter() {
-                    cancel.remove(sym);
+                for sym in module.get_regex(*regex).unwrap().follow.iter() {
+                    cancel_sets[error.0].remove(sym);
                 }
             }
         }
+        for (index, regex) in module.regexes.iter_mut().enumerate() {
+            std::mem::swap(&mut regex.cancel, &mut cancel_sets[index]);
+        }
     }
 
-    fn add_pred(&mut self, r: &'a Regex<'a>, p: &'a Regex<'a>) {
+    fn add_pred(&mut self, r: RegexRef, p: RegexRef) {
         if let Some(pred) = self.pred.get_mut(&r) {
             pred.insert(p);
         } else {
@@ -741,21 +854,21 @@ impl<'a> CancelSetGenerator<'a> {
         }
     }
 
-    fn set_regex_pred(&mut self, regex: &'a Regex<'a>) {
-        match &regex.kind {
+    fn set_regex_pred(&mut self, module: &Module, regex: RegexRef) {
+        match module.get_regex(regex).unwrap().kind {
             RegexKind::Id { elem, .. } => {
                 if let Some(Element {
                     kind: ElementKind::Rule { regex: op, .. },
                     ..
-                }) = elem.get()
+                }) = module.get_element(elem)
                 {
-                    self.add_pred(op, regex);
+                    self.add_pred(*op, regex);
                 }
             }
-            RegexKind::Concat { ops, .. } | RegexKind::Or { ops, .. } => {
+            RegexKind::Concat { ref ops, .. } | RegexKind::Or { ref ops, .. } => {
                 for op in ops {
-                    self.add_pred(op, regex);
-                    self.set_regex_pred(op);
+                    self.add_pred(*op, regex);
+                    self.set_regex_pred(module, *op);
                 }
             }
             RegexKind::Star { op }
@@ -763,7 +876,7 @@ impl<'a> CancelSetGenerator<'a> {
             | RegexKind::Option { op }
             | RegexKind::Paren { op } => {
                 self.add_pred(op, regex);
-                self.set_regex_pred(op);
+                self.set_regex_pred(module, op);
             }
             _ => {}
         }

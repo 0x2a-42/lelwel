@@ -15,30 +15,20 @@ value{Value}:
 | 'null' #7
 ;
 object{Value}:
-  '{' [member #1 (',' member #2)* | !1] '}' #3
+  '{' [member #1 (',' member #2 !1)* | !1] '}' #3
 ;
 member{(String, Value)}:
   String ':' value #1
 ;
 array{Value}:
-  '[' [value #1 (',' value #2)* | !1] ']' #3
+  '[' [value #1 (',' value #2 !1)* | !1] ']' #3
 ;
-
-limit 1000;
-
-preamble {
-    use std::collections::BTreeMap;
-    use super::diag::*;
-    use super::Value;
-}
-parameters { diag: &mut Diag }
-error { Code }
 
 start#1 { Ok(value) }
 
 value#1 { Ok(object) }
 value#2 { Ok(array) }
-value#3 { Ok(Value::String(String.0)) }
+value#3 { check_string(&String.0, &String.1, diags); Ok(Value::String(String.0)) }
 value#4 { Ok(Value::Number(Number.0)) }
 value#5 { Ok(Value::Bool(true)) }
 value#6 { Ok(Value::Bool(false)) }
@@ -48,12 +38,12 @@ object#0 { let mut members = BTreeMap::new(); }
 object#1 { members.insert(member.0, member.1); }
 object#2 { members.insert(member.0, member.1); }
 object#3 { Ok(Value::Object(members)) }
-object!1 { diag.error(error_code, error_range); }
+object!1 { diags.push(diagnostic); }
 
-member#1 { Ok((String.0, value)) }
+member#1 { check_string(&String.0, &String.1, diags); Ok((String.0, value)) }
 
 array#0 { let mut values = vec![]; }
 array#1 { values.push(value); }
 array#2 { values.push(value); }
 array#3 { Ok(Value::Array(values)) }
-array!1 { diag.error(error_code, error_range); }
+array!1 { diags.push(diagnostic); }

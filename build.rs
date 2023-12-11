@@ -9,7 +9,14 @@ fn main() {
             std::process::exit(1)
         }
     }
+    if let Ok(cmd) = Command::new("rustfmt")
+        .args(["src/frontend/generated.rs"])
+        .status()
+    {
+        if !cmd.success() {
+            std::process::exit(1)
+        }
+    }
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=src/frontend/lelwel.llw");
-    println!("cargo:rerun-if-changed=src/frontend/parser.rs");
 }

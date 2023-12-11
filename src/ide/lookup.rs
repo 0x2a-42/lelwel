@@ -1,18 +1,37 @@
-use crate::frontend::{ast::*, token::*};
+use crate::frontend::ast::*;
+
+fn compare(span: &Span, pos: usize) -> std::cmp::Ordering {
+    if span.start > pos {
+        std::cmp::Ordering::Greater
+    } else if span.end <= pos {
+        std::cmp::Ordering::Less
+    } else {
+        std::cmp::Ordering::Equal
+    }
+}
 
 pub struct LookupNode {}
 
 impl<'a> LookupNode {
-    pub fn find(module: &'a Module<'a>, pos: Position) -> Option<Node<'a>> {
-        Self::visit_element(module.elements.lookup(pos)?, pos)
+    pub fn find(module: &'a Module<'a>, pos: usize) -> Option<Node<'a>> {
+        let index = module
+            .elements
+            .binary_search_by(|elem| compare(&elem.span, pos))
+            .ok()?;
+        Self::visit_element(module, &module.elements[index], pos)
     }
 
-    fn visit_element(element: &'a Element<'a>, pos: Position) -> Option<Node<'a>> {
-        match &element.kind {
+    fn visit_element(
+        module: &'a Module<'a>,
+        element: &'a Element<'a>,
+        pos: usize,
+    ) -> Option<Node<'a>> {
+        match element.kind {
             ElementKind::Start { regex, .. } | ElementKind::Rule { regex, .. } => {
-                if let Some(regex) = regex.lookup(pos) {
-                    Self::visit_regex(regex, pos).map(Node::Regex)
-                } else if pos < regex.range().start {
+                let regex = module.get_regex(regex).unwrap();
+                if regex.span.contains(&pos) {
+                    Self::visit_regex(module, regex, pos).map(Node::Regex)
+                } else if pos < regex.span.start {
                     Some(Node::Element(element))
                 } else {
                     None
@@ -26,11 +45,17 @@ impl<'a> LookupNode {
         }
     }
 
-    fn visit_regex(regex: &'a Regex<'a>, pos: Position) -> Option<&'a Regex<'a>> {
-        match &regex.kind {
-            RegexKind::Concat { ops, .. } | RegexKind::Or { ops, .. } => {
-                if let Some(regex) = ops.lookup(pos) {
-                    Self::visit_regex(regex, pos)
+    fn visit_regex(
+        module: &'a Module<'a>,
+        regex: &'a Regex<'a>,
+        pos: usize,
+    ) -> Option<&'a Regex<'a>> {
+        match regex.kind {
+            RegexKind::Concat { ref ops, .. } | RegexKind::Or { ref ops, .. } => {
+                if let Ok(index) = ops
+                    .binary_search_by(|regex| compare(&module.get_regex(*regex).unwrap().span, pos))
+                {
+                    Self::visit_regex(module, module.get_regex(ops[index]).unwrap(), pos)
                 } else {
                     Some(regex)
                 }
@@ -39,8 +64,9 @@ impl<'a> LookupNode {
             | RegexKind::Plus { op }
             | RegexKind::Option { op }
             | RegexKind::Paren { op } => {
-                if let Some(regex) = op.lookup(pos) {
-                    Self::visit_regex(regex, pos)
+                let op = module.get_regex(op).unwrap();
+                if op.span.contains(&pos) {
+                    Self::visit_regex(module, op, pos)
                 } else {
                     Some(regex)
                 }
@@ -53,7 +79,7 @@ impl<'a> LookupNode {
 pub struct LookupDefinition {}
 
 impl<'a> LookupDefinition {
-    pub fn find(module: &'a Module<'a>, pos: Position) -> Option<&'a Element<'a>> {
+    pub fn find(module: &'a Module<'a>, pos: usize) -> Option<&'a Element<'a>> {
         match LookupNode::find(module, pos) {
             Some(Node::Element(element)) => Some(element),
             Some(Node::Regex(Regex {
@@ -64,7 +90,7 @@ impl<'a> LookupDefinition {
                     | RegexKind::Action { elem, .. }
                     | RegexKind::ErrorHandler { elem, .. },
                 ..
-            })) => elem.get(),
+            })) => module.get_element(*elem),
             _ => None,
         }
     }
@@ -73,47 +99,59 @@ impl<'a> LookupDefinition {
 pub struct LookupReferences {}
 
 impl<'a> LookupReferences {
-    pub fn find(module: &'a Module<'a>, pos: Position, with_def: bool) -> Vec<Range> {
+    pub fn find(module: &'a Module<'a>, pos: usize, with_def: bool) -> Vec<Span> {
         let mut refs = vec![];
         if let Some(def) = LookupDefinition::find(module, pos) {
             if with_def {
-                refs.push(def.range());
+                refs.push(def.span.clone());
             }
             for element in module.elements.iter() {
-                Self::visit_element(element, def, &mut refs);
+                Self::visit_element(module, element, def, &mut refs);
             }
         }
         refs
     }
 
-    fn visit_element(element: &'a Element<'a>, def: &'a Element<'a>, refs: &mut Vec<Range>) {
-        match &element.kind {
+    fn visit_element(
+        module: &'a Module<'a>,
+        element: &'a Element<'a>,
+        def: &'a Element<'a>,
+        refs: &mut Vec<Span>,
+    ) {
+        match element.kind {
             ElementKind::Start { regex, .. } | ElementKind::Rule { regex, .. } => {
-                Self::visit_regex(regex, def, refs)
+                Self::visit_regex(module, module.get_regex(regex).unwrap(), def, refs)
             }
             _ => {}
         }
     }
 
-    fn visit_regex(regex: &'a Regex<'a>, def: &'a Element<'a>, refs: &mut Vec<Range>) {
-        match &regex.kind {
-            RegexKind::Concat { ops, .. } | RegexKind::Or { ops, .. } => {
+    fn visit_regex(
+        module: &'a Module<'a>,
+        regex: &'a Regex<'a>,
+        def: &'a Element<'a>,
+        refs: &mut Vec<Span>,
+    ) {
+        match regex.kind {
+            RegexKind::Concat { ref ops, .. } | RegexKind::Or { ref ops, .. } => {
                 for op in ops {
-                    Self::visit_regex(op, def, refs)
+                    Self::visit_regex(module, module.get_regex(*op).unwrap(), def, refs)
                 }
             }
             RegexKind::Star { op }
             | RegexKind::Plus { op }
             | RegexKind::Option { op }
-            | RegexKind::Paren { op } => Self::visit_regex(op, def, refs),
+            | RegexKind::Paren { op } => {
+                Self::visit_regex(module, module.get_regex(op).unwrap(), def, refs)
+            }
             RegexKind::Id { elem, .. }
             | RegexKind::Str { elem, .. }
             | RegexKind::Predicate { elem, .. }
             | RegexKind::Action { elem, .. }
             | RegexKind::ErrorHandler { elem, .. } => {
-                if let Some(elem) = elem.get() {
+                if let Some(elem) = module.get_element(elem) {
                     if std::ptr::eq(elem, def) {
-                        refs.push(regex.range());
+                        refs.push(regex.span.clone());
                     }
                 }
             }

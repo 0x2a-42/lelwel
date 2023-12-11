@@ -1,4 +1,4 @@
-token A B _C;
+token A B C;
 
 start:
   c
@@ -18,5 +18,5 @@ c:
 d:
 ;
 
-_e:
+e:
 ;

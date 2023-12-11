@@ -1,34 +1,30 @@
-mod lexer;
+use self::parser::{Parser, Token, TokenStream};
+use codespan_reporting::files::SimpleFile;
+use codespan_reporting::term::{
+    self,
+    termcolor::{ColorChoice, StandardStream},
+    Config,
+};
+use logos::Logos;
+
 mod parser;
-mod token;
-
-use std::env;
-
-use lexer::*;
-use parser::*;
-use token::*;
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
+    let args: Vec<String> = std::env::args().collect();
     if args.len() != 2 {
-        return;
+        std::process::exit(1);
+    }
+    let mut tokens = TokenStream::new(Token::lexer(&args[1]));
+    let file = SimpleFile::new("stdin", &args[1]);
+
+    let mut diags = vec![];
+    if let Some(result) = Parser::parse(&mut tokens, &mut diags) {
+        println!("{result}");
     }
 
-    let mut lexer = Lexer::new(args[1].clone(), false);
-    match Parser::parse(&mut lexer) {
-        Ok(result) => {
-            for (range, msg) in lexer.error_iter() {
-                eprintln!("{} at {}", msg, range);
-            }
-            println!("{}", result)
-        }
-        Err(expect) => eprintln!(
-            "syntax error at {}, expected one of {:?}",
-            lexer.current().range,
-            expect
-                .iter()
-                .map(TokenKind::to_string)
-                .collect::<Vec<String>>()
-        ),
+    let writer = StandardStream::stderr(ColorChoice::Auto);
+    let config = Config::default();
+    for diag in diags {
+        term::emit(&mut writer.lock(), &config, &file, &diag).unwrap();
     }
 }

@@ -1,4 +1,4 @@
-token Num{f64}='number';
+token Num{f64}='<number>';
 token Add='+' Sub='-' Mul='*' Div='/';
 token LPar='(' RPar=')';
 
