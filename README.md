@@ -34,7 +34,7 @@ The following example shows a grammar for a [basic calculator](examples/calc).
 ```antlr
 // calculator
 
-token Num{f64}='number';
+token Num{f64}='<number>';
 token Add='+' Sub='-' Mul='*' Div='/';
 token LPar='(' RPar=')';
 
