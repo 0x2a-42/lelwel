@@ -350,8 +350,6 @@ dependencies = [
  "codespan-reporting",
  "logos",
  "lsp-types 0.88.0",
- "serde",
- "serde_json",
  "tokio",
  "tower-lsp",
 ]
