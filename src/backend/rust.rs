@@ -98,6 +98,7 @@ impl RustOutput {
         for element in module.elements.iter() {
             if let ElementKind::Token { name, ty, sym } = element.kind {
                 if !(sym.0.is_empty()
+                    || sym == symbols::EMPTY
                     || sym.0.starts_with("'<") && sym.0.ends_with(">'") && sym.0.len() > 4)
                 {
                     token_enumerators += "    #[token(\"";
