@@ -47,12 +47,7 @@ fn create_new_llw(path: &Path) -> std::io::Result<()> {
     let mut file = File::create(path)?;
     file.write_all(
         b"start:\
-        \n  #1\
-        \n;\
-        \n\
-        \nstart#1 {\
-        \n    Ok(())\
-        \n}",
+        \n;",
     )
 }
 

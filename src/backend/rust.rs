@@ -141,6 +141,7 @@ impl RustOutput {
         if !element.used {
             return Ok(());
         }
+        let mut is_acceptor = true;
         match element.kind {
             ElementKind::Start {
                 ret,
@@ -190,8 +191,8 @@ impl RustOutput {
                     token_pattern,
                     token_symbols,
                     token_lifetime,
+                    &mut is_acceptor,
                 )?;
-                output.write_all(b"    }\n")?;
             }
             ElementKind::Rule {
                 name,
@@ -249,11 +250,17 @@ impl RustOutput {
                     token_pattern,
                     token_symbols,
                     token_lifetime,
+                    &mut is_acceptor,
                 )?;
-                output.write_all(b"    }\n")?;
             }
-            _ => {}
+            _ => {
+                return Ok(());
+            }
         }
+        if is_acceptor {
+            output.write_all(b"        Ok(())\n")?;
+        }
+        output.write_all(b"    }\n")?;
         Ok(())
     }
 
@@ -288,6 +295,7 @@ impl RustOutput {
         token_pattern: &HashMap<Symbol, &str>,
         token_symbols: &HashMap<Symbol, &str>,
         token_lifetime: &str,
+        is_acceptor: &mut bool,
     ) -> std::io::Result<()> {
         output.write_all(
             format!(
@@ -310,6 +318,7 @@ impl RustOutput {
             token_pattern,
             token_symbols,
             token_lifetime,
+            is_acceptor,
         )?;
         output.write_all(
             "                return Ok::<(), Diagnostic>(());\
@@ -351,6 +360,7 @@ impl RustOutput {
         token_pattern: &HashMap<Symbol, &str>,
         token_symbols: &HashMap<Symbol, &str>,
         token_lifetime: &str,
+        is_acceptor: &mut bool,
     ) -> std::io::Result<()> {
         match regex.kind {
             RegexKind::Id { name, elem } => match module.get_element(elem).unwrap().kind {
@@ -434,6 +444,7 @@ impl RustOutput {
                             token_pattern,
                             token_symbols,
                             token_lifetime,
+                            is_acceptor,
                         )?;
                     }
                 }
@@ -447,6 +458,7 @@ impl RustOutput {
                         token_pattern,
                         token_symbols,
                         token_lifetime,
+                        is_acceptor,
                     )?;
                 }
             }
@@ -482,6 +494,7 @@ impl RustOutput {
                         token_pattern,
                         token_symbols,
                         token_lifetime,
+                        is_acceptor,
                     )?;
                     if module.get_regex(error).is_some() {
                         output.write_all("Ok(())\n".indent(level + 2).as_bytes())?;
@@ -509,6 +522,7 @@ impl RustOutput {
                         token_pattern,
                         token_symbols,
                         token_lifetime,
+                        is_acceptor,
                     )?;
                 }
             }
@@ -534,6 +548,7 @@ impl RustOutput {
                     token_pattern,
                     token_symbols,
                     token_lifetime,
+                    is_acceptor,
                 )?;
                 output.write_all(
                     format!(
@@ -574,6 +589,7 @@ impl RustOutput {
                     token_pattern,
                     token_symbols,
                     token_lifetime,
+                    is_acceptor,
                 )?;
                 output.write_all(
                     format!(
@@ -635,6 +651,7 @@ impl RustOutput {
                     token_pattern,
                     token_symbols,
                     token_lifetime,
+                    is_acceptor,
                 )?;
                 if name != symbols::EMPTY {
                     output.write_all(format!("Some({})\n", name).indent(level + 2).as_bytes())?;
@@ -670,6 +687,7 @@ impl RustOutput {
                     token_pattern,
                     token_symbols,
                     token_lifetime,
+                    is_acceptor,
                 )?;
             }
             RegexKind::Action {
@@ -677,6 +695,7 @@ impl RustOutput {
                 elem,
                 rule_name,
             } => {
+                *is_acceptor = false;
                 let code = match module.get_element(elem) {
                     Some(Element {
                         kind: ElementKind::Action { code, .. },
