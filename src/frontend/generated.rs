@@ -61,6 +61,7 @@ impl<'a> Parser {
             Ok(out) => Some(out),
             Err(diag) => {
                 diags.push(diag);
+                *current = Token::EOF;
                 None
             }
         };

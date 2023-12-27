@@ -862,6 +862,7 @@ impl RustOutput {
                \n            Ok(out) => Some(out),\
                \n            Err(diag) => {{\
                \n                diags.push(diag);\
+               \n                *current = Token::EOF;\
                \n                None\
                \n            }}\
                \n        }};\
