@@ -177,6 +177,7 @@ pub enum Token<'a> {
     Predicate(u64),
     #[regex(r"#[0-9]+", |lex| lex.slice()[1..].parse::<u64>())]
     Action(u64),
+    #[regex(r"!", |_| u64::MAX)]
     #[regex(r"![0-9]+", |lex| lex.slice()[1..].parse::<u64>())]
     ErrorHandler(u64),
     #[regex("(///.*\n)+")]

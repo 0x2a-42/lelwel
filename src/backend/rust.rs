@@ -177,7 +177,7 @@ impl RustOutput {
                         "    ".to_string() + code.trim()
                     };
                     output.write_all(
-                        format!("    // semantic action 0\n{code}\n")
+                        format!("    // semantic action start#0\n{code}\n")
                             .indent(1)
                             .as_bytes(),
                     )?;
@@ -236,7 +236,7 @@ impl RustOutput {
                         "    ".to_string() + code.trim()
                     };
                     output.write_all(
-                        format!("    // semantic action 0\n{code}\n")
+                        format!("    // semantic action {name}#0\n{code}\n")
                             .indent(1)
                             .as_bytes(),
                     )?;
@@ -632,7 +632,7 @@ impl RustOutput {
                         "{}match current {{\
                        \n    {}{} => {{\n",
                         if name != symbols::EMPTY {
-                            format!("let r#{} = ", name)
+                            format!("let r#{name} = ")
                         } else {
                             "".to_string()
                         },
@@ -654,7 +654,7 @@ impl RustOutput {
                     is_acceptor,
                 )?;
                 if name != symbols::EMPTY {
-                    output.write_all(format!("Some({})\n", name).indent(level + 2).as_bytes())?;
+                    output.write_all(format!("Some({name})\n").indent(level + 2).as_bytes())?;
                 }
                 output.write_all(
                     format!(
@@ -707,10 +707,10 @@ impl RustOutput {
                             "    ".to_string() + code.trim()
                         }
                     }
-                    _ => format!("    todo!(\"semantic action {}#{}\");\n", rule_name, val,),
+                    _ => format!("    todo!(\"semantic action {rule_name}#{val}\");\n"),
                 };
                 output.write_all(
-                    format!("    // semantic action {}\n{}\n", val, code)
+                    format!("    // semantic action {rule_name}#{val}\n{code}\n")
                         .indent(level - 1)
                         .as_bytes(),
                 )?;
@@ -720,6 +720,11 @@ impl RustOutput {
                 elem,
                 rule_name,
             } => {
+                let label = if val == u64::MAX {
+                    "default error handler".to_string()
+                } else {
+                    format!("error handler {rule_name}!{val}")
+                };
                 let code = match module.get_element(elem) {
                     Some(Element {
                         kind: ElementKind::ErrorHandler { code, .. },
@@ -731,10 +736,16 @@ impl RustOutput {
                             "    ".to_string() + code.trim()
                         }
                     }
-                    _ => format!("    todo!(\"error handler {}!{}\");\n", rule_name, val,),
+                    _ => {
+                        if val == u64::MAX {
+                            "    diags.push(diagnostic);".to_string()
+                        } else {
+                            format!("    todo!(\"error handler {rule_name}!{val}\");\n")
+                        }
+                    }
                 };
                 output.write_all(
-                    format!("    // error handler {}\n{}\n", val, code)
+                    format!("    // {label}\n{code}\n")
                         .indent(level - 1)
                         .as_bytes(),
                 )?;

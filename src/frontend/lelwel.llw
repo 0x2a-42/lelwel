@@ -26,7 +26,7 @@ start{Module<'a>}:
 
 /// Token list definition
 tokens{()}{module: &mut Module<'a>}:
-  'token' (Id #1 [Code #2] ['=' Str #3] #4 !1)+ ';' #5
+  'token' (Id #1 [Code #2] ['=' Str #3] #4 !)+ ';' #5
 ;
 /// Grammar rule, action, or predicate definition
 rule_or_action{()}{module: &mut Module<'a>}:
@@ -45,7 +45,7 @@ concat{RegexRef}{module: &mut Module<'a>, name: Symbol<'a>}:
 ;
 /// Repetition (e.g. `R*`)
 postfix{RegexRef}{module: &mut Module<'a>, name: Symbol<'a>}:
-  (atomic #1 ('*' #2 | '+' #3)* | !1) #4
+  (atomic #1 ('*' #2 | '+' #3)* | !) #4
 ;
 /// Atomic or parenthesized regular expressions
 atomic{RegexRef}{module: &mut Module<'a>, name: Symbol<'a>}:
@@ -100,8 +100,6 @@ tokens#3 {
 tokens#4 { Element::new_token(module, interner.get(Id.0), ty, sym, &span, doc); }
 /// Return successful
 tokens#5 { Ok(()) }
-/// Create diagnostic for error
-tokens!1 { diags.push(diagnostic); }
 
 /// Define variables
 rule_or_action#0 {
@@ -234,10 +232,9 @@ postfix#3 {
     span = span.start..Plus.end;
     regex = Some(Regex::new_plus(module, regex.unwrap(), &span));
 }
-/// Return result regex or invalid regex if parsing was not successful
+/// Return result regex or invalid regex if parsing was not successful.
+/// Result will be the last successfully parsed regex.
 postfix#4 { Ok(regex.unwrap_or_else(|| Regex::new_invalid(module, &span))) }
-/// Create diagnostic for error, result will be the last successfully parsed regex
-postfix!1 { diags.push(diagnostic); }
 
 /// Create identifier
 atomic#1 { Ok(Regex::new_id(module, interner.get(Id.0), &Id.1)) }

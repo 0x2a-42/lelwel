@@ -282,6 +282,7 @@ impl<'a> GeneralValidator {
                     ..
                 } => match bindings.get(&Binding::ErrorHandler(rule_name, val)) {
                     Some(e) => *elem = *e,
+                    None if val == u64::MAX => { /* default handler */ }
                     None => diags.push(Diagnostic::missing_definition_warning(
                         &regex.span,
                         "error handler",
@@ -377,7 +378,9 @@ impl<'a> GeneralValidator {
                 }
             }
             RegexKind::ErrorHandler { val, .. } => {
-                if num.2 == val && num.2 < u64::MAX {
+                if val == u64::MAX {
+                    // default handler
+                } else if num.2 == val && num.2 < u64::MAX - 1 {
                     num.2 += 1;
                 } else if num.2 - 1 != val || val == 0 {
                     diags.push(Diagnostic::invalid_number(

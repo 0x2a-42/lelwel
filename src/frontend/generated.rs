@@ -77,7 +77,7 @@ impl<'a> Parser {
         interner: &mut StringInterner<'a>,
     ) -> Result<Module<'a>, Diagnostic> {
         let lelwel_depth = 0;
-        // semantic action 0
+        // semantic action start#0
         let mut module = Module::new(input.uri);
         loop {
             match current {
@@ -85,7 +85,7 @@ impl<'a> Parser {
                     (|| {
                         match current {
                             Token::Token => {
-                                // semantic action 1
+                                // semantic action start#1
                                 let module = &mut module;
                                 let r#tokens = Self::r#tokens(
                                     lelwel_depth + 1,
@@ -98,7 +98,7 @@ impl<'a> Parser {
                                 Ok(())
                             }
                             Token::Id(..) | Token::Start => {
-                                // semantic action 2
+                                // semantic action start#2
                                 let module = &mut module;
                                 let r#rule_or_action = Self::r#rule_or_action(
                                     lelwel_depth + 1,
@@ -114,7 +114,7 @@ impl<'a> Parser {
                                 let r#Pars = consume!(Pars, "parameters", current, input, diags);
                                 let r#Code =
                                     consume!(Code, "<code segment>", current, input, diags, _);
-                                // semantic action 3
+                                // semantic action start#3
                                 module.parameters =
                                     Element::new_parameters(&mut module, Code.0, &Code.1);
                                 Ok(())
@@ -133,7 +133,7 @@ impl<'a> Parser {
                                 | Token::Pars
                                 | Token::Start
                                 | Token::Token => {
-                                    // error handler 1
+                                    // error handler start!1
                                     diags.push(diagnostic);
                                     Element::new_invalid(&mut module, &input.span());
                                     return Ok::<(), Diagnostic>(());
@@ -158,7 +158,7 @@ impl<'a> Parser {
                 }
             }
         }
-        // semantic action 4
+        // semantic action start#4
         Ok(module)
     }
     fn r#tokens(
@@ -170,7 +170,7 @@ impl<'a> Parser {
         module: &mut Module<'a>,
     ) -> Result<(), Diagnostic> {
         check_limit!(input, current, lelwel_depth);
-        // semantic action 0
+        // semantic action tokens#0
         let doc = std::mem::take(&mut input.last_doc_comment);
         let r#Token = consume!(Token, "token", current, input, diags);
         let mut lelwel_is_first = true;
@@ -179,7 +179,7 @@ impl<'a> Parser {
                 Token::Id(..) => {
                     (|| {
                         let r#Id = consume!(Id, "<identifier>", current, input, diags, _);
-                        // semantic action 1
+                        // semantic action tokens#1
                         let mut span = Id.1;
                         let mut ty = "";
                         let mut sym = Symbol::default();
@@ -187,7 +187,7 @@ impl<'a> Parser {
                             Token::Code(..) => {
                                 let r#Code =
                                     consume!(Code, "<code segment>", current, input, diags, _);
-                                // semantic action 2
+                                // semantic action tokens#2
                                 ty = Code.0;
                                 span = span.start..Code.1.end;
                             }
@@ -199,14 +199,14 @@ impl<'a> Parser {
                                 let r#Equal = consume!(Equal, "=", current, input, diags);
                                 let r#Str =
                                     consume!(Str, "<string literal>", current, input, diags, _);
-                                // semantic action 3
+                                // semantic action tokens#3
                                 sym = interner.get(Str.0);
                                 span = span.start..Str.1.end;
                             }
                             Token::Id(..) | Token::Semi => {}
                             _ => return err![input, "=", "<identifier>", ";"],
                         }
-                        // semantic action 4
+                        // semantic action tokens#4
                         Element::new_token(module, interner.get(Id.0), ty, sym, &span, doc);
                         match current {
                             Token::Id(..) | Token::Semi => Ok(()),
@@ -218,7 +218,7 @@ impl<'a> Parser {
                         loop {
                             match current {
                                 Token::Id(..) | Token::Semi => {
-                                    // error handler 1
+                                    // default error handler
                                     diags.push(diagnostic);
                                     return Ok::<(), Diagnostic>(());
                                 }
@@ -239,7 +239,7 @@ impl<'a> Parser {
             lelwel_is_first = false;
         }
         let r#Semi = consume!(Semi, ";", current, input, diags);
-        // semantic action 5
+        // semantic action tokens#5
         Ok(())
     }
     fn r#rule_or_action(
@@ -251,7 +251,7 @@ impl<'a> Parser {
         module: &mut Module<'a>,
     ) -> Result<(), Diagnostic> {
         check_limit!(input, current, lelwel_depth);
-        // semantic action 0
+        // semantic action rule_or_action#0
         enum ElemType {
             Action,
             Predicate,
@@ -268,13 +268,13 @@ impl<'a> Parser {
         match current {
             Token::Id(..) => {
                 let r#Id = consume!(Id, "<identifier>", current, input, diags, _);
-                // semantic action 1
+                // semantic action rule_or_action#1
                 name = interner.get(Id.0);
                 name_span = Id.1;
             }
             Token::Start => {
                 let r#Start = consume!(Start, "start", current, input, diags);
-                // semantic action 2
+                // semantic action rule_or_action#2
                 name = symbols::START;
                 name_span = Start;
             }
@@ -285,13 +285,13 @@ impl<'a> Parser {
                 match current {
                     Token::Code(..) => {
                         let r#Code = consume!(Code, "<code segment>", current, input, diags, _);
-                        // semantic action 3
+                        // semantic action rule_or_action#3
                         ret = Code.0;
                         match current {
                             Token::Code(..) => {
                                 let r#Code =
                                     consume!(Code, "<code segment>", current, input, diags, _);
-                                // semantic action 4
+                                // semantic action rule_or_action#4
                                 pars = Code.0;
                             }
                             Token::Colon => {}
@@ -328,7 +328,7 @@ impl<'a> Parser {
                                         module,
                                         name,
                                     )?;
-                                    // semantic action 5
+                                    // semantic action rule_or_action#5
                                     rule_regex = Some(regex);
                                     Ok(())
                                 }
@@ -351,7 +351,7 @@ impl<'a> Parser {
                             loop {
                                 match current {
                                     Token::Semi => {
-                                        // error handler 1
+                                        // error handler rule_or_action!1
                                         rule_regex = Some(Regex::new_invalid(module, &name_span));
                                         diags.push(diagnostic);
                                         return Ok::<(), Diagnostic>(());
@@ -384,7 +384,7 @@ impl<'a> Parser {
                     }
                 }
                 let r#Semi = consume!(Semi, ";", current, input, diags);
-                // semantic action 6
+                // semantic action rule_or_action#6
                 let span = name_span.start..Semi.end;
                 let regex = rule_regex.unwrap_or_else(|| Regex::new_empty(module, &span));
                 if name == symbols::START {
@@ -399,21 +399,21 @@ impl<'a> Parser {
                     Token::Action(..) => {
                         let r#Action =
                             consume!(Action, "<semantic action>", current, input, diags, _);
-                        // semantic action 7
+                        // semantic action rule_or_action#7
                         elem_type = ElemType::Action;
                         num = Action.0;
                     }
                     Token::Predicate(..) => {
                         let r#Predicate =
                             consume!(Predicate, "<semantic predicate>", current, input, diags, _);
-                        // semantic action 8
+                        // semantic action rule_or_action#8
                         elem_type = ElemType::Predicate;
                         num = Predicate.0;
                     }
                     Token::ErrorHandler(..) => {
                         let r#ErrorHandler =
                             consume!(ErrorHandler, "<error handler>", current, input, diags, _);
-                        // semantic action 9
+                        // semantic action rule_or_action#9
                         elem_type = ElemType::ErrorHandler;
                         num = ErrorHandler.0;
                     }
@@ -427,7 +427,7 @@ impl<'a> Parser {
                     }
                 }
                 let r#Code = consume!(Code, "<code segment>", current, input, diags, _);
-                // semantic action 10
+                // semantic action rule_or_action#10
                 let span = name_span.start..Code.1.end;
                 match elem_type {
                     ElemType::Action => {
@@ -473,7 +473,7 @@ impl<'a> Parser {
             module,
             name,
         )?;
-        // semantic action 1
+        // semantic action regex#1
         let mut regexes = vec![concat];
         loop {
             match current {
@@ -488,14 +488,14 @@ impl<'a> Parser {
                         module,
                         name,
                     )?;
-                    // semantic action 2
+                    // semantic action regex#2
                     regexes.push(concat);
                 }
                 Token::RBrak | Token::RPar | Token::Semi => break,
                 _ => return err![input, "|", "]", ")", ";"],
             }
         }
-        // semantic action 3
+        // semantic action regex#3
         let span = module.get_regex(concat).unwrap().span.start
             ..module.get_regex(*regexes.last().unwrap()).unwrap().span.end;
         if regexes.len() > 1 {
@@ -514,7 +514,7 @@ impl<'a> Parser {
         name: Symbol<'a>,
     ) -> Result<RegexRef, Diagnostic> {
         check_limit!(input, current, lelwel_depth);
-        // semantic action 0
+        // semantic action concat#0
         let mut regexes = Vec::new();
         let mut lelwel_is_first = true;
         loop {
@@ -535,7 +535,7 @@ impl<'a> Parser {
                         module,
                         name,
                     )?;
-                    // semantic action 1
+                    // semantic action concat#1
                     regexes.push(postfix);
                 }
                 Token::Or | Token::RBrak | Token::RPar | Token::Semi if !lelwel_is_first => break,
@@ -570,7 +570,7 @@ impl<'a> Parser {
             }
             lelwel_is_first = false;
         }
-        // semantic action 2
+        // semantic action concat#2
         let span = module.get_regex(regexes[0]).unwrap().span.start
             ..module.get_regex(*regexes.last().unwrap()).unwrap().span.end;
         if regexes.len() > 1 {
@@ -589,7 +589,7 @@ impl<'a> Parser {
         name: Symbol<'a>,
     ) -> Result<RegexRef, Diagnostic> {
         check_limit!(input, current, lelwel_depth);
-        // semantic action 0
+        // semantic action postfix#0
         let mut regex = None;
         let mut span = input.span();
         (|| {
@@ -610,7 +610,7 @@ impl<'a> Parser {
                         module,
                         name,
                     )?;
-                    // semantic action 1
+                    // semantic action postfix#1
                     regex = Some(atomic);
                     span = module.get_regex(atomic).unwrap().span.clone();
                     loop {
@@ -619,14 +619,14 @@ impl<'a> Parser {
                                 match current {
                                     Token::Star => {
                                         let r#Star = consume!(Star, "*", current, input, diags);
-                                        // semantic action 2
+                                        // semantic action postfix#2
                                         span = span.start..Star.end;
                                         regex =
                                             Some(Regex::new_star(module, regex.unwrap(), &span));
                                     }
                                     Token::Plus => {
                                         let r#Plus = consume!(Plus, "+", current, input, diags);
-                                        // semantic action 3
+                                        // semantic action postfix#3
                                         span = span.start..Plus.end;
                                         regex =
                                             Some(Regex::new_plus(module, regex.unwrap(), &span));
@@ -696,7 +696,7 @@ impl<'a> Parser {
                     | Token::RPar
                     | Token::Semi
                     | Token::Str(..) => {
-                        // error handler 1
+                        // default error handler
                         diags.push(diagnostic);
                         return Ok::<(), Diagnostic>(());
                     }
@@ -709,7 +709,7 @@ impl<'a> Parser {
                 }
             }
         })?;
-        // semantic action 4
+        // semantic action postfix#4
         Ok(regex.unwrap_or_else(|| Regex::new_invalid(module, &span)))
     }
     fn r#atomic(
@@ -725,18 +725,18 @@ impl<'a> Parser {
         match current {
             Token::Id(..) => {
                 let r#Id = consume!(Id, "<identifier>", current, input, diags, _);
-                // semantic action 1
+                // semantic action atomic#1
                 Ok(Regex::new_id(module, interner.get(Id.0), &Id.1))
             }
             Token::Str(..) => {
                 let r#Str = consume!(Str, "<string literal>", current, input, diags, _);
-                // semantic action 2
+                // semantic action atomic#2
                 Ok(Regex::new_str(module, interner.get(Str.0), &Str.1))
             }
             Token::Predicate(..) => {
                 let r#Predicate =
                     consume!(Predicate, "<semantic predicate>", current, input, diags, _);
-                // semantic action 3
+                // semantic action atomic#3
                 Ok(Regex::new_predicate(
                     module,
                     name,
@@ -746,13 +746,13 @@ impl<'a> Parser {
             }
             Token::Action(..) => {
                 let r#Action = consume!(Action, "<semantic action>", current, input, diags, _);
-                // semantic action 4
+                // semantic action atomic#4
                 Ok(Regex::new_action(module, name, Action.0, &Action.1))
             }
             Token::ErrorHandler(..) => {
                 let r#ErrorHandler =
                     consume!(ErrorHandler, "<error handler>", current, input, diags, _);
-                // semantic action 5
+                // semantic action atomic#5
                 Ok(Regex::new_error_handler(
                     module,
                     name,
@@ -772,7 +772,7 @@ impl<'a> Parser {
                     name,
                 )?;
                 let r#RPar = consume!(RPar, ")", current, input, diags);
-                // semantic action 6
+                // semantic action atomic#6
                 let span = LPar.start..RPar.end;
                 Ok(Regex::new_paren(module, regex, &span))
             }
@@ -788,7 +788,7 @@ impl<'a> Parser {
                     name,
                 )?;
                 let r#RBrak = consume!(RBrak, "]", current, input, diags);
-                // semantic action 7
+                // semantic action atomic#7
                 let span = LBrak.start..RBrak.end;
                 Ok(Regex::new_option(module, regex, &span))
             }
