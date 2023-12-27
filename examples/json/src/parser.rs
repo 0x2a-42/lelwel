@@ -137,8 +137,10 @@ pub enum Token {
     Colon,
     #[regex("\"", parse_string)]
     String(String),
-    #[regex(r"[-]?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?", |lex| lex.slice().to_string())]
+    #[regex(r"-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?", |lex| lex.slice().to_string())]
     Number(String),
+    #[regex(r"[[:alpha:]][[:alnum:]]*", |_| Err(LexerError::Invalid))]
+    Invalid,
 }
 
 fn check_string(value: &str, span: &Span, diags: &mut Vec<Diagnostic>) {
