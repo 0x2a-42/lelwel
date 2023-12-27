@@ -1,0 +1,50 @@
+// adapted from https://en.wikipedia.org/wiki/PL/0#Grammar
+
+/// keyword
+token Const='const' Var='var' Procedure='procedure' Call='call' Begin='begin'
+      End='end' If='if' Then='then' While='while' Do='do' Odd='odd';
+/// punctuator
+token Dot='.' Eq='=' Comma=',' Semi=';' Asn=':=' Quest='?' Excl='!' Hash='#'
+      Lt='<' Leq='<=' Gt='>' Geq='>=' Add='+' Sub='-' Mul='*' Div='/' LPar='('
+      RPar=')';
+token Ident='<identifier>' Number='<number>';
+
+start:
+  (block !) '.'
+;
+
+block:
+  ['const' (Ident '=' Number (',' Ident '=' Number !)* !) ';']
+  ['var' (Ident (',' Ident !)* !) ';']
+  ('procedure' (Ident !) ';' (block !) ';' !)* statement
+;
+
+statement:
+  [
+    Ident ':=' expression
+  | 'call' Ident
+  | '?' Ident
+  | '!' expression
+  | 'begin' (statement (';' statement !)* !) 'end'
+  | 'if' (condition !) 'then' statement
+  | 'while' (condition !) 'do' statement
+  | !
+  ]
+;
+
+condition:
+  'odd' expression
+| expression ('=' | '#' | '<' | '<=' | '>' | '>=') expression
+;
+
+expression:
+  ['+' | '-'] term (('+' | '-') term)*
+;
+
+term:
+  factor (('*' | '/') factor)*
+;
+
+factor:
+  Ident | Number | '(' (expression !) ')'
+;
