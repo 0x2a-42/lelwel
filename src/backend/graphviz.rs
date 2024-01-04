@@ -99,7 +99,11 @@ impl GraphvizOutput {
                 format!("#{}", val)
             }
             RegexKind::ErrorHandler { val, .. } => {
-                format!("!{}", val)
+                if val != u64::MAX {
+                    format!("!{}", val)
+                } else {
+                    "!".to_string()
+                }
             }
             _ => "".to_string(),
         }
@@ -156,7 +160,11 @@ impl GraphvizOutput {
                     ..
                 }) = module.get_regex(error)
                 {
-                    format!("\\||!{}", val)
+                    if *val != u64::MAX {
+                        format!("\\||!{}", val)
+                    } else {
+                        "\\||!".to_string()
+                    }
                 } else {
                     "\\|".to_string()
                 };
