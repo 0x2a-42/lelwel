@@ -3,4 +3,4 @@ A parser for C11 with some GNU extensions and without the preprocessor. Backslas
 
 Scopes and typedef names are tracked during parsing, which is required to resolve some ambiguities in the grammar. Otherwise no semantic checks are done.
 
-To parse most programs, you first have to create the preprocessed output by running `ggc -E -P` and remove all remaining `#pragma` directives.
+To parse most programs, you first have to create the preprocessed output by running `gcc -E -P` and remove all remaining `#pragma` directives.
