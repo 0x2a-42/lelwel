@@ -513,7 +513,7 @@ impl<'a> GeneralCheck<'a> {
                             .last()
                         {
                             if self.name_references_rule(cst, sema, rule, op) {
-                                // at least on recursive branch
+                                // at least one recursive branch
                                 is_right_recursive = true;
                             }
                         }
@@ -893,7 +893,7 @@ impl<'a> LL1Validator {
             let mut set = first.clone();
             if set.contains(&TokenName("ɛ")) {
                 set.remove(&TokenName("ɛ"));
-                set.extend(sema.follow_sets[&node].iter());
+                set.extend(sema.follow_sets[node].iter());
             }
             sema.predict_sets.insert(*node, set);
         }
@@ -1180,7 +1180,6 @@ struct RecoverySetGenerator {
     dom: HashMap<Regex, HashSet<Regex>>,
     pred: HashMap<Regex, HashSet<Regex>>,
 }
-#[allow(clippy::mutable_key_type)]
 impl RecoverySetGenerator {
     fn new() -> Self {
         Self::default()

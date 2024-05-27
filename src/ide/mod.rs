@@ -42,7 +42,7 @@ impl Cache {
     }
     pub fn invalidate(&self, uri: &Url) {
         if self.analyzers.contains_key(uri) {
-            self.analyzers[&uri].handle.abort();
+            self.analyzers[uri].handle.abort();
         }
     }
     pub async fn get_diagnostics(&mut self, uri: &Url) -> Vec<Diagnostic> {
