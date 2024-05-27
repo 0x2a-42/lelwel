@@ -1,47 +1,33 @@
 token True='true' False='false' Null='null';
 token LBrace='{' RBrace='}' LBrak='[' RBrak=']' Comma=',' Colon=':';
-token String{String}='<string>' Number{String}='<number>';
+token String='<string>' Number='<number>';
+token Whitespace;
 
-start{Value}:
-  value #1
+skip Whitespace;
+
+start file;
+
+file:
+  value
 ;
-value{Value}:
-  object #1
-| array #2
-| String #3
-| Number #4
-| 'true' #5
-| 'false' #6
-| 'null' #7
+value:
+  object
+| array
+| literal
 ;
-object{Value}:
-  '{' [member #1 (',' member #2 !)* | !] '}' #3
+object:
+  '{' [member (',' member)*] '}'
 ;
-member{(String, Value)}:
-  String ':' value #1
+member:
+  String ':' value
 ;
-array{Value}:
-  '[' [value #1 (',' value #2 !)* | !] ']' #3
+array:
+  '[' [value (',' value)*] ']'
 ;
-
-start#1 { Ok(value) }
-
-value#1 { Ok(object) }
-value#2 { Ok(array) }
-value#3 { check_string(&String.0, &String.1, diags); Ok(Value::String(String.0)) }
-value#4 { Ok(Value::Number(Number.0)) }
-value#5 { Ok(Value::Bool(true)) }
-value#6 { Ok(Value::Bool(false)) }
-value#7 { Ok(Value::Null) }
-
-object#0 { let mut members = BTreeMap::new(); }
-object#1 { members.insert(member.0, member.1); }
-object#2 { members.insert(member.0, member.1); }
-object#3 { Ok(Value::Object(members)) }
-
-member#1 { check_string(&String.0, &String.1, diags); Ok((String.0, value)) }
-
-array#0 { let mut values = vec![]; }
-array#1 { values.push(value); }
-array#2 { values.push(value); }
-array#3 { Ok(Value::Array(values)) }
+literal:
+  String
+| Number
+| 'true'
+| 'false'
+| 'null'
+;

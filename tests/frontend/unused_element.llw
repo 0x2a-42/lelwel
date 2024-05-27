@@ -1,6 +1,8 @@
 token A B C;
 
-start:
+start s;
+
+s:
   c
 ;
 

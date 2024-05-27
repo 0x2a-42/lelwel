@@ -1,258 +1,73 @@
 /// Keyword
-token Token='token' Start='start' Pars='parameters';
+token Token='token' Start='start' Right='right' Skip='skip';
 /// Punctuator
 token Colon=':' Semi=';' Equal='=' LPar='(' RPar=')' LBrak='[' RBrak=']'
       Or='|' Star='*' Plus='+';
 /// Identifier for rules and tokens
-token Id{&'a str}='<identifier>' Str{&'a str}='<string literal>';
-/// Segment of code delimited by `{` and `}`
-token Code{&'a str}='<code segment>';
+token Id='<identifier>' Str='<string literal>';
 /// Semantic predicate identifier
-token Predicate{u64}='<semantic predicate>';
-/// Semantic action identifier
-token Action{u64}='<semantic action>';
-/// Error handler identifier
-token ErrorHandler{u64}='<error handler>';
+token Predicate='<semantic predicate>' Action='<semantic action>' Binding='<binding>';
+token OpenNode='<open node mark>' CloseNode='<close node mark>';
+token Comment DocComment Whitespace;
 
-/// Module consisting of tokens, grammar rules, actions and other definitions
-start{Module<'a>}:
-  (
-    #1 tokens
-  | #2 rule_or_action
-  | 'parameters' Code #3
-  | !1
-  )* #4
+start file;
+skip Comment DocComment Whitespace;
+
+file:
+  decl*
 ;
-
-/// Token list definition
-tokens{()}{module: &mut Module<'a>}:
-  'token' (Id #1 [Code #2] ['=' Str #3] #4 !)+ ';' #5
+decl:
+  token_list
+| rule_decl
+| start_decl
+| right_decl
+| skip_decl
 ;
-/// Grammar rule, action, or predicate definition
-rule_or_action{()}{module: &mut Module<'a>}:
-  (Id #1 | 'start' #2) (
-    [Code #3 [Code #4]] ':' [regex #5 | !1] ';' #6
-  | (Action #7 | Predicate #8 | ErrorHandler #9) Code #10
-  )
+start_decl:
+  'start' Id ';'
 ;
-/// Alternation (e.g. `R1 | R2 | ...`)
-regex{RegexRef}{module: &mut Module<'a>, name: Symbol<'a>}:
-  concat #1 ('|' concat #2)* #3
+right_decl:
+  'right' (Id | Str)+ ';'
 ;
-/// Concatenation (e.g. `R1 R2 ...`)
-concat{RegexRef}{module: &mut Module<'a>, name: Symbol<'a>}:
-  (postfix #1)+ #2
+skip_decl:
+  'skip' (Id | Str)+ ';'
 ;
-/// Repetition (e.g. `R*`)
-postfix{RegexRef}{module: &mut Module<'a>, name: Symbol<'a>}:
-  (atomic #1 ('*' #2 | '+' #3)* | !) #4
+token_list:
+  'token' token_decl+ ';'
 ;
-/// Atomic or parenthesized regular expressions
-atomic{RegexRef}{module: &mut Module<'a>, name: Symbol<'a>}:
-  Id #1
-| Str #2
-| Predicate #3
-| Action #4
-| ErrorHandler #5
-| '(' regex ')' #6
-| '[' regex ']' #7
+token_decl:
+  Id ['=' Str]
 ;
-
-parameters { interner: &mut StringInterner<'a> }
-
-// semantic actions
-
-/// Create a module
-start#0 { let mut module = Module::new(input.uri); }
-/// Bind the name `module` for the parameter
-start#1 { let module = &mut module; }
-/// Bind the name `module` for the parameter
-start#2 { let module = &mut module; }
-start#3 { module.parameters = Element::new_parameters(&mut module, Code.0, &Code.1); }
-start#4 {
-    Ok(module)
-}
-/// Create diagnostic for error and invalid element
-start!1 {
-    diags.push(diagnostic);
-    Element::new_invalid(&mut module, &input.span());
-}
-
-/// Save the last documentation comment
-tokens#0 { let doc = std::mem::take(&mut input.last_doc_comment); }
-/// Define variables for parts of token definition
-tokens#1 {
-    let mut span = Id.1;
-    let mut ty = "";
-    let mut sym = Symbol::default();
-}
-/// Set variable for token type and update range
-tokens#2 {
-    ty = Code.0;
-    span = span.start..Code.1.end;
-}
-/// Set variable for token symbol and update range
-tokens#3 {
-    sym = interner.get(Str.0);
-    span = span.start..Str.1.end;
-}
-/// Create and push token definition
-tokens#4 { Element::new_token(module, interner.get(Id.0), ty, sym, &span, doc); }
-/// Return successful
-tokens#5 { Ok(()) }
-
-/// Define variables
-rule_or_action#0 {
-    enum ElemType {
-        Action,
-        Predicate,
-        ErrorHandler,
-    }
-    let name;
-    let name_span;
-    let mut ret = "";
-    let mut pars = "";
-    let elem_type;
-    let num;
-    let doc = std::mem::take(&mut input.last_doc_comment);
-    let mut rule_regex = None;
-}
-/// Set name and range
-rule_or_action#1 {
-    name = interner.get(Id.0);
-    name_span = Id.1;
-}
-/// Set name and range
-rule_or_action#2 {
-    name = symbols::START;
-    name_span = Start;
-}
-/// Set return type
-rule_or_action#3 { ret = Code.0; }
-/// Set parameters
-rule_or_action#4 { pars = Code.0; }
-/// Set regex
-rule_or_action#5 { rule_regex = Some(regex); }
-/// Create the rule
-rule_or_action#6 {
-    let span = name_span.start..Semi.end;
-    let regex = rule_regex.unwrap_or_else(|| Regex::new_empty(module, &span));
-    if name == symbols::START {
-        Element::new_start(module, ret, pars, regex, &span, doc);
-    } else {
-        Element::new_rule(module, name, name_span, ret, pars, regex, &span, doc);
-    }
-    Ok(())
-}
-/// Set action number
-rule_or_action#7 {
-    elem_type = ElemType::Action;
-    num = Action.0;
-}
-/// Set predicate number
-rule_or_action#8 {
-    elem_type = ElemType::Predicate;
-    num = Predicate.0;
-}
-/// Set error handler number
-rule_or_action#9 {
-    elem_type = ElemType::ErrorHandler;
-    num = ErrorHandler.0;
-}
-/// Create action or predicate
-rule_or_action#10 {
-    let span = name_span.start..Code.1.end;
-    match elem_type {
-        ElemType::Action => {
-            Element::new_action(module, name, &name_span, num, Code.0, &span, doc)
-        }
-        ElemType::Predicate => {
-            Element::new_predicate(module, name, &name_span, num, Code.0, &span, doc)
-        }
-        ElemType::ErrorHandler => Element::new_error_handler(
-            module, name, &name_span, num, Code.0, &span, doc,
-        ),
-    };
-    Ok(())
-}
-rule_or_action!1 {
-    rule_regex = Some(Regex::new_invalid(module, &name_span));
-    diags.push(diagnostic);
-}
-
-/// Create vector for operands
-regex#1 {
-    let mut regexes = vec![concat];
-}
-/// Push operand
-regex#2 { regexes.push(concat); }
-/// Create alternative if there were more than one operands
-regex#3 {
-    let span = module.get_regex(concat).unwrap().span.start
-        ..module.get_regex(*regexes.last().unwrap()).unwrap().span.end;
-    if regexes.len() > 1 {
-        Ok(Regex::new_or(module, regexes, &span))
-    } else {
-        Ok(regexes[0])
-    }
-}
-
-/// Create vector for operands
-concat#0 { let mut regexes = Vec::new(); }
-/// Push operand
-concat#1 { regexes.push(postfix); }
-/// Create concatenation if there were more than one operands
-concat#2 {
-    let span = module.get_regex(regexes[0]).unwrap().span.start
-        ..module.get_regex(*regexes.last().unwrap()).unwrap().span.end;
-    if regexes.len() > 1 {
-        Ok(Regex::new_concat(module, regexes, &span))
-    } else {
-        Ok(regexes[0])
-    }
-}
-
-/// Initialize regex and range variables
-postfix#0 {
-    let mut regex = None;
-    let mut span = input.span();
-}
-/// Set regex to atomic and update range
-postfix#1 {
-    regex = Some(atomic);
-    span = module.get_regex(atomic).unwrap().span.clone();
-}
-/// Create star regex
-postfix#2 {
-    span = span.start..Star.end;
-    regex = Some(Regex::new_star(module, regex.unwrap(), &span));
-}
-/// Create plus regex
-postfix#3 {
-    span = span.start..Plus.end;
-    regex = Some(Regex::new_plus(module, regex.unwrap(), &span));
-}
-/// Return result regex or invalid regex if parsing was not successful.
-/// Result will be the last successfully parsed regex.
-postfix#4 { Ok(regex.unwrap_or_else(|| Regex::new_invalid(module, &span))) }
-
-/// Create identifier
-atomic#1 { Ok(Regex::new_id(module, interner.get(Id.0), &Id.1)) }
-/// Create string
-atomic#2 { Ok(Regex::new_str(module, interner.get(Str.0), &Str.1)) }
-/// Create semantic predicate
-atomic#3 { Ok(Regex::new_predicate(module, name, Predicate.0, &Predicate.1)) }
-/// Create semantic action
-atomic#4 { Ok(Regex::new_action(module, name, Action.0, &Action.1)) }
-/// Create error handler
-atomic#5 { Ok(Regex::new_error_handler(module, name, ErrorHandler.0, &ErrorHandler.1)) }
-/// Create parenthesized regex
-atomic#6 {
-    let span = LPar.start..RPar.end;
-    Ok(Regex::new_paren(module, regex, &span))
-}
-/// Create option regex
-atomic#7 {
-    let span = LBrak.start..RBrak.end;
-    Ok(Regex::new_option(module, regex, &span))
-}
+rule_decl:
+  Id ':' [regex] ';'
+;
+regex:
+  alternation
+;
+alternation:
+  concat ('|' concat)*
+;
+concat:
+  postfix postfix*
+;
+postfix:
+  postfix ('*' | '+')
+| atomic
+| paren
+| optional
+;
+paren:
+  '(' regex ')'
+;
+optional:
+  '[' regex ']'
+;
+atomic:
+  Id
+| Str
+| Predicate
+| Action
+| Binding
+| OpenNode
+| CloseNode
+;

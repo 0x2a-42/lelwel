@@ -1,9 +1,7 @@
 #![cfg(feature = "lsp")]
 
-use crate::frontend::ast::{Element, ElementKind, Module, Node, Regex, RegexKind};
-use crate::frontend::parser::{Parser, Token, TokenStream};
-use crate::frontend::sema::SemanticPass;
-use crate::frontend::symbols::StringInterner;
+use crate::frontend::ast::{AstNode, Regex, RuleDecl};
+use crate::{tokenize, Cst, NodeRef, Parser, Rule, SemanticData, SemanticPass, Token};
 use codespan_reporting::diagnostic::{LabelStyle, Severity};
 use codespan_reporting::files::SimpleFile;
 use logos::{Logos, Span};
@@ -12,7 +10,7 @@ use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tower_lsp::lsp_types::*;
 
-use self::lookup::{LookupDefinition, LookupNode, LookupReferences};
+use self::lookup::*;
 
 mod lookup;
 
@@ -113,54 +111,57 @@ enum Notification {
 
 async fn analyze(
     uri: Url,
-    content: String,
+    source: String,
     mut req: mpsc::Receiver<Request>,
     noti: mpsc::Sender<Notification>,
 ) {
     let path = uri.as_str();
-    let mut tokens = TokenStream::new(Token::lexer(&content), path);
-
-    let file = SimpleFile::new(path, &content);
-
     let mut diags = vec![];
-    let mut interner = StringInterner::new();
-    if let Some(mut module) = Parser::parse(&mut tokens, &mut diags, &mut interner) {
-        SemanticPass::run(&mut module, &mut diags);
-        while let Some(req) = req.recv().await {
-            match req {
-                Request::Diagnostic => {
-                    let mut diags = diags
-                        .iter()
-                        .map(|diag| to_lsp_diag(&file, &uri, diag))
-                        .collect::<Vec<_>>();
-                    let mut hints = related_as_hints(&diags);
-                    diags.append(&mut hints);
-                    noti.send(Notification::PublishDiagnostics(diags))
-                        .await
-                        .unwrap();
-                }
-                Request::Hover(pos) => {
-                    let pos = compat::position_to_offset(&file, &pos);
-                    let res = hover(&module, pos)
-                        .map(|(msg, span)| (msg, compat::span_to_range(&file, &span)));
-                    noti.send(Notification::Hover(res)).await.unwrap();
-                }
-                Request::GotoDefinition(pos) => {
-                    let pos = compat::position_to_offset(&file, &pos);
-                    let range = LookupDefinition::find(&module, pos)
-                        .map(|elem| compat::span_to_range(&file, &elem.span));
-                    noti.send(Notification::GotoDefinition(range))
-                        .await
-                        .unwrap();
-                }
-                Request::References(pos, with_def) => {
-                    let pos = compat::position_to_offset(&file, &pos);
-                    let ranges = LookupReferences::find(&module, pos, with_def)
-                        .iter()
-                        .map(|span| Location::new(uri.clone(), compat::span_to_range(&file, span)))
-                        .collect();
-                    noti.send(Notification::References(ranges)).await.unwrap();
-                }
+
+    let (tokens, ranges) = tokenize(Token::lexer(&source), &mut diags);
+    let cst = Parser::parse(&source, tokens, ranges, &mut diags);
+    let sema = SemanticPass::run(&cst, &mut diags);
+    let file = SimpleFile::new(path, source.as_str());
+
+    while let Some(req) = req.recv().await {
+        match req {
+            Request::Diagnostic => {
+                let mut diags = diags
+                    .iter()
+                    .map(|diag| to_lsp_diag(&file, &uri, diag))
+                    .collect::<Vec<_>>();
+                let mut hints = related_as_hints(&diags);
+                diags.append(&mut hints);
+                noti.send(Notification::PublishDiagnostics(diags))
+                    .await
+                    .unwrap();
+            }
+            Request::Hover(pos) => {
+                let pos = compat::position_to_offset(&file, &pos);
+                let res = hover(&cst, &sema, pos)
+                    .map(|(msg, span)| (msg, compat::span_to_range(&file, &span)));
+                noti.send(Notification::Hover(res)).await.unwrap();
+            }
+            Request::GotoDefinition(pos) => {
+                let pos = compat::position_to_offset(&file, &pos);
+                let range = lookup_definition(&cst, &sema, pos)
+                    .map(|node| compat::span_to_range(&file, &cst.get_span(node).unwrap()));
+                noti.send(Notification::GotoDefinition(range))
+                    .await
+                    .unwrap();
+            }
+            Request::References(pos, with_def) => {
+                let pos = compat::position_to_offset(&file, &pos);
+                let ranges = lookup_references(&cst, &sema, pos, with_def)
+                    .into_iter()
+                    .map(|node| {
+                        Location::new(
+                            uri.clone(),
+                            compat::span_to_range(&file, &cst.get_span(node).unwrap()),
+                        )
+                    })
+                    .collect();
+                noti.send(Notification::References(ranges)).await.unwrap();
             }
         }
     }
@@ -179,89 +180,100 @@ async fn analyze(
     }
 }
 
-fn hover(module: &Module, pos: usize) -> Option<(String, Span)> {
-    let hover_ret_pars = |ret: &str, pars: &str| {
-        format!(
-            "---\n**Return:** `{}`  \n**Parameters:** `{}`",
-            if ret.is_empty() { " " } else { ret },
-            if pars.is_empty() { " " } else { pars },
-        )
-    };
-    let hover_element = |element: &Element| match element.kind {
-        ElementKind::Rule {
-            regex, ret, pars, ..
-        }
-        | ElementKind::Start {
-            regex, ret, pars, ..
-        } => {
-            let doc = if !element.doc.is_empty() {
-                format!("---\n{}", element.doc)
-            } else {
-                "".to_string()
-            };
-            let regex = module.get_regex(regex).unwrap();
-            let doc = format!(
-                "**First:** {:?}  \n**Follow:** {:?}\n{}\n{}",
-                regex.first,
-                regex.follow,
-                hover_ret_pars(ret, pars),
-                doc,
-            );
-            Some((doc, element.span.clone()))
-        }
-        _ => None,
-    };
-    match LookupNode::find(module, pos)? {
-        Node::Element(element) => hover_element(element),
-        Node::Regex(regex) => match regex {
-            Regex {
-                kind:
-                    RegexKind::Id { elem, .. }
-                    | RegexKind::Str { elem, .. }
-                    | RegexKind::Predicate { elem, .. }
-                    | RegexKind::Action { elem, .. },
-                ..
-            } => {
-                let doc = if let Some(element) = module.get_element(*elem) {
-                    if !element.doc.is_empty() {
-                        format!("---\n{}", element.doc)
-                    } else {
-                        "".to_string()
+fn hover(cst: &Cst, sema: &SemanticData, pos: usize) -> Option<(String, Span)> {
+    let node = lookup_node(cst, NodeRef::ROOT, pos)?;
+    let span = cst.get_span(node)?;
+
+    if let Some(regex) = Regex::cast(cst, node) {
+        let first = &sema
+            .first_sets
+            .get(&regex.syntax())
+            .map_or("{}".to_string(), |s| format!("{s:?}"));
+        let follow = &sema
+            .follow_sets
+            .get(&regex.syntax())
+            .map_or("{}".to_string(), |s| format!("{s:?}"));
+        let predict = &sema
+            .predict_sets
+            .get(&regex.syntax())
+            .map_or("{}".to_string(), |s| format!("{s:?}"));
+
+        match regex {
+            Regex::Star(_) | Regex::Plus(_) => {
+                let recovery = &sema
+                    .recovery_sets
+                    .get(&regex.syntax())
+                    .map_or("{}".to_string(), |s| format!("{s:?}"));
+                Some((format!(
+                    "**First:** {first}\n**Follow:** {follow}\n**Predict:** {predict}\n**Recovery:** {recovery}\n"
+                ), span))
+            }
+            Regex::Name(_) | Regex::Symbol(_) => {
+                let comment_attached_node = sema
+                    .decl_bindings
+                    .get(&node)
+                    .and_then(|decl| cst.get_span(*decl))
+                    .and_then(|span| {
+                        find_node(cst, NodeRef::ROOT, span.start, |r| {
+                            r == Rule::TokenList || r == Rule::RuleDecl
+                        })
+                    });
+                let mut comment_nodes = vec![];
+                if let Some(comment_attached_node) = comment_attached_node {
+                    for i in 1.. {
+                        if let Some(node) = cst.get_token(
+                            NodeRef(comment_attached_node.0.saturating_sub(i)),
+                            Token::DocComment,
+                        ) {
+                            comment_nodes.push(node);
+                        } else {
+                            break;
+                        }
                     }
-                } else {
-                    "".to_string()
-                };
+                }
+                let mut comment = String::new();
+                for (val, _) in comment_nodes.iter().rev() {
+                    comment.push_str(val.strip_prefix("///").unwrap().trim_start());
+                }
+                if !comment.is_empty() {
+                    comment.push_str("---\n")
+                }
                 Some((
-                    format!(
-                        "**First:** {:?}  \n**Follow:** {:?}\n{}",
-                        regex.first, regex.follow, doc,
-                    ),
-                    regex.span.clone(),
+                    format!("{comment}**First:** {first}\n**Follow:** {follow}\n**Predict:** {predict}\n"),
+                    span,
                 ))
             }
-            Regex {
-                kind: RegexKind::ErrorHandler { .. },
-                ..
-            } => Some((
-                format!(
-                    "**Follow:** {:?}  \n**Cancel:** {:?}\n",
-                    regex.follow, regex.cancel
-                ),
-                regex.span.clone(),
-            )),
             _ => Some((
-                format!(
-                    "**First:** {:?}  \n**Follow:** {:?}\n",
-                    regex.first, regex.follow
-                ),
-                regex.span.clone(),
+                format!("**First:** {first}\n**Follow:** {follow}\n**Predict:** {predict}\n"),
+                span,
             )),
-        },
+        }
+    } else if let Some(rule) = RuleDecl::cast(cst, node) {
+        let regex = rule.regex(cst)?;
+        let first = &sema
+            .first_sets
+            .get(&regex.syntax())
+            .map_or("{}".to_string(), |s| format!("{s:?}"));
+        let follow = &sema
+            .follow_sets
+            .get(&regex.syntax())
+            .map_or("{}".to_string(), |s| format!("{s:?}"));
+        let predict = &sema
+            .predict_sets
+            .get(&regex.syntax())
+            .map_or("{}".to_string(), |s| format!("{s:?}"));
+        let pattern = sema
+            .patterns
+            .get(&rule)
+            .map_or("None".to_string(), |pattern| format!("{pattern:?}"));
+        Some((format!("**Pattern:** {pattern}\n**First:** {first}\n**Follow:** {follow}\n**Predict:** {predict}\n"), span))
+    } else {
+        None
     }
 }
 
 fn to_lsp_related(
-    file: &SimpleFile<&str, &String>,
+    file: &SimpleFile<&str, &str>,
     span: &Span,
     uri: &Url,
     msg: &str,
@@ -273,7 +285,7 @@ fn to_lsp_related(
 }
 
 fn to_lsp_diag(
-    file: &SimpleFile<&str, &String>,
+    file: &SimpleFile<&str, &str>,
     uri: &Url,
     diag: &super::frontend::parser::Diagnostic,
 ) -> Diagnostic {
@@ -289,7 +301,11 @@ fn to_lsp_diag(
         })
         .collect::<Vec<_>>();
     Diagnostic::new(
-        compat::span_to_range(file, &diag.labels[0].range),
+        diag.labels
+            .first()
+            .map_or(tower_lsp::lsp_types::Range::default(), |label| {
+                compat::span_to_range(file, &label.range)
+            }),
         Some(match diag.severity {
             Severity::Error | Severity::Bug => DiagnosticSeverity::ERROR,
             Severity::Warning => DiagnosticSeverity::WARNING,
@@ -324,11 +340,11 @@ fn related_as_hints(diags: &[Diagnostic]) -> Vec<Diagnostic> {
 
 /// required functions due to different versions of lsp-types in codespan and tower-lsp
 mod compat {
-    use crate::frontend::ast::Span;
+    use crate::Span;
     use codespan_reporting::files::SimpleFile;
 
     pub fn position_to_offset(
-        file: &SimpleFile<&str, &String>,
+        file: &SimpleFile<&str, &str>,
         pos: &tower_lsp::lsp_types::Position,
     ) -> usize {
         codespan_lsp::position_to_byte_index(
@@ -340,7 +356,7 @@ mod compat {
     }
 
     pub fn span_to_range(
-        file: &SimpleFile<&str, &String>,
+        file: &SimpleFile<&str, &str>,
         span: &Span,
     ) -> tower_lsp::lsp_types::Range {
         let range = codespan_lsp::byte_span_to_range(file, (), span.clone()).unwrap();

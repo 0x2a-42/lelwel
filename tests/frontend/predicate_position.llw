@@ -1,10 +1,10 @@
 token A;
 
-start:
+start s;
+
+s:
   ?1 (
     ?1 A
   | A
   )
 ;
-
-start?1 {}

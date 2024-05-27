@@ -1,13 +1,3 @@
 # lelwel-json
-This project is a simple example for the lelwel parser generator.
-
-The program reads a JSON file and returns 0 if it is valid or 1 otherwise.
+A parser for [JSON](https://en.wikipedia.org/wiki/JSON) files.
 It passes all the parsing tests from [https://github.com/nst/JSONTestSuite](https://github.com/nst/JSONTestSuite).
-
-## Example
-
-```sh
-$ cargo run some_file.json
-$ echo $?
-0
-```

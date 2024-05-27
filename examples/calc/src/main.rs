@@ -1,4 +1,4 @@
-use self::parser::{Parser, Token, TokenStream};
+use self::parser::{tokenize, Parser, Token};
 use codespan_reporting::files::SimpleFile;
 use codespan_reporting::term::{
     self,
@@ -14,17 +14,16 @@ fn main() {
     if args.len() != 2 {
         std::process::exit(1);
     }
-    let mut tokens = TokenStream::new(Token::lexer(&args[1]));
-    let file = SimpleFile::new("stdin", &args[1]);
 
+    let source = &args[1];
     let mut diags = vec![];
-    if let Some(result) = Parser::parse(&mut tokens, &mut diags) {
-        println!("{result}");
-    }
-
+    let (tokens, ranges) = tokenize(Token::lexer(source), &mut diags);
+    let cst = Parser::parse(source, tokens, ranges, &mut diags);
+    println!("{cst}");
     let writer = StandardStream::stderr(ColorChoice::Auto);
     let config = Config::default();
-    for diag in diags {
-        term::emit(&mut writer.lock(), &config, &file, &diag).unwrap();
+    let file = SimpleFile::new(&args[1], source);
+    for diag in diags.iter() {
+        term::emit(&mut writer.lock(), &config, &file, diag).unwrap();
     }
 }

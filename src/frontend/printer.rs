@@ -1,45 +1,41 @@
+use crate::{Cst, NodeRef, SemanticData};
+
 use super::ast::*;
 
 macro_rules! member {
     ($id: ident) => {
         format!(
-            concat!("\x1b[90m", stringify!($id), "=\x1b[32m\"{}\"\x1b[0m"),
+            concat!("\x1b[90m", stringify!($id), "=\x1b[32m{:?}\x1b[0m"),
             $id
         )
+    };
+    ($id: literal) => {
+        concat!("\x1b[90m", $id, "\x1b[0m")
     };
 }
 macro_rules! set {
     ($id: ident) => {
         format!(
-            concat!("\x1b[90m", stringify!($id), "=\x1b[36m{:?}\x1b[0m"),
+            concat!("\x1b[90m", stringify!($id), "=\x1b[36m{}\x1b[0m"),
             $id
         )
     };
 }
-macro_rules! ptr {
-    ($id: expr) => {
-        if let Some(adr) = $id {
-            format!(
-                concat!("\x1b[90m", stringify!($id), "=\x1b[33m[{:p}]\x1b[0m"),
-                adr
-            )
-        } else {
-            format!(concat!(
-                "\x1b[90m",
-                stringify!($id),
-                "=\x1b[33m[null]\x1b[0m"
-            ),)
-        }
-    };
-}
-macro_rules! addr {
-    ($id: ident) => {
-        format!(concat!("\x1b[33m[{:p}]\x1b[0m"), $id)
-    };
-}
 macro_rules! pos {
-    ($id: ident) => {
+    ($id: expr) => {
         format!(concat!("\x1b[34m<{:?}>\x1b[0m"), $id)
+    };
+}
+macro_rules! syntax {
+    ($e: expr) => {
+        format!("\x1b[33m[{:?}]\x1b[0m", $e)
+    };
+    ($name: literal, $e: expr) => {
+        if let Some(syntax) = $e {
+            format!("\x1b[90m{}=\x1b[32m[{:?}]\x1b[0m", $name, syntax.0)
+        } else {
+            "\x1b[33m[]\x1b[0m".to_string()
+        }
     };
 }
 
@@ -47,8 +43,7 @@ macro_rules! pos {
 pub struct DebugPrinter {
     active: Vec<bool>,
 }
-
-impl<'a> DebugPrinter {
+impl DebugPrinter {
     pub fn new() -> DebugPrinter {
         Self::default()
     }
@@ -61,7 +56,7 @@ impl<'a> DebugPrinter {
             }
         }
     }
-    fn branch(&mut self, last: bool, module: &Module<'a>, regex: RegexRef) {
+    fn branch<Visit: Fn(&mut Self)>(&mut self, last: bool, visit: Visit) {
         self.indent();
         if last {
             print!("└─ ");
@@ -69,229 +64,268 @@ impl<'a> DebugPrinter {
             print!("├─ ");
         }
         self.active.push(!last);
-        self.visit_regex(module, regex);
+        visit(self);
         self.active.pop();
     }
-
-    pub fn visit(&mut self, module: &'a Module<'a>) {
-        for element in module.elements.iter() {
-            self.visit_element(module, element);
+    pub fn run(&mut self, cst: &Cst, sema: &SemanticData) {
+        if let Some(file) = File::cast(cst, NodeRef::ROOT) {
+            println!("File {}", syntax!(file.syntax().0));
+            self.branch(false, |s| {
+                println!("{}", member!("start_decls"));
+                let mut it = file.start_decls(cst).peekable();
+                while let Some(decl) = it.next() {
+                    s.branch(it.peek().is_none(), |s| s.print_start_decl(cst, decl));
+                }
+            });
+            self.branch(false, |s| {
+                println!("{}", member!("right_decls"));
+                let mut it = file.right_decls(cst).peekable();
+                while let Some(decl) = it.next() {
+                    s.branch(it.peek().is_none(), |s| s.print_right_decl(cst, decl));
+                }
+            });
+            self.branch(false, |s| {
+                println!("{}", member!("skip_decls"));
+                let mut it = file.skip_decls(cst).peekable();
+                while let Some(decl) = it.next() {
+                    s.branch(it.peek().is_none(), |s| s.print_skip_decl(cst, decl));
+                }
+            });
+            self.branch(false, |s| {
+                println!("{}", member!("token_decls"));
+                let mut it = file.token_decls(cst).peekable();
+                while let Some(decl) = it.next() {
+                    s.branch(it.peek().is_none(), |s| s.print_token_decl(cst, decl));
+                }
+            });
+            self.branch(true, |s| {
+                println!("{}", member!("rule_decls"));
+                let mut it = file.rule_decls(cst).peekable();
+                while let Some(decl) = it.next() {
+                    s.branch(it.peek().is_none(), |s| s.print_rule_decl(cst, sema, decl));
+                }
+            });
         }
     }
-
-    fn visit_element(&mut self, module: &'a Module<'a>, element: &Element<'a>) {
-        let span = &element.span;
-        match element.kind {
-            ElementKind::Start { regex, .. } => {
-                println!("start: {} {}", addr!(element), pos!(span));
-                self.branch(true, module, regex);
-            }
-            ElementKind::Rule { name, regex, .. } => {
-                println!("rule: {} {} {}", member!(name), addr!(element), pos!(span));
-                self.branch(true, module, regex);
-            }
-            ElementKind::Token { name, ty, sym } => {
-                println!(
-                    "token: {} {} {} {} {}",
-                    member!(name),
-                    member!(ty),
-                    member!(sym),
-                    addr!(element),
-                    pos!(span)
-                );
-            }
-            ElementKind::Action { name, num, .. } => {
-                println!(
-                    "action: {} {} {} {}",
-                    member!(name),
-                    member!(num),
-                    addr!(element),
-                    pos!(span)
-                );
-            }
-            ElementKind::Predicate { name, num, .. } => {
-                println!(
-                    "predicate: {} {} {} {}",
-                    member!(name),
-                    member!(num),
-                    addr!(element),
-                    pos!(span)
-                );
-            }
-            ElementKind::ErrorHandler { name, num, .. } => {
-                println!(
-                    "error handler: {} {} {} {}",
-                    member!(name),
-                    member!(num),
-                    addr!(element),
-                    pos!(span)
-                );
-            }
-            ElementKind::Parameters { .. } => {
-                println!("parameters: {}", pos!(span));
-            }
-            ElementKind::Invalid => {
-                println!("invalid: {}", pos!(span));
-            }
-        }
+    fn print_token_decl(&mut self, cst: &Cst, decl: TokenDecl) {
+        let name = decl.name(cst).map_or("", |(val, _)| val);
+        let symbol = decl.symbol(cst).map_or("", |(val, _)| val);
+        println!(
+            "Token {} {} {} {}",
+            member!(name),
+            member!(symbol),
+            pos!(decl.span(cst)),
+            syntax!(decl.syntax().0),
+        );
     }
-
-    fn visit_regex(&mut self, module: &Module<'a>, regex: RegexRef) {
-        let regex = module.get_regex(regex).unwrap();
-        let span = &regex.span;
-        let first = &regex.first;
-        let follow = &regex.follow;
-        let cancel = &regex.cancel;
-        match regex.kind {
-            RegexKind::Id { name, elem } => {
-                let elem = module.get_element(elem);
+    fn print_rule_decl(&mut self, cst: &Cst, sema: &SemanticData, decl: RuleDecl) {
+        let name = decl.name(cst).map_or("", |(val, _)| val);
+        let pattern = sema.patterns.get(&decl);
+        println!(
+            "Rule {} {} {} {}",
+            member!(name),
+            member!(pattern),
+            pos!(decl.span(cst)),
+            syntax!(decl.syntax().0),
+        );
+        decl.regex(cst)
+            .inspect(|r| self.branch(true, |s| s.print_regex(cst, sema, *r)));
+    }
+    fn print_start_decl(&mut self, cst: &Cst, decl: StartDecl) {
+        let rule_name = decl.rule_name(cst).map_or("", |(val, _)| val);
+        println!(
+            "Start {} {} {}",
+            member!(rule_name),
+            pos!(decl.span(cst)),
+            syntax!(decl.syntax().0),
+        );
+    }
+    fn print_right_decl(&mut self, cst: &Cst, decl: RightDecl) {
+        let mut token_names = vec![];
+        decl.token_names(cst, |(val, _)| token_names.push(val));
+        println!(
+            "Right {} {} {}",
+            member!(token_names),
+            pos!(decl.span(cst)),
+            syntax!(decl.syntax().0),
+        );
+    }
+    fn print_skip_decl(&mut self, cst: &Cst, decl: SkipDecl) {
+        let mut token_names = vec![];
+        decl.token_names(cst, |(val, _)| token_names.push(val));
+        println!(
+            "Skip {} {} {}",
+            member!(token_names),
+            pos!(decl.span(cst)),
+            syntax!(decl.syntax().0),
+        );
+    }
+    fn print_regex(&mut self, cst: &Cst, sema: &SemanticData, regex: Regex) {
+        let first = &sema
+            .first_sets
+            .get(&regex.syntax())
+            .map_or("{}".to_string(), |set| format!("{:?}", set));
+        let follow = &sema
+            .follow_sets
+            .get(&regex.syntax())
+            .map_or("{}".to_string(), |set| format!("{:?}", set));
+        let recovery = &sema
+            .recovery_sets
+            .get(&regex.syntax())
+            .map_or("{}".to_string(), |set| format!("{:?}", set));
+        match regex {
+            Regex::Alternation(alt) => {
                 println!(
-                    "id: {} {} {} {} {} {}",
-                    member!(name),
-                    ptr!(elem),
+                    "Alternation {} {} {} {}",
                     set!(first),
                     set!(follow),
-                    addr!(regex),
-                    pos!(span)
+                    pos!(alt.span(cst)),
+                    syntax!(alt.syntax().0),
                 );
-            }
-            RegexKind::Concat { ref ops, error } => {
-                let error = module.get_regex(error);
-                println!(
-                    "concat: {} {} {} {} {}",
-                    ptr!(error),
-                    set!(first),
-                    set!(follow),
-                    addr!(regex),
-                    pos!(span)
-                );
-                let mut count = 0;
-                for op in ops {
-                    count += 1;
-                    self.branch(count == ops.len(), module, *op);
+                let mut it = alt.operands(cst).peekable();
+                while let Some(op) = it.next() {
+                    self.branch(it.peek().is_none(), |s| s.print_regex(cst, sema, op));
                 }
             }
-            RegexKind::Or { ref ops, error } => {
-                let error = module.get_regex(error);
+            Regex::Concat(concat) => {
                 println!(
-                    "or: {} {} {} {} {}",
-                    ptr!(error),
+                    "Concat {} {} {} {}",
                     set!(first),
                     set!(follow),
-                    addr!(regex),
-                    pos!(span)
+                    pos!(concat.span(cst)),
+                    syntax!(concat.syntax().0),
                 );
-                let mut count = 0;
-                for op in ops {
-                    count += 1;
-                    self.branch(count == ops.len(), module, *op);
+                let mut it = concat.operands(cst).peekable();
+                while let Some(op) = it.next() {
+                    self.branch(it.peek().is_none(), |s| s.print_regex(cst, sema, op));
                 }
             }
-            RegexKind::Star { op } => {
+            Regex::Paren(paren) => {
                 println!(
-                    "star: {} {} {} {}",
+                    "Paren {} {} {} {}",
                     set!(first),
                     set!(follow),
-                    addr!(regex),
-                    pos!(span)
+                    pos!(paren.span(cst)),
+                    syntax!(paren.syntax().0),
                 );
-                self.branch(true, module, op);
+                paren
+                    .inner(cst)
+                    .inspect(|r| self.branch(true, |s| s.print_regex(cst, sema, *r)));
             }
-            RegexKind::Plus { op } => {
+            Regex::Optional(opt) => {
                 println!(
-                    "plus: {} {} {} {}",
+                    "Optional {} {} {} {}",
                     set!(first),
                     set!(follow),
-                    addr!(regex),
-                    pos!(span)
+                    pos!(opt.span(cst)),
+                    syntax!(opt.syntax().0),
                 );
-                self.branch(true, module, op);
+                opt.operand(cst)
+                    .inspect(|r| self.branch(true, |s| s.print_regex(cst, sema, *r)));
             }
-            RegexKind::Option { op } => {
+            Regex::Star(star) => {
                 println!(
-                    "option: {} {} {} {}",
+                    "Star {} {} {} {} {}",
                     set!(first),
                     set!(follow),
-                    addr!(regex),
-                    pos!(span)
+                    set!(recovery),
+                    pos!(star.span(cst)),
+                    syntax!(star.syntax().0),
                 );
-                self.branch(true, module, op);
+                star.operand(cst)
+                    .inspect(|r| self.branch(true, |s| s.print_regex(cst, sema, *r)));
             }
-            RegexKind::Paren { op } => {
+            Regex::Plus(plus) => {
                 println!(
-                    "paren: {} {} {} {}",
+                    "Plus {} {} {} {} {}",
                     set!(first),
                     set!(follow),
-                    addr!(regex),
-                    pos!(span)
+                    set!(recovery),
+                    pos!(plus.span(cst)),
+                    syntax!(plus.syntax().0),
                 );
-                self.branch(true, module, op);
+                plus.operand(cst)
+                    .inspect(|r| self.branch(true, |s| s.print_regex(cst, sema, *r)));
             }
-            RegexKind::Str { val, elem } => {
-                let elem = module.get_element(elem);
+            Regex::Name(name) => {
+                let value = name.value(cst).map_or("", |(val, _)| val);
+                let binding = sema.decl_bindings.get(&name.syntax());
                 println!(
-                    "str: {} {} {} {} {} {}",
-                    member!(val),
-                    ptr!(elem),
+                    "Name {} {} {} {} {} {}",
+                    member!(value),
+                    syntax!("binding", binding),
                     set!(first),
                     set!(follow),
-                    addr!(regex),
-                    pos!(span)
-                );
-            }
-            RegexKind::Predicate { val, elem, .. } => {
-                let elem = module.get_element(elem);
-                println!(
-                    "predicate: {} {} {} {} {} {}",
-                    member!(val),
-                    ptr!(elem),
-                    set!(first),
-                    set!(follow),
-                    addr!(regex),
-                    pos!(span)
+                    pos!(name.span(cst)),
+                    syntax!(name.syntax().0),
                 );
             }
-            RegexKind::Action { val, elem, .. } => {
-                let elem = module.get_element(elem);
+            Regex::Symbol(symbol) => {
+                let value = symbol.value(cst).map_or("", |(val, _)| val);
+                let binding = sema.decl_bindings.get(&symbol.syntax());
                 println!(
-                    "action: {} {} {} {} {} {}",
-                    member!(val),
-                    ptr!(elem),
+                    "Symbol {} {} {} {} {} {}",
+                    member!(value),
+                    syntax!("binding", binding),
                     set!(first),
                     set!(follow),
-                    addr!(regex),
-                    pos!(span)
+                    pos!(symbol.span(cst)),
+                    syntax!(symbol.syntax().0),
                 );
             }
-            RegexKind::ErrorHandler { val, elem, .. } => {
-                let elem = module.get_element(elem);
+            Regex::Predicate(pred) => {
+                let value = pred.value(cst).map_or("", |(val, _)| val);
                 println!(
-                    "error: {} {} {} {} {} {} {}",
-                    member!(val),
-                    ptr!(elem),
+                    "Predicate {} {} {} {} {}",
+                    member!(value),
                     set!(first),
                     set!(follow),
-                    set!(cancel),
-                    addr!(regex),
-                    pos!(span)
+                    pos!(pred.span(cst)),
+                    syntax!(pred.syntax().0),
                 );
             }
-            RegexKind::Empty => {
+            Regex::Action(alt) => {
+                let value = alt.value(cst).map_or("", |(val, _)| val);
                 println!(
-                    "empty: {} {} {} {}",
+                    "Action {} {} {} {} {}",
+                    member!(value),
                     set!(first),
                     set!(follow),
-                    addr!(regex),
-                    pos!(span)
+                    pos!(alt.span(cst)),
+                    syntax!(alt.syntax().0),
                 );
             }
-            RegexKind::Invalid => {
+            Regex::Binding(bind) => {
+                let value = bind.value(cst).map_or("", |(val, _)| val);
                 println!(
-                    "invalid: {} {} {} {}",
+                    "Binding {} {} {} {} {}",
+                    member!(value),
                     set!(first),
                     set!(follow),
-                    addr!(regex),
-                    pos!(span)
+                    pos!(bind.span(cst)),
+                    syntax!(bind.syntax().0),
+                );
+            }
+            Regex::OpenNode(open) => {
+                let value = open.value(cst).map_or("", |(val, _)| val);
+                println!(
+                    "OpenNode {} {} {} {} {}",
+                    member!(value),
+                    set!(first),
+                    set!(follow),
+                    pos!(open.span(cst)),
+                    syntax!(open.syntax().0),
+                );
+            }
+            Regex::CloseNode(close) => {
+                let value = close.value(cst).map_or("", |(val, _)| val);
+                println!(
+                    "CloseNode {} {} {} {} {}",
+                    member!(value),
+                    set!(first),
+                    set!(follow),
+                    pos!(close.span(cst)),
+                    syntax!(close.syntax().0),
                 );
             }
         }

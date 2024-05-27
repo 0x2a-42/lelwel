@@ -1,444 +1,306 @@
-use super::symbols;
-use super::symbols::Symbol;
-use std::collections::BTreeSet;
+use crate::{Cst, CstChildren, Node, NodeRef, Rule, Span, Token};
 
-pub type Span = core::ops::Range<usize>;
+pub trait AstNode {
+    fn cast(cst: &Cst, syntax: NodeRef) -> Option<Self>
+    where
+        Self: Sized;
 
-/// Abstract syntax tree
+    fn syntax(&self) -> NodeRef;
 
-#[derive(Debug)]
-pub struct Module<'a> {
-    pub uri: &'a str,
-    pub elements: Vec<Element<'a>>,
-    pub regexes: Vec<Regex<'a>>,
-
-    pub parameters: ElementRef,
+    fn span(&self, cst: &Cst) -> Span {
+        cst.get_span(self.syntax()).unwrap()
+    }
 }
 
-impl<'a> Module<'a> {
-    pub fn new(uri: &'a str) -> Self {
-        Module {
-            uri,
-            elements: vec![],
-            regexes: vec![],
-            parameters: ElementRef::INVALID,
+macro_rules! ast_node {
+    ($node_name:ident) => {
+        #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, Ord, PartialOrd)]
+        pub struct $node_name {
+            syntax: NodeRef,
+        }
+        impl AstNode for $node_name {
+            fn cast(cst: &Cst, syntax: NodeRef) -> Option<Self> {
+                match cst.get(syntax) {
+                    Node::Rule(Rule::$node_name, _) => Some(Self { syntax }),
+                    _ => None,
+                }
+            }
+            fn syntax(&self) -> NodeRef {
+                self.syntax
+            }
+        }
+    };
+    ($node_name:ident, $rule_name:ident, $token_name:ident) => {
+        #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, Ord, PartialOrd)]
+        pub struct $node_name {
+            syntax: NodeRef,
+        }
+        impl AstNode for $node_name {
+            fn cast(cst: &Cst, syntax: NodeRef) -> Option<Self> {
+                match cst.get(syntax) {
+                    Node::Rule(Rule::$rule_name, _)
+                        if cst
+                            .children(syntax)
+                            .find_map(|n| cst.get_token(n, Token::$token_name))
+                            .is_some() =>
+                    {
+                        Some(Self { syntax })
+                    }
+                    _ => None,
+                }
+            }
+            fn syntax(&self) -> NodeRef {
+                self.syntax
+            }
+        }
+    };
+    ($node_name:ident, ($($node_names:ident),+)) => {
+        #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, Ord, PartialOrd)]
+        pub enum $node_name {
+            $($node_names($node_names),)*
+        }
+        impl AstNode for $node_name {
+            fn cast(cst: &Cst, syntax: NodeRef) -> Option<Self> {
+                $(
+                if let Some(node) = $node_names::cast(cst, syntax) {
+                    return Some(Self::$node_names(node));
+                }
+                )*
+                return None;
+            }
+            fn syntax(&self) -> NodeRef {
+                match self {
+                    $(Self::$node_names(node) => node.syntax,)*
+                }
+            }
         }
     }
+}
 
-    fn alloc_element(&mut self, kind: ElementKind<'a>, span: Span, doc: &'a str) -> ElementRef {
-        let index = self.elements.len();
-        self.elements.push(Element {
-            kind,
-            used: false,
-            span,
-            doc,
-        });
-        ElementRef(index)
-    }
-    fn alloc_regex(&mut self, kind: RegexKind<'a>, span: Span) -> RegexRef {
-        let index = self.regexes.len();
-        self.regexes.push(Regex {
-            kind,
-            span,
-            first: BTreeSet::new(),
-            follow: BTreeSet::new(),
-            cancel: BTreeSet::new(),
-        });
-        RegexRef(index)
-    }
+ast_node!(File);
+ast_node!(TokenDecl);
+ast_node!(RuleDecl);
+ast_node!(StartDecl);
+ast_node!(RightDecl);
+ast_node!(SkipDecl);
+ast_node!(
+    Regex,
+    (
+        Alternation,
+        Concat,
+        Paren,
+        Optional,
+        Star,
+        Plus,
+        Name,
+        Symbol,
+        Predicate,
+        Action,
+        Binding,
+        OpenNode,
+        CloseNode
+    )
+);
+ast_node!(Alternation);
+ast_node!(Concat);
+ast_node!(Paren);
+ast_node!(Optional);
+ast_node!(Star, Postfix, Star);
+ast_node!(Plus, Postfix, Plus);
+ast_node!(Name, Atomic, Id);
+ast_node!(Symbol, Atomic, Str);
+ast_node!(Predicate, Atomic, Predicate);
+ast_node!(Action, Atomic, Action);
+ast_node!(Binding, Atomic, Binding);
+ast_node!(OpenNode, Atomic, OpenNode);
+ast_node!(CloseNode, Atomic, CloseNode);
 
-    pub fn get_element(&self, r: ElementRef) -> Option<&Element<'a>> {
-        self.elements.get(r.0)
+impl Cst<'_> {
+    fn child_node<T: AstNode>(&self, syntax: NodeRef) -> Option<T> {
+        self.children(syntax).find_map(|c| T::cast(self, c))
     }
-    pub fn get_regex(&self, r: RegexRef) -> Option<&Regex<'a>> {
-        self.regexes.get(r.0)
+    fn child_node_iter<T: AstNode>(
+        &self,
+        syntax: NodeRef,
+    ) -> std::iter::FilterMap<CstChildren, impl FnMut(NodeRef) -> Option<T> + '_> {
+        self.children(syntax).filter_map(|c| T::cast(self, c))
     }
-    pub fn get_element_mut(&mut self, r: ElementRef) -> &mut Element<'a> {
-        &mut self.elements[r.0]
-    }
-    pub fn get_regex_mut(&mut self, r: RegexRef) -> &mut Regex<'a> {
-        &mut self.regexes[r.0]
+    fn child_token(&self, syntax: NodeRef, token: Token) -> Option<(&str, Span)> {
+        self.children(syntax).find_map(|c| self.get_token(c, token))
     }
 }
 
-#[derive(Debug)]
-pub enum Node<'a> {
-    Element(&'a Element<'a>),
-    Regex(&'a Regex<'a>),
+pub trait Named: AstNode {
+    fn name<'a>(&self, cst: &'a Cst) -> Option<(&'a str, Span)>;
 }
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct ElementRef(pub usize);
-
-impl ElementRef {
-    pub const INVALID: Self = Self(usize::MAX);
-
-    pub fn is_valid(self) -> bool {
-        self != Self::INVALID
+impl File {
+    pub fn token_decls<'a>(
+        &self,
+        cst: &'a Cst,
+    ) -> std::iter::FilterMap<
+        std::iter::Flatten<
+            std::iter::FilterMap<CstChildren<'a>, impl FnMut(NodeRef) -> Option<CstChildren<'a>>>,
+        >,
+        impl FnMut(NodeRef) -> Option<TokenDecl> + 'a,
+    > {
+        cst.children(self.syntax)
+            .filter_map(|c| cst.get_rule(c, Rule::TokenList).map(|l| cst.children(l)))
+            .flatten()
+            .filter_map(|c| TokenDecl::cast(cst, c))
     }
-}
-impl From<usize> for ElementRef {
-    fn from(value: usize) -> Self {
-        Self(value)
+    pub fn rule_decls<'a>(
+        &self,
+        cst: &'a Cst,
+    ) -> std::iter::FilterMap<CstChildren<'a>, impl FnMut(NodeRef) -> Option<RuleDecl> + 'a> {
+        cst.child_node_iter(self.syntax)
     }
-}
-
-#[derive(Debug)]
-pub struct Element<'a> {
-    pub kind: ElementKind<'a>,
-    pub used: bool,
-    pub span: Span,
-    pub doc: &'a str,
-}
-
-#[derive(Debug)]
-pub enum ElementKind<'a> {
-    Start {
-        ret: &'a str,
-        pars: &'a str,
-        regex: RegexRef,
-        action: ElementRef,
-    },
-    Rule {
-        name: Symbol<'a>,
-        name_span: Span,
-        ret: &'a str,
-        pars: &'a str,
-        regex: RegexRef,
-        action: ElementRef,
-    },
-    Token {
-        name: Symbol<'a>,
-        ty: &'a str,
-        sym: Symbol<'a>,
-    },
-    Action {
-        name: Symbol<'a>,
-        name_span: Span,
-        num: u64,
-        code: &'a str,
-    },
-    Predicate {
-        name: Symbol<'a>,
-        name_span: Span,
-        num: u64,
-        code: &'a str,
-    },
-    ErrorHandler {
-        name: Symbol<'a>,
-        name_span: Span,
-        num: u64,
-        code: &'a str,
-    },
-    Parameters {
-        code: &'a str,
-    },
-    Invalid,
-}
-
-impl<'a> Element<'a> {
-    pub fn new_start(
-        module: &mut Module<'a>,
-        ret: &'a str,
-        pars: &'a str,
-        regex: RegexRef,
-        span: &Span,
-        doc: &'a str,
-    ) -> ElementRef {
-        module.alloc_element(
-            ElementKind::Start {
-                ret,
-                pars,
-                regex,
-                action: ElementRef::INVALID,
-            },
-            span.clone(),
-            doc,
-        )
+    pub fn start_decls<'a>(
+        &self,
+        cst: &'a Cst,
+    ) -> std::iter::FilterMap<CstChildren<'a>, impl FnMut(NodeRef) -> Option<StartDecl> + 'a> {
+        cst.child_node_iter(self.syntax)
     }
-    #[allow(clippy::too_many_arguments)]
-    pub fn new_rule(
-        module: &mut Module<'a>,
-        name: Symbol<'a>,
-        name_span: Span,
-        ret: &'a str,
-        pars: &'a str,
-        regex: RegexRef,
-        span: &Span,
-        doc: &'a str,
-    ) -> ElementRef {
-        module.alloc_element(
-            ElementKind::Rule {
-                name,
-                name_span,
-                ret,
-                pars,
-                regex,
-                action: ElementRef::INVALID,
-            },
-            span.clone(),
-            doc,
-        )
+    pub fn right_decls<'a>(
+        &self,
+        cst: &'a Cst,
+    ) -> std::iter::FilterMap<CstChildren<'a>, impl FnMut(NodeRef) -> Option<RightDecl> + 'a> {
+        cst.child_node_iter(self.syntax)
     }
-    pub fn new_token(
-        module: &mut Module<'a>,
-        name: Symbol<'a>,
-        ty: &'a str,
-        sym: Symbol<'a>,
-        span: &Span,
-        doc: &'a str,
-    ) -> ElementRef {
-        module.alloc_element(ElementKind::Token { name, ty, sym }, span.clone(), doc)
-    }
-    pub fn new_action(
-        module: &mut Module<'a>,
-        name: Symbol<'a>,
-        name_span: &Span,
-        num: u64,
-        code: &'a str,
-        span: &Span,
-        doc: &'a str,
-    ) -> ElementRef {
-        module.alloc_element(
-            ElementKind::Action {
-                name,
-                name_span: name_span.clone(),
-                num,
-                code,
-            },
-            span.clone(),
-            doc,
-        )
-    }
-    pub fn new_predicate(
-        module: &mut Module<'a>,
-        name: Symbol<'a>,
-        name_span: &Span,
-        num: u64,
-        code: &'a str,
-        span: &Span,
-        doc: &'a str,
-    ) -> ElementRef {
-        module.alloc_element(
-            ElementKind::Predicate {
-                name,
-                name_span: name_span.clone(),
-                num,
-                code,
-            },
-            span.clone(),
-            doc,
-        )
-    }
-    pub fn new_error_handler(
-        module: &mut Module<'a>,
-        name: Symbol<'a>,
-        name_span: &Span,
-        num: u64,
-        code: &'a str,
-        span: &Span,
-        doc: &'a str,
-    ) -> ElementRef {
-        module.alloc_element(
-            ElementKind::ErrorHandler {
-                name,
-                name_span: name_span.clone(),
-                num,
-                code,
-            },
-            span.clone(),
-            doc,
-        )
-    }
-    pub fn new_parameters(module: &mut Module<'a>, code: &'a str, span: &Span) -> ElementRef {
-        module.alloc_element(ElementKind::Parameters { code }, span.clone(), "")
-    }
-    pub fn new_invalid(module: &mut Module<'a>, span: &Span) -> ElementRef {
-        module.alloc_element(ElementKind::Invalid, span.clone(), "")
+    pub fn skip_decls<'a>(
+        &self,
+        cst: &'a Cst,
+    ) -> std::iter::FilterMap<CstChildren<'a>, impl FnMut(NodeRef) -> Option<SkipDecl> + 'a> {
+        cst.child_node_iter(self.syntax)
     }
 }
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct RegexRef(pub usize);
-
-impl RegexRef {
-    pub const INVALID: Self = Self(usize::MAX);
-
-    pub fn is_valid(self) -> bool {
-        self != Self::INVALID
+impl Named for TokenDecl {
+    fn name<'a>(&self, cst: &'a Cst) -> Option<(&'a str, Span)> {
+        cst.child_token(self.syntax, Token::Id)
     }
 }
-impl From<usize> for RegexRef {
-    fn from(value: usize) -> Self {
-        Self(value)
+impl TokenDecl {
+    pub fn symbol<'a>(&self, cst: &'a Cst) -> Option<(&'a str, Span)> {
+        cst.child_token(self.syntax, Token::Str)
     }
 }
-
-#[derive(Debug)]
-pub struct Regex<'a> {
-    pub kind: RegexKind<'a>,
-    pub span: Span,
-    pub first: BTreeSet<Symbol<'a>>,
-    pub follow: BTreeSet<Symbol<'a>>,
-    pub cancel: BTreeSet<Symbol<'a>>,
+impl Named for RuleDecl {
+    fn name<'a>(&self, cst: &'a Cst) -> Option<(&'a str, Span)> {
+        cst.child_token(self.syntax, Token::Id)
+    }
 }
-
-#[derive(Debug)]
-pub enum RegexKind<'a> {
-    Id {
-        name: Symbol<'a>,
-        elem: ElementRef,
-    },
-    Concat {
-        ops: Vec<RegexRef>,
-        error: RegexRef,
-    },
-    Or {
-        ops: Vec<RegexRef>,
-        error: RegexRef,
-    },
-    Star {
-        op: RegexRef,
-    },
-    Plus {
-        op: RegexRef,
-    },
-    Option {
-        op: RegexRef,
-    },
-    Paren {
-        op: RegexRef,
-    },
-    Str {
-        val: Symbol<'a>,
-        elem: ElementRef,
-    },
-    Predicate {
-        rule_name: Symbol<'a>,
-        val: u64,
-        elem: ElementRef,
-    },
-    Action {
-        rule_name: Symbol<'a>,
-        val: u64,
-        elem: ElementRef,
-    },
-    ErrorHandler {
-        rule_name: Symbol<'a>,
-        val: u64,
-        elem: ElementRef,
-    },
-    Empty,
-    Invalid,
+impl RuleDecl {
+    pub fn regex(&self, cst: &Cst) -> Option<Regex> {
+        cst.child_node(self.syntax)
+    }
 }
-
-impl<'a> Regex<'a> {
-    pub fn new_id(module: &mut Module<'a>, name: Symbol<'a>, span: &Span) -> RegexRef {
-        module.alloc_regex(
-            RegexKind::Id {
-                name,
-                elem: ElementRef::INVALID,
-            },
-            span.clone(),
-        )
+impl StartDecl {
+    pub fn rule_name<'a>(&self, cst: &'a Cst) -> Option<(&'a str, Span)> {
+        cst.child_token(self.syntax, Token::Id)
     }
-    pub fn new_concat(module: &mut Module<'a>, ops: Vec<RegexRef>, span: &Span) -> RegexRef {
-        module.alloc_regex(
-            RegexKind::Concat {
-                ops,
-                error: RegexRef::INVALID,
-            },
-            span.clone(),
-        )
+}
+impl RightDecl {
+    pub fn token_names<'a, F: FnMut((&'a str, Span))>(&self, cst: &'a Cst, f: F) {
+        cst.children(self.syntax)
+            .filter_map(|c| {
+                cst.get_token(c, Token::Id)
+                    .or_else(|| cst.get_token(c, Token::Str))
+            })
+            .for_each(f);
     }
-    pub fn new_or(module: &mut Module<'a>, ops: Vec<RegexRef>, span: &Span) -> RegexRef {
-        module.alloc_regex(
-            RegexKind::Or {
-                ops,
-                error: RegexRef::INVALID,
-            },
-            span.clone(),
-        )
+}
+impl SkipDecl {
+    pub fn token_names<'a, F: FnMut((&'a str, Span))>(&self, cst: &'a Cst, f: F) {
+        cst.children(self.syntax)
+            .filter_map(|c| {
+                cst.get_token(c, Token::Id)
+                    .or_else(|| cst.get_token(c, Token::Str))
+            })
+            .for_each(f);
     }
-    pub fn new_star(module: &mut Module<'a>, op: RegexRef, span: &Span) -> RegexRef {
-        module.alloc_regex(RegexKind::Star { op }, span.clone())
+}
+impl Alternation {
+    pub fn operands<'a>(
+        &self,
+        cst: &'a Cst,
+    ) -> std::iter::FilterMap<CstChildren<'a>, impl FnMut(NodeRef) -> Option<Regex> + 'a> {
+        cst.child_node_iter(self.syntax)
     }
-    pub fn new_plus(module: &mut Module<'a>, op: RegexRef, span: &Span) -> RegexRef {
-        module.alloc_regex(RegexKind::Plus { op }, span.clone())
+}
+impl Concat {
+    pub fn operands<'a>(
+        &self,
+        cst: &'a Cst,
+    ) -> std::iter::FilterMap<CstChildren<'a>, impl FnMut(NodeRef) -> Option<Regex> + 'a> {
+        cst.child_node_iter(self.syntax)
     }
-    pub fn new_option(module: &mut Module<'a>, op: RegexRef, span: &Span) -> RegexRef {
-        module.alloc_regex(RegexKind::Option { op }, span.clone())
+}
+impl Paren {
+    pub fn inner(&self, cst: &Cst) -> Option<Regex> {
+        cst.child_node(self.syntax)
     }
-    pub fn new_paren(module: &mut Module<'a>, op: RegexRef, span: &Span) -> RegexRef {
-        module.alloc_regex(RegexKind::Paren { op }, span.clone())
+}
+impl Optional {
+    pub fn operand(&self, cst: &Cst) -> Option<Regex> {
+        cst.child_node(self.syntax)
     }
-    pub fn new_str(module: &mut Module<'a>, val: Symbol<'a>, span: &Span) -> RegexRef {
-        module.alloc_regex(
-            RegexKind::Str {
-                val,
-                elem: ElementRef::INVALID,
-            },
-            span.clone(),
-        )
+}
+impl Star {
+    pub fn operand(&self, cst: &Cst) -> Option<Regex> {
+        cst.child_node(self.syntax)
     }
-    pub fn new_predicate(
-        module: &mut Module<'a>,
-        rule_name: Symbol<'a>,
-        val: u64,
-        span: &Span,
-    ) -> RegexRef {
-        module.alloc_regex(
-            RegexKind::Predicate {
-                rule_name,
-                val,
-                elem: ElementRef::INVALID,
-            },
-            span.clone(),
-        )
+}
+impl Plus {
+    pub fn operand(&self, cst: &Cst) -> Option<Regex> {
+        cst.child_node(self.syntax)
     }
-    pub fn new_action(
-        module: &mut Module<'a>,
-        rule_name: Symbol<'a>,
-        val: u64,
-        span: &Span,
-    ) -> RegexRef {
-        module.alloc_regex(
-            RegexKind::Action {
-                rule_name,
-                val,
-                elem: ElementRef::INVALID,
-            },
-            span.clone(),
-        )
+}
+impl Name {
+    pub fn value<'a>(&self, cst: &'a Cst) -> Option<(&'a str, Span)> {
+        cst.child_token(self.syntax, Token::Id)
     }
-    pub fn new_error_handler(
-        module: &mut Module<'a>,
-        rule_name: Symbol<'a>,
-        val: u64,
-        span: &Span,
-    ) -> RegexRef {
-        module.alloc_regex(
-            RegexKind::ErrorHandler {
-                rule_name,
-                val,
-                elem: ElementRef::INVALID,
-            },
-            span.clone(),
-        )
+}
+impl Symbol {
+    pub fn value<'a>(&self, cst: &'a Cst) -> Option<(&'a str, Span)> {
+        cst.child_token(self.syntax, Token::Str)
     }
-    pub fn new_empty(module: &mut Module<'a>, span: &Span) -> RegexRef {
-        module.alloc_regex(RegexKind::Empty, span.clone())
+}
+impl Predicate {
+    pub fn value<'a>(&self, cst: &'a Cst) -> Option<(&'a str, Span)> {
+        cst.child_token(self.syntax, Token::Predicate)
     }
-    pub fn new_invalid(module: &mut Module<'a>, span: &Span) -> RegexRef {
-        module.alloc_regex(RegexKind::Invalid, span.clone())
+}
+impl Action {
+    pub fn value<'a>(&self, cst: &'a Cst) -> Option<(&'a str, Span)> {
+        cst.child_token(self.syntax, Token::Action)
     }
-
-    pub fn predict(&self) -> BTreeSet<Symbol> {
-        let mut set = self.first.clone();
-        if set.contains(&symbols::EMPTY) {
-            set.remove(&symbols::EMPTY);
-            set.extend(self.follow.iter());
-        }
-        set
+}
+impl Binding {
+    pub fn value<'a>(&self, cst: &'a Cst) -> Option<(&'a str, Span)> {
+        cst.child_token(self.syntax, Token::Binding)
+    }
+}
+impl OpenNode {
+    pub fn value<'a>(&self, cst: &'a Cst) -> Option<(&'a str, Span)> {
+        cst.child_token(self.syntax, Token::OpenNode)
+    }
+    pub fn number<'a>(&self, cst: &'a Cst) -> Option<&'a str> {
+        self.value(cst)
+            .and_then(|(s, _)| s.split_once('<'))
+            .map(|(_, r)| r)
+    }
+}
+impl CloseNode {
+    pub fn value<'a>(&self, cst: &'a Cst) -> Option<(&'a str, Span)> {
+        cst.child_token(self.syntax, Token::CloseNode)
+    }
+    pub fn number<'a>(&self, cst: &'a Cst) -> Option<&'a str> {
+        self.value(cst)
+            .and_then(|(s, _)| s.split_once('>'))
+            .map(|(l, _)| l)
+    }
+    pub fn node_name<'a>(&self, cst: &'a Cst) -> Option<&'a str> {
+        self.value(cst)
+            .and_then(|(s, _)| s.split_once('>'))
+            .map(|(_, r)| r)
     }
 }

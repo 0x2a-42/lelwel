@@ -1,5 +1,7 @@
 token EOF Invalid;
 
-start:
+start s;
+
+s:
   Invalid EOF
 ;

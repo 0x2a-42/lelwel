@@ -1,6 +1,6 @@
 [package]
 name = "lelwel"
-version = "0.5.1"
+version = "0.6.0"
 description = "LL(1) parser generator"
 repository = "https://github.com/0x2a-42/lelwel"
 readme = "README.md"
@@ -10,17 +10,19 @@ keywords = ["parser", "generator", "LL", "grammar"]
 categories = ["parsing"]
 
 [dependencies]
-logos = "0.13.0"
+logos = "0.14.0"
 codespan-reporting = "0.11.1"
 codespan-lsp = { version = "0.11.1", optional = true }
 tokio = { version = "1.29.1", features = ["full"], optional = true  }
 clap = { version = "4.4", features = ["cargo"], optional = true }
 lsp-types = { version = "0.88.0", optional = true }
 tower-lsp = { version = "0.20.0", optional = true }
+wasm-bindgen = { version = "0.2.92", optional = true }
 
 [features]
 cli = ["clap"]
 lsp = ["tokio", "tower-lsp", "codespan-lsp", "lsp-types"]
+wasm = ["wasm-bindgen"]
 
 [[bin]]
 name = "llw"
@@ -29,3 +31,6 @@ required-features = ["cli"]
 [[bin]]
 name = "lelwel-ls"
 required-features = ["lsp"]
+
+[lib]
+crate-type = ["lib", "cdylib"]

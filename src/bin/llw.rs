@@ -1,6 +1,6 @@
 #![cfg(feature = "cli")]
 
-use clap::{arg, crate_name, crate_version, error::ErrorKind, Command};
+use clap::{arg, crate_name, crate_version, error::ErrorKind, ArgAction, Command};
 
 fn main() {
     let mut cmd = Command::new(crate_name!())
@@ -10,7 +10,7 @@ fn main() {
         .arg(arg!(-c --check "Only check the file for errors"))
         .arg(arg!(-g --graph "Output a graphviz file for the grammar"))
         .arg(arg!(-s --short "Use short diagnostics"))
-        .arg(arg!(-v --verbose "Sets the level of verbosity"))
+        .arg(arg!(-v --verbose "Sets the level of verbosity").action(ArgAction::Count))
         .arg(
             arg!(-o --output <FILE> "Sets the output directory")
                 .default_value(".")
@@ -27,7 +27,7 @@ fn main() {
         input,
         output,
         matches.get_flag("check"),
-        matches.get_flag("verbose"),
+        matches.get_count("verbose"),
         matches.get_flag("graph"),
         matches.get_flag("short"),
     ) {

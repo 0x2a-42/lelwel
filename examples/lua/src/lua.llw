@@ -1,0 +1,179 @@
+// Based on https://www.lua.org/manual/5.4/manual.html#9
+
+token BreakKw='break' ReturnKw='return' FunctionKw='function' EndKw='end' GotoKw='goto'
+      DoKw='do' WhileKw='while' RepeatKw='repeat' IfKw='if' ThenKw='then' UntilKw='until'
+      ElseifKw='elseif' ElseKw='else' ForKw='for' InKw='in' LocalKw='local' AndKw='and'
+      OrKw='or' NotKw='not' NilKw='nil' FalseKw='false' TrueKw='true';
+token Semi=';' ColonColon='::' Colon=':' Dot='.' Comma=',' Ellipsis='...'
+      Equal='=' Plus='+' Minus='-' Star='*' Slash='/' SlashSlash='//' Hat='^' Percent='%'
+      And='&' Tilde='~' Pipe='|' GtGt='>>' LtLt='<<' DotDot='..' Less='<' LessEqual='<='
+      Greater='>' GreaterEqual='>=' EqualEqual='==' TildeEqual='~=' Hash='#';
+token LBrak='[' RBrak=']' LParen='(' RParen=')' LBrace='{' RBrace='}';
+token Name='<name>' LiteralString='<string>'
+      Numeral='<numeral>';
+token Comment Whitespace;
+
+skip Comment Whitespace;
+right '..';
+
+start chunk;
+
+chunk:
+  block
+;
+block:
+  stat* [retstat]
+;
+stat:
+  emptystat
+| expstat
+| label
+| breakstat
+| gotostat
+| dostat
+| whilestat
+| repeatstat
+| ifstat
+| forstat
+| funcstat
+| localstat
+;
+emptystat:
+  ';'
+;
+/// superset of official grammar, check in cst that syntax is valid
+expstat:
+  prefixexp [(',' prefixexp)* '=' explist @assignstat] @
+;
+
+breakstat:
+  'break'
+;
+gotostat:
+  'goto' Name
+;
+dostat:
+  'do' block 'end'
+;
+whilestat:
+  'while' exp 'do' block 'end'
+;
+repeatstat:
+  'repeat' block 'until' exp
+;
+ifstat:
+  'if' exp 'then' block
+  ('elseif' exp 'then' block)*
+  ['else' block] 'end'
+;
+forstat:
+  'for' (
+    ?1 Name '=' exp ',' exp [',' exp] 'do' block 'end' // resolve LL(1) conflict with extra lookahead
+  | namelist 'in' explist 'do' block 'end')
+;
+funcstat:
+  'function' funcname pars funcbody
+;
+localstat:
+  'local' (
+    'function' Name pars funcbody
+  | attnamelist ['=' explist]
+  )
+;
+attnamelist:
+  Name attrib (',' Name attrib)*
+;
+attrib:
+  ['<' Name '>']
+;
+retstat:
+  'return' [explist] [';']
+;
+label:
+  '::' Name '::'
+;
+funcname:
+  Name ('.' Name)* [':' Name]
+;
+namelist:
+  Name (',' Name)* @
+;
+explist:
+  exp (',' exp)* @
+;
+// extra rule for better error handling
+args_explist:
+  '(' [exp (',' exp)*] ')'
+;
+exp:
+  binexp
+;
+binexp:
+  binexp ('*' | '/' | '//' | '%') binexp
+| binexp ('+' | '-') binexp
+| binexp '..' binexp
+| binexp ('<<' | '>>') binexp
+| binexp '&' binexp
+| binexp '~' binexp
+| binexp '|' binexp
+| binexp ('<' | '>' | '<=' | '>=' | '~=' | '==') binexp
+| binexp 'and' binexp
+| binexp 'or' binexp
+| unaryexp
+;
+unaryexp:
+  ('not' | '-' | '#' | '~') unaryexp
+| powexp
+;
+powexp:
+  (literalexp | prefixexp | tableconstructor | functiondef) ['^' unaryexp]
+;
+literalexp:
+  'nil'
+| 'false'
+| 'true'
+| '...'
+| Numeral
+| LiteralString
+;
+nameexp:
+  Name
+;
+parenexp:
+  '(' exp ')'
+;
+prefixexp:
+  prefixexp '[' exp ']' @indexexp
+| prefixexp '.' Name @fieldexp
+| ?1 prefixexp (args | ':' Name args) @callexp // resolve ambiguity described in section 3.3.1
+| nameexp
+| parenexp
+;
+args:
+  args_explist
+| tableconstructor
+| stringarg
+;
+stringarg:
+  LiteralString
+;
+functiondef:
+  'function' pars funcbody
+;
+pars:
+  '(' [Name (?1 ',' Name)* [',' '...'] | '...'] ')' // resolve LL(1) conflict with extra lookahead
+;
+funcbody:
+  block 'end'
+;
+tableconstructor:
+  '{' fieldlist '}'
+;
+fieldlist:
+  [field (?1 (',' | ';') field)* [',' | ';']] // resolve LL(1) conflict with extra lookahead
+;
+field:
+  '[' exp ']' '=' exp
+| ?1 Name '=' exp // resolve LL(1) conflict with extra lookahead
+| exp
+;

@@ -1,6 +1,8 @@
 token A B C D E;
 
-start:
+start s;
+
+s:
   (A | A)
   (a | A)
   (B)* B
@@ -23,8 +25,6 @@ d:
   ?1 D
 | D
 ;
-
-d?1 {}
 
 e:
   e

@@ -1,45 +1,11 @@
-use super::Value;
 use codespan_reporting::diagnostic::Label;
 use logos::{Lexer, Logos};
-use std::collections::BTreeMap;
 
 pub type Span = core::ops::Range<usize>;
 pub type Diagnostic = codespan_reporting::diagnostic::Diagnostic<()>;
 
-pub struct TokenStream<'a> {
-    lexer: Lexer<'a, Token>,
-}
-
-impl<'a> TokenStream<'a> {
-    pub fn new(lexer: Lexer<'a, Token>) -> Self {
-        Self { lexer }
-    }
-    #[inline]
-    pub fn next_token(&mut self) -> Result<Token, LexerError> {
-        if let Some(token) = Iterator::next(&mut self.lexer) {
-            return token;
-        }
-        Ok(Token::EOF)
-    }
-    #[inline]
-    fn span(&self) -> Span {
-        self.lexer.span()
-    }
-}
-
-macro_rules! check_limit {
-    ($input:expr, $current:expr, $depth:expr) => {
-        if $depth > 128 {
-            *$current = Token::EOF;
-            return Err(Diagnostic::error()
-                .with_message("exceeded recursion depth limit")
-                .with_labels(vec![Label::primary((), $input.span())]));
-        }
-    };
-}
-
 macro_rules! err {
-    [$input:expr, $($tk:literal),*] => {
+    [$span:expr, $($tk:literal),*] => {
         {
             let expected = [$($tk),*];
             let mut msg = "invalid syntax, expected".to_string();
@@ -62,9 +28,9 @@ macro_rules! err {
                     msg.push_str(", ");
                 }
             }
-            Err(Diagnostic::error()
-                    .with_message(msg)
-                    .with_labels(vec![Label::primary((), $input.span())]))
+            Diagnostic::error()
+                .with_message(msg)
+                .with_labels(vec![Label::primary((), $span.start as usize..$span.end as usize)])
         }
     }
 }
@@ -89,14 +55,13 @@ impl LexerError {
     }
 }
 
-fn parse_string<'a>(lexer: &mut Lexer<'a, Token>) -> Result<String, LexerError> {
+fn parse_string(lexer: &mut Lexer<'_, Token>) -> Result<(), LexerError> {
     let mut it = lexer.remainder().chars();
     while let Some(c) = it.next() {
         match c {
             '"' => {
                 lexer.bump(1);
-                let len = lexer.slice().len();
-                return Ok(lexer.slice()[1..len - 1].to_string());
+                return Ok(());
             }
             '\\' => {
                 lexer.bump(1);
@@ -112,11 +77,13 @@ fn parse_string<'a>(lexer: &mut Lexer<'a, Token>) -> Result<String, LexerError> 
     Err(LexerError::UnterminatedString)
 }
 
-#[derive(Logos, Debug, PartialEq, Clone)]
-#[logos(skip "[\u{0020}\u{000A}\u{000D}\u{0009}]+")]
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Logos, Debug, PartialEq, Copy, Clone)]
 #[logos(error = LexerError)]
 pub enum Token {
     EOF,
+    #[regex("[\u{0020}\u{000A}\u{000D}\u{0009}]+")]
+    Whitespace,
     #[token("true")]
     True,
     #[token("false")]
@@ -136,11 +103,18 @@ pub enum Token {
     #[token(":")]
     Colon,
     #[regex("\"", parse_string)]
-    String(String),
-    #[regex(r"-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?", |lex| lex.slice().to_string())]
-    Number(String),
-    #[regex(r"[[:alpha:]][[:alnum:]]*", |_| Err(LexerError::Invalid))]
-    Invalid,
+    String,
+    #[regex(r"-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?")]
+    Number,
+    #[regex(r"[[:alpha:]][[:alnum:]]*", |_| false)]
+    Error,
+}
+
+type CstIndex = usize;
+
+#[derive(Default)]
+struct Context<'a> {
+    marker: std::marker::PhantomData<&'a ()>,
 }
 
 fn check_string(value: &str, span: &Span, diags: &mut Vec<Diagnostic>) {
@@ -161,7 +135,7 @@ fn check_string(value: &str, span: &Span, diags: &mut Vec<Diagnostic>) {
                                     .with_message("invalid unicode escape sequence")
                                     .with_labels(vec![Label::primary(
                                         (),
-                                        span.start + i..span.start + i + j + 3,
+                                        span.start + i - 1..span.start + i + j + 1,
                                     )]),
                             );
                             break;
@@ -174,7 +148,7 @@ fn check_string(value: &str, span: &Span, diags: &mut Vec<Diagnostic>) {
                             .with_message("invalid escape sequence")
                             .with_labels(vec![Label::primary(
                                 (),
-                                span.start + j..span.start + j + 2,
+                                span.start + j - 1..span.start + j + 1,
                             )]),
                     );
                 }
@@ -193,4 +167,52 @@ fn check_string(value: &str, span: &Span, diags: &mut Vec<Diagnostic>) {
     }
 }
 
+pub fn tokenize(
+    lexer: logos::Lexer<Token>,
+    diags: &mut Vec<Diagnostic>,
+) -> (Vec<Token>, Vec<std::ops::Range<CstIndex>>) {
+    let mut tokens = vec![];
+    let mut ranges = vec![];
+    let source = lexer.source();
+
+    let mut count_brace = 0;
+    let mut count_brak = 0;
+    for (token, span) in lexer.spanned() {
+        match token {
+            Ok(token) => {
+                match token {
+                    Token::String => {
+                        check_string(&source[span.start..span.end], &span, diags);
+                    }
+                    Token::LBrace => count_brace += 1,
+                    Token::RBrace => count_brace -= 1,
+                    Token::LBrak => count_brak += 1,
+                    Token::RBrak => count_brak -= 1,
+                    _ => {}
+                }
+                if count_brace + count_brak > 256 {
+                    diags.push(
+                        Diagnostic::error()
+                            .with_message("bracket nesting level exceeded maximum of 256")
+                            .with_labels(vec![Label::primary((), span)]),
+                    );
+                    break;
+                }
+                tokens.push(token);
+            }
+            Err(err) => {
+                diags.push(err.into_diagnostic(span.clone()));
+                tokens.push(Token::Error);
+            }
+        }
+        ranges.push(span.start as CstIndex..span.end as CstIndex);
+    }
+    (tokens, ranges)
+}
+
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
+
+impl Parser<'_> {
+    #[allow(clippy::ptr_arg)]
+    fn build(&mut self, _rule: Rule, _node: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+}

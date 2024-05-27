@@ -1,7 +1,9 @@
 token A B C
 token D;
 
-start:
+start s;
+
+s:
   A B (C
 ;
 

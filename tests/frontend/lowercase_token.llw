@@ -1,4 +1,4 @@
 token a b C D;
 
-start:
-;
+start s;
+s:;

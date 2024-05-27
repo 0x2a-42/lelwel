@@ -1,41 +1,27 @@
-token Num{f64}='<number>';
-token Add='+' Sub='-' Mul='*' Div='/';
+token Num='<number>';
+token Plus='+' Minus='-' Star='*' Slash='/';
 token LPar='(' RPar=')';
+token Whitespace;
 
-start{f64}:
-  expr #1
+skip Whitespace;
+
+start calc;
+
+calc:
+  expr
 ;
-
-expr{f64}:
-  term #1 (
-    '+' term #2
-  | '-' term #3
-  )* #4
+expr:
+  expr ('*' | '/') expr
+| expr ('+' | '-') expr
+| atomic
 ;
-
-term{f64}:
-  atomic #1 (
-    '*' atomic #2
-  | '/' atomic #3
-  )* #4
+atomic:
+  literal
+| paren
 ;
-
-atomic{f64}:
-  Num #1
-| '(' expr ')' #2
+literal:
+  Num
 ;
-
-start#1 { Ok(expr) }
-
-expr#1 { let mut res = term; }
-expr#2 { res += term; }
-expr#3 { res -= term; }
-expr#4 { Ok(res) }
-
-term#1 { let mut res = atomic; }
-term#2 { res *= atomic; }
-term#3 { res /= atomic; }
-term#4 { Ok(res) }
-
-atomic#1 { Ok(Num.0) }
-atomic#2 { Ok(expr) }
+paren:
+  '(' expr ')'
+;

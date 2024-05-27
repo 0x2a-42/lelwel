@@ -1,43 +1,11 @@
 use codespan_reporting::diagnostic::Label;
-use logos::{Lexer, Logos};
+use logos::Logos;
 
 pub type Span = core::ops::Range<usize>;
 pub type Diagnostic = codespan_reporting::diagnostic::Diagnostic<()>;
 
-pub struct TokenStream<'a> {
-    lexer: Lexer<'a, Token>,
-}
-
-impl<'a> TokenStream<'a> {
-    pub fn new(lexer: Lexer<'a, Token>) -> Self {
-        Self { lexer }
-    }
-    #[inline]
-    pub fn next_token(&mut self) -> Result<Token, LexerError> {
-        if let Some(token) = Iterator::next(&mut self.lexer) {
-            return token;
-        }
-        Ok(Token::EOF)
-    }
-    #[inline]
-    fn span(&self) -> Span {
-        self.lexer.span()
-    }
-}
-
-macro_rules! check_limit {
-    ($input:expr, $current:expr, $depth:expr) => {
-        if $depth > 128 {
-            *$current = Token::EOF;
-            return Err(Diagnostic::error()
-                .with_message("exceeded recursion depth limit")
-                .with_labels(vec![Label::primary((), $input.span())]));
-        }
-    };
-}
-
 macro_rules! err {
-    [$input:expr, $($tk:literal),*] => {
+    [$span:expr, $($tk:literal),*] => {
         {
             let expected = [$($tk),*];
             let mut msg = "invalid syntax, expected".to_string();
@@ -60,9 +28,9 @@ macro_rules! err {
                     msg.push_str(", ");
                 }
             }
-            Err(Diagnostic::error()
-                    .with_message(msg)
-                    .with_labels(vec![Label::primary((), $input.span())]))
+            Diagnostic::error()
+                .with_message(msg)
+                .with_labels(vec![Label::primary((), $span.start as usize..$span.end as usize)])
         }
     }
 }
@@ -83,12 +51,15 @@ impl LexerError {
     }
 }
 
-#[derive(Logos, Debug, PartialEq, Clone)]
-#[logos(skip r"\s+")]
-#[logos(skip r"\(\*[^*]*\*+([^)*][^*]*\*+)*\)")]
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Logos, Debug, PartialEq, Copy, Clone)]
 #[logos(error = LexerError)]
 pub enum Token {
     EOF,
+    #[regex(r"\(\*[^*]*\*+([^)*][^*]*\*+)*\)")]
+    Comment,
+    #[regex(r"\s+")]
+    Whitespace,
     #[token("CONST")]
     Const,
     #[token("VAR")]
@@ -175,6 +146,41 @@ pub enum Token {
     Ident,
     #[regex(r"\d+")]
     Number,
+    Error,
+}
+
+type CstIndex = usize;
+
+#[derive(Default)]
+struct Context<'a> {
+    marker: std::marker::PhantomData<&'a ()>,
+}
+
+pub fn tokenize(
+    lexer: logos::Lexer<Token>,
+    diags: &mut Vec<Diagnostic>,
+) -> (Vec<Token>, Vec<std::ops::Range<CstIndex>>) {
+    let mut tokens = vec![];
+    let mut ranges = vec![];
+
+    for (token, span) in lexer.spanned() {
+        match token {
+            Ok(token) => {
+                tokens.push(token);
+            }
+            Err(err) => {
+                diags.push(err.into_diagnostic(span.clone()));
+                tokens.push(Token::Error);
+            }
+        }
+        ranges.push(span.start as CstIndex..span.end as CstIndex);
+    }
+    (tokens, ranges)
 }
 
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
+
+impl Parser<'_> {
+    #[allow(clippy::ptr_arg)]
+    fn build(&mut self, _rule: Rule, _node: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+}

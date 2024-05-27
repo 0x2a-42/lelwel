@@ -1,88 +1,11 @@
-use super::ast::*;
-use super::symbols;
-use super::symbols::{StringInterner, Symbol};
-
 use codespan_reporting::diagnostic::Label;
 use logos::{Lexer, Logos};
 
 pub type Span = core::ops::Range<usize>;
 pub type Diagnostic = codespan_reporting::diagnostic::Diagnostic<()>;
 
-pub struct TokenStream<'a> {
-    lexer: Lexer<'a, Token<'a>>,
-    uri: &'a str,
-    last_doc_comment: &'a str,
-}
-
-impl<'a> TokenStream<'a> {
-    pub fn new(lexer: Lexer<'a, Token<'a>>, uri: &'a str) -> Self {
-        Self {
-            lexer,
-            uri,
-            last_doc_comment: "",
-        }
-    }
-    #[inline]
-    pub fn next_token(&mut self) -> Result<Token<'a>, LexerError> {
-        while let Some(token) = Iterator::next(&mut self.lexer) {
-            match token {
-                Ok(Token::_Comment(content)) => {
-                    self.last_doc_comment = content;
-                }
-                _ => {
-                    return token;
-                }
-            }
-        }
-        Ok(Token::EOF)
-    }
-    #[inline]
-    fn span(&self) -> Span {
-        self.lexer.span()
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Default)]
-pub enum LexerError {
-    InvalidInteger,
-    #[default]
-    Invalid,
-}
-
-impl LexerError {
-    pub fn into_diagnostic(self, span: Span) -> Diagnostic {
-        match self {
-            Self::Invalid => Diagnostic::error()
-                .with_message("invalid token")
-                .with_labels(vec![Label::primary((), span)]),
-            Self::InvalidInteger => Diagnostic::error()
-                .with_message("invalid integer")
-                .with_labels(vec![Label::primary((), span)]),
-        }
-    }
-}
-impl From<std::num::ParseIntError> for LexerError {
-    fn from(value: std::num::ParseIntError) -> Self {
-        match value.kind() {
-            std::num::IntErrorKind::PosOverflow => LexerError::InvalidInteger,
-            _ => LexerError::Invalid,
-        }
-    }
-}
-
-macro_rules! check_limit {
-    ($input:expr, $current:expr, $depth:expr) => {
-        if $depth > 128 {
-            *$current = Token::EOF;
-            return Err(Diagnostic::error()
-                .with_message("exceeded recursion depth limit")
-                .with_labels(vec![Label::primary((), $input.span())]));
-        }
-    };
-}
-
 macro_rules! err {
-    [$input:expr, $($tk:literal),*] => {
+    [$span:expr, $($tk:literal),*] => {
         {
             let expected = [$($tk),*];
             let mut msg = "invalid syntax, expected".to_string();
@@ -105,48 +28,92 @@ macro_rules! err {
                     msg.push_str(", ");
                 }
             }
-            Err(Diagnostic::error()
-                    .with_message(msg)
-                    .with_labels(vec![Label::primary((), $input.span())]))
+            Diagnostic::error()
+                .with_message(msg)
+                .with_labels(vec![Label::primary((), $span.start as usize..$span.end as usize)])
         }
     }
 }
 
-fn parse_code<'a>(lexer: &mut Lexer<'a, Token<'a>>) -> Option<&'a str> {
-    let mut count = 1;
-    while count != 0 {
-        lexer
-            .remainder()
-            .find(|c| {
-                if c == '{' {
-                    count += 1;
-                    true
-                } else if c == '}' {
-                    count -= 1;
-                    true
-                } else {
-                    false
-                }
-            })
-            .map(|i| lexer.bump(i + 1))?;
-    }
-    let len = lexer.slice().len();
-    Some(&lexer.slice()[1..len - 1])
+#[derive(Debug, Clone, PartialEq, Default)]
+pub enum LexerError {
+    #[default]
+    Invalid,
+    UnterminatedString,
+    UnterminatedComment,
 }
 
-#[derive(Logos, Debug, PartialEq, Clone)]
-#[logos(skip r"[ \t\n\f]+")]
-#[logos(skip r"//.*\n")]
-#[logos(skip r"/\*[^*]*\*+([^/*][^*]*\*+)*/")]
+impl LexerError {
+    pub fn into_diagnostic(self, span: Span) -> Diagnostic {
+        match self {
+            LexerError::Invalid => Diagnostic::error()
+                .with_message("invalid token")
+                .with_labels(vec![Label::primary((), span)]),
+            LexerError::UnterminatedString => Diagnostic::error()
+                .with_message("unterminated string literal")
+                .with_labels(vec![Label::primary((), span)]),
+            LexerError::UnterminatedComment => Diagnostic::error()
+                .with_message("unterminated comment")
+                .with_labels(vec![Label::primary((), span)]),
+        }
+    }
+}
+
+fn parse_string(lexer: &mut Lexer<'_, Token>) -> Result<(), LexerError> {
+    let mut it = lexer.remainder().chars();
+    while let Some(c) = it.next() {
+        match c {
+            '\'' => {
+                lexer.bump(1);
+                return Ok(());
+            }
+            '\\' => {
+                lexer.bump(1);
+                if let Some(c) = it.next() {
+                    lexer.bump(c.len_utf8());
+                }
+            }
+            c => {
+                lexer.bump(c.len_utf8());
+            }
+        }
+    }
+    Err(LexerError::UnterminatedString)
+}
+fn parse_block_comment(lexer: &mut Lexer<'_, Token>) -> Result<(), LexerError> {
+    if lexer
+        .remainder()
+        .find("*/")
+        .map(|i| lexer.bump(i + 2))
+        .is_some()
+    {
+        Ok(())
+    } else {
+        lexer.bump(lexer.remainder().len());
+        Err(LexerError::UnterminatedComment)
+    }
+}
+
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Logos, Debug, PartialEq, Copy, Clone)]
 #[logos(error = LexerError)]
-pub enum Token<'a> {
+pub enum Token {
     EOF,
+    #[regex(r"//[^\n]*\n")]
+    #[regex(r"/\*", parse_block_comment)]
+    Comment,
+    #[regex(r"///[^\n]*\n")]
+    DocComment,
+    #[regex(r"[ \t\n\f]+")]
+    Whitespace,
     #[token("token")]
     Token,
     #[token("start")]
     Start,
-    #[token("parameters")]
-    Pars,
+    #[token("right")]
+    Right,
+    #[token("skip")]
+    Skip,
     #[token(":")]
     Colon,
     #[token(";")]
@@ -168,20 +135,80 @@ pub enum Token<'a> {
     #[token("+")]
     Plus,
     #[regex("[a-zA-Z][a-zA-Z_0-9]*")]
-    Id(&'a str),
-    #[regex("'[^']*'")]
-    Str(&'a str),
-    #[regex(r"\{", parse_code)]
-    Code(&'a str),
-    #[regex(r"\?[0-9]+", |lex| lex.slice()[1..].parse::<u64>())]
-    Predicate(u64),
-    #[regex(r"#[0-9]+", |lex| lex.slice()[1..].parse::<u64>())]
-    Action(u64),
-    #[regex(r"!", |_| u64::MAX)]
-    #[regex(r"![0-9]+", |lex| lex.slice()[1..].parse::<u64>())]
-    ErrorHandler(u64),
-    #[regex("(///.*\n)+")]
-    _Comment(&'a str),
+    Id,
+    #[regex("'", parse_string)]
+    Str,
+    #[regex(r"\?[0-9]+")]
+    Predicate,
+    #[regex(r"#[0-9]+")]
+    Action,
+    #[regex(r"@([a-zA-Z][a-zA-Z_0-9]*)?")]
+    Binding,
+    #[regex("<[0-9]+")]
+    OpenNode,
+    #[regex("[0-9]+>([a-zA-Z][a-zA-Z_0-9]*)")]
+    CloseNode,
+    Error,
+}
+
+type CstIndex = usize;
+
+#[derive(Default)]
+struct Context<'a> {
+    marker: std::marker::PhantomData<&'a ()>,
+}
+
+fn check_string(value: &str, span: &Span, diags: &mut Vec<Diagnostic>) {
+    let mut it = value.chars().enumerate();
+    while let Some((_, c)) = it.next() {
+        if c == '\\' {
+            match it.next() {
+                Some((_, '\'' | '\\')) => {}
+                Some((i, _)) => {
+                    diags.push(
+                        Diagnostic::error()
+                            .with_message("invalid escape sequence")
+                            .with_labels(vec![Label::primary(
+                                (),
+                                span.start + i - 1..span.start + i + 1,
+                            )]),
+                    );
+                }
+                _ => unreachable!(),
+            }
+        }
+    }
+}
+
+pub fn tokenize(
+    lexer: logos::Lexer<Token>,
+    diags: &mut Vec<Diagnostic>,
+) -> (Vec<Token>, Vec<std::ops::Range<CstIndex>>) {
+    let mut tokens = vec![];
+    let mut ranges = vec![];
+    let source = lexer.source();
+
+    for (token, span) in lexer.spanned() {
+        match token {
+            Ok(token) => {
+                if token == Token::Str {
+                    check_string(&source[span.start..span.end], &span, diags);
+                }
+                tokens.push(token);
+            }
+            Err(err) => {
+                diags.push(err.into_diagnostic(span.clone()));
+                tokens.push(Token::Error);
+            }
+        }
+        ranges.push(span.start as CstIndex..span.end as CstIndex);
+    }
+    (tokens, ranges)
 }
 
 include!("./generated.rs");
+
+impl Parser<'_> {
+    #[allow(clippy::ptr_arg)]
+    fn build(&mut self, _rule: Rule, _node: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+}

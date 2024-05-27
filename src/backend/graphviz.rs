@@ -1,56 +1,45 @@
-use crate::frontend::ast::*;
-use std::fs::*;
+use crate::frontend::ast::{AstNode, File, Named, Regex, RuleDecl, TokenDecl};
+use crate::{Cst, NodeRef, SemanticData};
 use std::io::Write;
 
 pub struct GraphvizOutput;
 
 impl GraphvizOutput {
-    pub fn visit(module: &Module) -> std::io::Result<()> {
-        let mut file = File::create("parser.gv")?;
-        file.write_all(b"digraph {\n")?;
-        for element in module.elements.iter() {
-            Self::visit_element(module, element, &mut file)?;
+    pub fn run(cst: &Cst, sema: &SemanticData) -> std::io::Result<()> {
+        let mut graph_file = std::fs::File::create("parser.gv")?;
+        graph_file.write_all(b"digraph {\n")?;
+        if let Some(file) = File::cast(cst, NodeRef::ROOT) {
+            for rule in file.rule_decls(cst) {
+                Self::visit_rule(cst, sema, rule, &mut graph_file)?;
+            }
         }
-        file.write_all(b"}\n")
+        graph_file.write_all(b"}\n")
     }
 
-    fn visit_element(module: &Module, element: &Element, output: &mut File) -> std::io::Result<()> {
-        match element.kind {
-            ElementKind::Start { regex, .. } => {
-                output.write_all(format!("  \"{:p}\" [label=\"start\"];\n", element).as_bytes())?;
-                let regex = Self::skip_paren(module, regex);
-                Self::visit_regex(module, regex, output)?;
-                output.write_all(
-                    format!(
-                        "  \"{:p}\" -> \"{}\";\n",
-                        element,
-                        Self::skip_id(module, regex)
-                    )
-                    .as_bytes(),
-                )
-            }
-            ElementKind::Rule { name, regex, .. } => {
-                output
-                    .write_all(format!("  \"{:p}\" [label=\"{}\"];\n", element, name).as_bytes())?;
-                let regex = Self::skip_paren(module, regex);
-                Self::visit_regex(module, regex, output)?;
-                output.write_all(
-                    format!(
-                        "  \"{:p}\" -> \"{}\";\n",
-                        element,
-                        Self::skip_id(module, regex)
-                    )
-                    .as_bytes(),
-                )
-            }
-            _ => Ok(()),
-        }
+    fn visit_rule(
+        cst: &Cst,
+        sema: &SemanticData,
+        rule: RuleDecl,
+        output: &mut std::fs::File,
+    ) -> std::io::Result<()> {
+        let name = rule.name(cst).unwrap().0;
+        output
+            .write_all(format!("  \"{}\" [label=\"{}\"];\n", rule.syntax().0, name).as_bytes())?;
+        let regex = Self::skip_paren(cst, rule.regex(cst).unwrap());
+        Self::visit_regex(cst, sema, regex, output)?;
+        output.write_all(
+            format!(
+                "  \"{}\" -> \"{}\";\n",
+                rule.syntax().0,
+                Self::skip_name(cst, sema, regex)
+            )
+            .as_bytes(),
+        )
     }
 
-    fn skip_paren<'a>(module: &'a Module<'a>, regex: RegexRef) -> &'a Regex<'a> {
-        let regex = module.get_regex(regex).unwrap();
-        match regex.kind {
-            RegexKind::Paren { op } => Self::skip_paren(module, op),
+    fn skip_paren(cst: &Cst, regex: Regex) -> Regex {
+        match regex {
+            Regex::Paren(paren) => Self::skip_paren(cst, paren.inner(cst).unwrap()),
             _ => regex,
         }
     }
@@ -67,86 +56,105 @@ impl GraphvizOutput {
         output
     }
 
-    fn skip_id(module: &Module, regex: &Regex) -> String {
-        match regex.kind {
-            RegexKind::Id { elem, .. } => {
-                let elem = module.get_element(elem).unwrap();
-                match elem.kind {
-                    ElementKind::Rule { .. } => format!("{:p}", elem),
-                    _ => format!("{:p}", regex),
+    fn skip_name(cst: &Cst, sema: &SemanticData, regex: Regex) -> String {
+        match regex {
+            Regex::Name(name) => {
+                if let Some(rule) = sema
+                    .decl_bindings
+                    .get(&name.syntax())
+                    .and_then(|decl| RuleDecl::cast(cst, *decl))
+                {
+                    format!("{}", rule.syntax().0)
+                } else {
+                    format!("{}", regex.syntax().0)
                 }
             }
-            _ => format!("{:p}", regex),
+            _ => format!("{}", regex.syntax().0),
         }
     }
 
-    fn regex_to_string(module: &Module, regex: &Regex) -> String {
-        match regex.kind {
-            RegexKind::Id { elem, .. } => {
-                let elem = module.get_element(elem).unwrap();
-                match elem.kind {
-                    ElementKind::Token { name, .. } => name.0.to_string(),
-                    _ => "".to_string(),
-                }
-            }
-            RegexKind::Str { val, .. } => {
-                format!("'{}'", Self::escape(val.0))
-            }
-            RegexKind::Predicate { val, .. } => {
-                format!("?{}", val)
-            }
-            RegexKind::Action { val, .. } => {
-                format!("#{}", val)
-            }
-            RegexKind::ErrorHandler { val, .. } => {
-                if val != u64::MAX {
-                    format!("!{}", val)
+    fn regex_to_string(cst: &Cst, sema: &SemanticData, regex: Regex) -> String {
+        match regex {
+            Regex::Name(name) => {
+                if let Some(value) = sema
+                    .decl_bindings
+                    .get(&name.syntax())
+                    .and_then(|decl| TokenDecl::cast(cst, *decl))
+                    .and_then(|token| token.name(cst))
+                {
+                    value.0.to_string()
                 } else {
-                    "!".to_string()
+                    "".to_string()
                 }
             }
+            Regex::Symbol(symbol) => Self::escape(symbol.value(cst).unwrap().0),
+            Regex::Predicate(pred) => pred.value(cst).unwrap().0.to_string(),
+            Regex::Action(action) => action.value(cst).unwrap().0.to_string(),
             _ => "".to_string(),
         }
     }
 
-    fn visit_regex(module: &Module, regex: &Regex, output: &mut File) -> std::io::Result<()> {
-        match regex.kind {
-            RegexKind::Id { elem, .. } => match module.get_element(elem).unwrap().kind {
-                ElementKind::Token { name, .. } => output.write_all(
-                    format!("  \"{:p}\" [shape=box, label=\"{}\"];\n", regex, name).as_bytes(),
-                ),
-                _ => Ok(()),
-            },
-            RegexKind::Str { val, .. } => output.write_all(
+    fn visit_regex(
+        cst: &Cst,
+        sema: &SemanticData,
+        regex: Regex,
+        output: &mut std::fs::File,
+    ) -> std::io::Result<()> {
+        match regex {
+            Regex::Name(name) => {
+                if let Some(value) = sema
+                    .decl_bindings
+                    .get(&name.syntax())
+                    .and_then(|decl| TokenDecl::cast(cst, *decl))
+                    .and_then(|token| token.name(cst))
+                {
+                    output.write_all(
+                        format!(
+                            "  \"{}\" [shape=box, label=\"{}\"];\n",
+                            name.syntax().0,
+                            value.0
+                        )
+                        .as_bytes(),
+                    )
+                } else {
+                    Ok(())
+                }
+            }
+            Regex::Symbol(symbol) => output.write_all(
                 format!(
-                    "  \"{:p}\" [shape=box, label=\"'{}'\"];\n",
-                    regex,
-                    Self::escape(val.0)
+                    "  \"{}\" [shape=box, label=\"'{}'\"];\n",
+                    symbol.syntax().0,
+                    Self::escape(symbol.value(cst).unwrap().0)
                 )
                 .as_bytes(),
             ),
-            RegexKind::Concat { ref ops, .. } => {
+            Regex::Concat(concat) => {
                 let mut s = String::new();
-                for (i, op) in ops.iter().enumerate() {
-                    let op = Self::skip_paren(module, *op);
+                for (i, op) in concat.operands(cst).enumerate() {
+                    let op = Self::skip_paren(cst, op);
                     if i > 0 {
                         s += "|"
                     }
-                    s += &format!("<f{}>{}", i, Self::regex_to_string(module, op));
+                    s += &format!("<f{}>{}", i, Self::regex_to_string(cst, sema, op));
                 }
                 output.write_all(
-                    format!("  \"{:p}\" [shape=record, label=\"{}\"];\n", regex, s).as_bytes(),
+                    format!(
+                        "  \"{}\" [shape=record, label=\"{}\"];\n",
+                        concat.syntax().0,
+                        s
+                    )
+                    .as_bytes(),
                 )?;
-                for (i, op) in ops.iter().enumerate() {
-                    let op = Self::skip_paren(module, *op);
-                    if Self::regex_to_string(module, op).is_empty() {
-                        Self::visit_regex(module, op, output)?;
+                for (i, op) in concat.operands(cst).enumerate() {
+                    let op = Self::skip_paren(cst, op);
+                    if Self::regex_to_string(cst, sema, op).is_empty() {
+                        Self::visit_regex(cst, sema, op, output)?;
                         output.write_all(
                             format!(
-                                "  \"{:p}\":f{} -> \"{}\";\n",
-                                regex,
+                                "  \"{}\":f{} -> \"{}\";\n",
+                                concat.syntax().0,
                                 i,
-                                Self::skip_id(module, op)
+                                Self::skip_name(cst, sema, op)
                             )
                             .as_bytes(),
                         )?;
@@ -154,71 +162,88 @@ impl GraphvizOutput {
                 }
                 Ok(())
             }
-            RegexKind::Or { ref ops, error } => {
-                let s = if let Some(Regex {
-                    kind: RegexKind::ErrorHandler { val, .. },
-                    ..
-                }) = module.get_regex(error)
-                {
-                    if *val != u64::MAX {
-                        format!("\\||!{}", val)
-                    } else {
-                        "\\||!".to_string()
-                    }
-                } else {
-                    "\\|".to_string()
-                };
+            Regex::Alternation(alt) => {
                 output.write_all(
-                    format!("  \"{:p}\" [shape=record, label=\"{{{}}}\"];\n", regex, s).as_bytes(),
+                    format!(
+                        "  \"{}\" [shape=record, label=\"{{\\|}}\"];\n",
+                        alt.syntax().0
+                    )
+                    .as_bytes(),
                 )?;
-                for op in ops {
-                    let op = Self::skip_paren(module, *op);
-                    if let RegexKind::ErrorHandler { .. } = op.kind {
-                        continue;
-                    }
-                    Self::visit_regex(module, op, output)?;
+                for op in alt.operands(cst) {
+                    let op = Self::skip_paren(cst, op);
+                    Self::visit_regex(cst, sema, op, output)?;
                     output.write_all(
-                        format!("  \"{:p}\" -> \"{}\";\n", regex, Self::skip_id(module, op))
-                            .as_bytes(),
+                        format!(
+                            "  \"{}\" -> \"{}\";\n",
+                            alt.syntax().0,
+                            Self::skip_name(cst, sema, op)
+                        )
+                        .as_bytes(),
                     )?;
                 }
                 Ok(())
             }
-            RegexKind::Star { op } => {
+            Regex::Star(star) => {
                 output.write_all(
-                    format!("  \"{:p}\" [shape=box, label=\"*\"];\n", regex).as_bytes(),
+                    format!("  \"{}\" [shape=box, label=\"*\"];\n", star.syntax().0).as_bytes(),
                 )?;
-                let op = Self::skip_paren(module, op);
-                Self::visit_regex(module, op, output)?;
+                let op = Self::skip_paren(cst, star.operand(cst).unwrap());
+                Self::visit_regex(cst, sema, op, output)?;
                 output.write_all(
-                    format!("  \"{:p}\" -> \"{}\";\n", regex, Self::skip_id(module, op)).as_bytes(),
+                    format!(
+                        "  \"{}\" -> \"{}\";\n",
+                        star.syntax().0,
+                        Self::skip_name(cst, sema, op)
+                    )
+                    .as_bytes(),
                 )
             }
-            RegexKind::Plus { op } => {
+            Regex::Plus(plus) => {
                 output.write_all(
-                    format!("  \"{:p}\" [shape=box, label=\"+\"];\n", regex).as_bytes(),
+                    format!("  \"{}\" [shape=box, label=\"+\"];\n", plus.syntax().0).as_bytes(),
                 )?;
-                let op = Self::skip_paren(module, op);
-                Self::visit_regex(module, op, output)?;
+                let op = Self::skip_paren(cst, plus.operand(cst).unwrap());
+                Self::visit_regex(cst, sema, op, output)?;
                 output.write_all(
-                    format!("  \"{:p}\" -> \"{}\";\n", regex, Self::skip_id(module, op)).as_bytes(),
+                    format!(
+                        "  \"{}\" -> \"{}\";\n",
+                        plus.syntax().0,
+                        Self::skip_name(cst, sema, op)
+                    )
+                    .as_bytes(),
                 )
             }
-            RegexKind::Option { op } => {
+            Regex::Optional(opt) => {
                 output.write_all(
-                    format!("  \"{:p}\" [shape=box, label=\"[]\"];\n", regex).as_bytes(),
+                    format!("  \"{}\" [shape=box, label=\"[]\"];\n", opt.syntax().0).as_bytes(),
                 )?;
-                let op = Self::skip_paren(module, op);
-                Self::visit_regex(module, op, output)?;
+                let op = Self::skip_paren(cst, opt.operand(cst).unwrap());
+                Self::visit_regex(cst, sema, op, output)?;
                 output.write_all(
-                    format!("  \"{:p}\" -> \"{}\";\n", regex, Self::skip_id(module, op)).as_bytes(),
+                    format!(
+                        "  \"{}\" -> \"{}\";\n",
+                        opt.syntax().0,
+                        Self::skip_name(cst, sema, op)
+                    )
+                    .as_bytes(),
                 )
             }
-            RegexKind::Action { val, .. } => output.write_all(
-                format!("  \"{:p}\" [shape=box, label=\"#{}\"];\n", regex, val,).as_bytes(),
+            Regex::Action(action) => output.write_all(
+                format!(
+                    "  \"{}\" [shape=box, label=\"#{}\"];\n",
+                    action.syntax().0,
+                    action.value(cst).unwrap().0
+                )
+                .as_bytes(),
             ),
-            RegexKind::Predicate { val, .. } => output.write_all(
-                format!("  \"{:p}\" [shape=box, label=\"?{}\"];\n", regex, val,).as_bytes(),
+            Regex::Predicate(pred) => output.write_all(
+                format!(
+                    "  \"{}\" [shape=box, label=\"?{}\"];\n",
+                    pred.syntax().0,
+                    pred.value(cst).unwrap().0
+                )
+                .as_bytes(),
             ),
             _ => Ok(()),
         }

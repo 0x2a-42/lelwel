@@ -12,26 +12,24 @@ cat << EOF > $output
 use codespan_reporting::files::SimpleFile;
 use codespan_reporting::term::termcolor::NoColor;
 use codespan_reporting::term::{self, DisplayStyle};
-use lelwel::frontend::parser::{Parser, Token, TokenStream};
+use lelwel::frontend::parser::{tokenize, Parser, Token};
 use lelwel::frontend::sema::SemanticPass;
-use lelwel::frontend::symbols::StringInterner;
 use logos::Logos;
 use std::io::BufWriter;
 
 fn gen_diags(input: &str) -> String {
-    let content = std::fs::read_to_string(input).unwrap();
-    let mut tokens = TokenStream::new(Token::lexer(&content), input);
-    let file = SimpleFile::new(input, &content);
+    let source = std::fs::read_to_string(input).unwrap();
     let mut diags = vec![];
-    let mut interner = StringInterner::new();
-    if let Some(mut module) = Parser::parse(&mut tokens, &mut diags, &mut interner) {
-        SemanticPass::run(&mut module, &mut diags);
-    }
+    let (tokens, ranges) = tokenize(Token::lexer(&source), &mut diags);
+    let cst = Parser::parse(&source, tokens, ranges, &mut diags);
+    let _ = SemanticPass::run(&cst, &mut diags);
+
     let mut writer = NoColor::new(BufWriter::new(Vec::new()));
     let config = codespan_reporting::term::Config {
         display_style: DisplayStyle::Short,
         ..Default::default()
     };
+    let file = SimpleFile::new(input, &source);
     for diag in diags {
         term::emit(&mut writer, &config, &file, &diag).unwrap();
     }

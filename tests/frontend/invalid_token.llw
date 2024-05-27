@@ -1,5 +1,7 @@
 token A;
 
-start:
+start s;
+
+s:
   A % ... ,
 ;

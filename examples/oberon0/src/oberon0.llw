@@ -8,16 +8,17 @@ token Dot='.' Eq='=' Comma=',' Semi=';' Asn=':=' Hash='#'
       Lt='<' Leq='<=' Gt='>' Geq='>=' Add='+' Sub='-' Mul='*' LPar='('
       RPar=')' LBrak='[' RBrak=']' Not='~' And='&' Colon=':';
 token Ident='<identifier>' Number='<number>';
+token Comment Whitespace;
 
-start:
-  module
-;
+skip Comment Whitespace;
+
+start module;
 
 selector:
-  ('.' Ident | '[' (expression !) ']')*
+  ('.' Ident | '[' expression ']')*
 ;
 factor:
-  Ident selector | Number | '(' (expression !) ')' | '~' factor
+  Ident selector | Number | '(' expression ')' | '~' factor
 ;
 term:
   factor (('*' | 'DIV' | 'MOD' | '&') factor)*
@@ -29,63 +30,63 @@ expression:
   simple_expression [('=' | '#' | '<' | '<=' | '>' | '>=') simple_expression]
 ;
 assignment_or_procedure_call:
-  Ident selector (':=' expression | [actual_parameters])
+  Ident selector (':=' expression @assignment | [actual_parameters] @procedure_call)
 ;
 actual_parameters:
-  '(' [expression (',' expression !)* !] ')'
+  '(' [expression (',' expression)*] ')'
 ;
 if_statement:
-  'IF' (expression !) 'THEN' statement_sequence
-  ('ELSIF' (expression !) 'THEN' statement_sequence)*
+  'IF' expression 'THEN' statement_sequence
+  ('ELSIF' expression 'THEN' statement_sequence)*
   ['ELSE' statement_sequence] 'END'
 ;
 while_statement:
-  'WHILE' (expression !) 'DO' statement_sequence 'END'
+  'WHILE' expression 'DO' statement_sequence 'END'
 ;
 repeat_statement:
   'REPEAT' statement_sequence 'UNTIL' expression
 ;
 statement:
-  [assignment_or_procedure_call | if_statement | while_statement | repeat_statement | !]
+  [assignment_or_procedure_call | if_statement | while_statement | repeat_statement]
 ;
 statement_sequence:
   statement (';' statement)*
 ;
 ident_list:
-  Ident (',' Ident !)*
+  Ident (',' Ident)*
 ;
 array_type:
-  'ARRAY' (expression !) 'OF' type
+  'ARRAY' expression 'OF' type
 ;
 field_list:
   [ident_list ':' type]
 ;
 record_type:
-  'RECORD' (field_list (';' field_list !)* !) 'END'
+  'RECORD' field_list (';' field_list)* 'END'
 ;
 type:
-  Ident | array_type | record_type | !
+  Ident | array_type | record_type
 ;
 fp_section:
   ['VAR'] ident_list ':' type
 ;
 formal_parameters:
-  '(' [fp_section (';' fp_section !)* !] ')'
+  '(' [fp_section (';' fp_section)*] ')'
 ;
 procedure_heading:
-  'PROCEDURE' Ident [formal_parameters] | !
+  'PROCEDURE' Ident [formal_parameters]
 ;
 procedure_body:
-  declarations ['BEGIN' statement_sequence] 'END' Ident | !
+  declarations ['BEGIN' statement_sequence] 'END' Ident
 ;
 procedure_declaration:
   procedure_heading ';' procedure_body
 ;
 declarations:
-  ['CONST' (Ident '=' expression ';' !)*]
-  ['TYPE' (Ident '=' type ';' !)*]
-  ['VAR' (ident_list ':' type ';' !)*]
-  (procedure_declaration ';' !)*
+  ['CONST' (Ident '=' expression ';')*]
+  ['TYPE' (Ident '=' type ';')*]
+  ['VAR' (ident_list ':' type ';')*]
+  (procedure_declaration ';')*
 ;
 module:
   'MODULE' Ident ';' declarations ['BEGIN' statement_sequence] 'END' Ident '.'

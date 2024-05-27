@@ -1,4 +1,6 @@
-start:
+start s;
+
+s:
 ;
 
 A:

@@ -1,5 +1,3 @@
-use std::fs::File;
-use std::io::Write;
 use std::path::Path;
 
 use codespan_reporting::diagnostic::Severity;
@@ -12,7 +10,6 @@ use backend::rust::RustOutput;
 use frontend::parser::*;
 use frontend::printer::DebugPrinter;
 use frontend::sema::*;
-use frontend::symbols::StringInterner;
 
 use self::backend::graphviz::GraphvizOutput;
 
@@ -20,14 +17,14 @@ pub mod backend;
 pub mod frontend;
 pub mod ide;
 
-const VERSION: &str = "0.5.0";
+const VERSION: &str = "0.6.0";
 
 pub fn build(path: &str) {
     let res = compile(
         path,
         &std::env::var("OUT_DIR").unwrap(),
         false,
-        false,
+        0,
         false,
         false,
     );
@@ -43,53 +40,44 @@ pub fn build(path: &str) {
     println!("cargo:rerun-if-changed={path}");
 }
 
-fn create_new_llw(path: &Path) -> std::io::Result<()> {
-    let mut file = File::create(path)?;
-    file.write_all(
-        b"start:\
-        \n;",
-    )
-}
-
 pub fn compile(
     input: &str,
     output: &str,
     check: bool,
-    verbose: bool,
+    verbose: u8,
     graph: bool,
     short: bool,
 ) -> std::io::Result<bool> {
     let input_path = Path::new(input);
     if !check && !input_path.exists() {
-        create_new_llw(input_path)?;
+        return Ok(false);
     }
 
-    let content = std::fs::read_to_string(input)?;
-    let mut tokens = TokenStream::new(Token::lexer(&content), input);
-
-    let file = SimpleFile::new(input, &content);
-
+    let source = std::fs::read_to_string(input)?;
     let mut diags = vec![];
-    let mut interner = StringInterner::new();
+    let (tokens, ranges) = tokenize(Token::lexer(&source), &mut diags);
+    let cst = Parser::parse(&source, tokens, ranges, &mut diags);
+    let sema = SemanticPass::run(&cst, &mut diags);
 
-    if let Some(mut module) = Parser::parse(&mut tokens, &mut diags, &mut interner) {
-        SemanticPass::run(&mut module, &mut diags);
-        if verbose {
-            DebugPrinter::new().visit(&module);
+    if verbose > 1 {
+        println!("{cst}");
+    }
+    if verbose > 0 {
+        DebugPrinter::new().run(&cst, &sema);
+    }
+    if !diags.iter().any(|d| d.severity == Severity::Error) {
+        if graph {
+            GraphvizOutput::run(&cst, &sema)?;
         }
-        if !diags.iter().any(|d| d.severity == Severity::Error) {
-            if graph {
-                GraphvizOutput::visit(&module)?;
-            }
-            if !check {
-                RustOutput::create(&module, input_path, Path::new(output))?;
-            }
+        if !check {
+            RustOutput::run(&cst, &sema, input_path, Path::new(output))?;
         }
     }
 
     let mut success = true;
     let writer = StandardStream::stderr(ColorChoice::Auto);
     let mut config = codespan_reporting::term::Config::default();
+    let file = SimpleFile::new(input, &source);
     if short {
         config.display_style = DisplayStyle::Short;
     }
@@ -98,4 +86,43 @@ pub fn compile(
         success &= diag.severity != Severity::Error;
     }
     Ok(success)
+}
+
+#[cfg(feature = "wasm")]
+#[wasm_bindgen::prelude::wasm_bindgen]
+pub fn generate_syntax_tree(source: &str) -> Vec<String> {
+    use std::io::BufWriter;
+
+    use codespan_reporting::term::termcolor::NoColor;
+    use codespan_reporting::term::Config;
+
+    let mut diags = vec![];
+    let (tokens, ranges) = tokenize(Token::lexer(source), &mut diags);
+    let cst = Parser::parse(source, tokens, ranges, &mut diags);
+    let _sema = SemanticPass::run(&cst, &mut diags);
+    let mut writer = NoColor::new(BufWriter::new(Vec::new()));
+    let config = Config::default();
+    let file = SimpleFile::new("<input>", source);
+    for diag in diags.iter() {
+        term::emit(&mut writer, &config, &file, diag).unwrap();
+    }
+    vec![
+        format!("{cst}"),
+        String::from_utf8(writer.into_inner().into_inner().unwrap()).unwrap(),
+    ]
+}
+#[cfg(feature = "wasm")]
+#[wasm_bindgen::prelude::wasm_bindgen]
+pub fn get_location(source: &str, start: usize, end: usize) -> Vec<usize> {
+    use codespan_reporting::files::Files;
+
+    let file = SimpleFile::new("<input>", source);
+    let start_loc = file.location((), start).unwrap();
+    let end_loc = file.location((), end).unwrap();
+    vec![
+        start_loc.line_number,
+        start_loc.column_number,
+        end_loc.line_number,
+        end_loc.column_number,
+    ]
 }
