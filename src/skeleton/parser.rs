@@ -62,7 +62,7 @@ pub enum Token {
     Error,
 }
 
-// TODO: chose type of CstIndex (in some cases 32 bit is enough)
+// TODO: choose type of CstIndex (in some cases 32 bit is enough)
 type CstIndex = usize;
 
 // TODO: add context information to the parser if required
