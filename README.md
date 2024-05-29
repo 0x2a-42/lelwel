@@ -95,7 +95,7 @@ expr_paren: '(' expr ')';
 
 ## Quickstart
 1. Write a grammar file and place it in the `src` directory of your crate.
-   Optionally you can install the CLI or language server to validate your grammar file: `cargo install --features="cli","lsp" lelwel`.
+   Optionally you can install the CLI or language server to validate your grammar file: `cargo install --features=cli,lsp lelwel`.
 1. Add the following to your `Cargo.toml` and  `build.rs` files.
    ```toml
    [dependencies]
