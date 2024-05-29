@@ -7,21 +7,12 @@ skip Whitespace;
 
 start calc;
 
-calc:
-  expr
-;
+calc: expr;
 expr:
   expr ('*' | '/') expr
 | expr ('+' | '-') expr
 | atomic
 ;
-atomic:
-  literal
-| paren
-;
-literal:
-  Num
-;
-paren:
-  '(' expr ')'
-;
+atomic: literal | paren;
+literal: Num;
+paren: '(' expr ')';

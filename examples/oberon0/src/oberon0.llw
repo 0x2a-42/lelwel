@@ -32,9 +32,7 @@ expression:
 assignment_or_procedure_call:
   Ident selector (':=' expression @assignment | [actual_parameters] @procedure_call)
 ;
-actual_parameters:
-  '(' [expression (',' expression)*] ')'
-;
+actual_parameters: '(' [expression (',' expression)*] ')';
 if_statement:
   'IF' expression 'THEN' statement_sequence
   ('ELSIF' expression 'THEN' statement_sequence)*
@@ -49,33 +47,17 @@ repeat_statement:
 statement:
   [assignment_or_procedure_call | if_statement | while_statement | repeat_statement]
 ;
-statement_sequence:
-  statement (';' statement)*
-;
-ident_list:
-  Ident (',' Ident)*
-;
-array_type:
-  'ARRAY' expression 'OF' type
-;
-field_list:
-  [ident_list ':' type]
-;
-record_type:
-  'RECORD' field_list (';' field_list)* 'END'
-;
-type:
-  Ident | array_type | record_type
-;
-fp_section:
-  ['VAR'] ident_list ':' type
-;
-formal_parameters:
-  '(' [fp_section (';' fp_section)*] ')'
-;
-procedure_heading:
-  'PROCEDURE' Ident [formal_parameters]
-;
+statement_sequence: statement (';' statement)*;
+
+ident_list: Ident (',' Ident)*;
+array_type: 'ARRAY' expression 'OF' type;
+field_list: [ident_list ':' type];
+record_type: 'RECORD' field_list (';' field_list)* 'END';
+type: Ident | array_type | record_type;
+
+fp_section: ['VAR'] ident_list ':' type;
+formal_parameters: '(' [fp_section (';' fp_section)*] ')';
+procedure_heading: 'PROCEDURE' Ident [formal_parameters];
 procedure_body:
   declarations ['BEGIN' statement_sequence] 'END' Ident
 ;

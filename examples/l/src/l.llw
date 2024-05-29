@@ -8,42 +8,22 @@ skip Whitespace;
 
 start file;
 
-file:
-  fn*
-;
-fn:
-  'fn' Name param_list ['->' type_expr] block
-;
-param_list:
-  '(' [param (?1 ',' param)* [',']] ')'
-;
-param:
-  Name ':' type_expr
-;
-type_expr:
-  Name
-;
-block:
-  '{' stmt* '}'
-;
+file: fn*;
+fn: 'fn' Name param_list ['->' type_expr] block;
+param_list: '(' [param (?1 ',' param)* [',']] ')';
+param: Name ':' type_expr;
+type_expr: Name;
+block: '{' stmt* '}';
 stmt:
   stmt_expr
 | stmt_let
 | block
 | stmt_return
 ;
-stmt_expr:
-  expr ';'
-;
-stmt_let:
-  'let' Name '=' expr ';'
-;
-stmt_return:
-  'return' [expr] ';'
-;
-expr:
-  expr_bin
-;
+stmt_expr: expr ';';
+stmt_let: 'let' Name '=' expr ';';
+stmt_return: 'return' [expr] ';';
+expr: expr_bin;
 expr_bin:
   expr_bin ('*' | '/') expr_bin
 | expr_bin ('+' | '-') expr_bin
@@ -55,15 +35,7 @@ expr_call:
 | expr_name
 | expr_paren
 ;
-arg_list:
-  '(' [expr (?1 ',' expr)* [',']] ')'
-;
-expr_literal:
-  Int | 'true' | 'false'
-;
-expr_name:
-  Name
-;
-expr_paren:
-  '(' expr ')'
-;
+arg_list: '(' [expr (?1 ',' expr)* [',']] ')';
+expr_literal: Int | 'true' | 'false';
+expr_name: Name;
+expr_paren: '(' expr ')';

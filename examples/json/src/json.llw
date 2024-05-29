@@ -7,23 +7,15 @@ skip Whitespace;
 
 start file;
 
-file:
-  value
-;
+file: value;
 value:
   object
 | array
 | literal
 ;
-object:
-  '{' [member (',' member)*] '}'
-;
-member:
-  String ':' value
-;
-array:
-  '[' [value (',' value)*] ']'
-;
+object: '{' [member (',' member)*] '}';
+member: String ':' value;
+array: '[' [value (',' value)*] ']';
 literal:
   String
 | Number
