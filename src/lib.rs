@@ -51,9 +51,7 @@ pub fn compile(
     short: bool,
 ) -> std::io::Result<bool> {
     let input_path = Path::new(input);
-    if !check && !input_path.exists() {
-        return Ok(false);
-    }
+    input_path.try_exists()?;
 
     let source = std::fs::read_to_string(input)?;
     let mut diags = vec![];
