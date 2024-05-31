@@ -803,11 +803,12 @@ impl<'a> LL1Validator {
                         .or_default()
                         .len();
                     let follow = sema.follow_sets.entry(regex.syntax()).or_default().clone();
+                    let left_rec_local_follow = sema
+                        .left_rec_local_follow_sets
+                        .entry(name_rule_regex.syntax())
+                        .or_default();
                     if rule_regex != name_rule_regex {
-                        sema.left_rec_local_follow_sets
-                            .entry(name_rule_regex.syntax())
-                            .or_default()
-                            .extend(follow.clone());
+                        left_rec_local_follow.extend(follow.clone());
                     }
                     sema.follow_sets
                         .get_mut(&name_rule_regex.syntax())
