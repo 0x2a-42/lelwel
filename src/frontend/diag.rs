@@ -2,11 +2,34 @@ use codespan_reporting::diagnostic::Label;
 
 use super::parser::{Diagnostic, Span};
 
+pub const INVALID_BINDING_POS: &str = "E001";
+pub const INVALID_PREDICATE_POS: &str = "E002";
+pub const UNDEFINED_RULE: &str = "E003";
+pub const UNDEFINED_TOKEN: &str = "E004";
+pub const REDEFINITION: &str = "E005";
+pub const UPPERCASE_RULE: &str = "E006";
+pub const LOWERCASE_TOKEN: &str = "E007";
+pub const MISSING_START_RULE: &str = "E008";
+pub const REFERENCE_START_RULE: &str = "E009";
+pub const PREDEFINED_TOKEN_NAME: &str = "E010";
+pub const LL1_CONFLICT_ALT: &str = "E011";
+pub const LL1_CONFLICT_LEFT_REC: &str = "E012";
+pub const LL1_CONFLICT_REP: &str = "E013";
+pub const LL1_CONFLICT_OPT: &str = "E014";
+pub const CONSUME_TOKENS: &str = "E015";
+pub const REDEFINE_AS_SKIPPED: &str = "E016";
+pub const USED_SKIPPED: &str = "E017";
+pub const EXPECTED_TOKEN: &str = "E018";
+pub const REDEFINE_AS_RIGHT: &str = "E019";
+
+pub const UNUSED_RULE: &str = "W001";
+pub const UNUSED_TOKEN: &str = "W002";
+
 pub trait LanguageErrors<'a> {
     fn invalid_binding_pos(span: &Span) -> Self;
     fn invalid_predicate_pos(span: &Span) -> Self;
-    fn undefined_rule(span: &Span, name: &str, used_span: &Span) -> Self;
-    fn missing_definition(span: &Span, def_kind: &str, name: &str) -> Self;
+    fn undefined_rule(span: &Span, name: &str) -> Self;
+    fn undefined_token(span: &Span, name: &str) -> Self;
     fn redefinition(span: &Span, binding: &str, old_span: &Span) -> Self;
     fn uppercase_rule(span: &Span, name: &str) -> Self;
     fn lowercase_token(span: &Span, name: &str) -> Self;
@@ -27,9 +50,10 @@ pub trait LanguageErrors<'a> {
 }
 
 impl<'a> LanguageErrors<'a> for Diagnostic {
+
     fn invalid_binding_pos(span: &Span) -> Self {
         Diagnostic::error()
-            .with_code("E001")
+            .with_code(INVALID_BINDING_POS)
             .with_message("invalid binding position")
             .with_labels(vec![Label::primary((), span.clone())])
             .with_notes(vec![
@@ -39,7 +63,7 @@ impl<'a> LanguageErrors<'a> for Diagnostic {
 
     fn invalid_predicate_pos(span: &Span) -> Self {
         Diagnostic::error()
-            .with_code("E002")
+            .with_code(INVALID_PREDICATE_POS)
             .with_message("invalid predicate position")
             .with_labels(vec![Label::primary((), span.clone())])
             .with_notes(vec![
@@ -48,26 +72,23 @@ impl<'a> LanguageErrors<'a> for Diagnostic {
             ])
     }
 
-    fn undefined_rule(span: &Span, name: &str, used_span: &Span) -> Self {
+    fn undefined_rule(span: &Span, name: &str) -> Self {
         Diagnostic::error()
-            .with_code("E003")
+            .with_code(UNDEFINED_RULE)
             .with_message(format!("use of undefined rule `{name}`"))
-            .with_labels(vec![
-                Label::primary((), span.clone()),
-                Label::secondary((), used_span.clone()).with_message("in this definition"),
-            ])
+            .with_labels(vec![Label::primary((), span.clone())])
     }
 
-    fn missing_definition(span: &Span, def_kind: &str, name: &str) -> Self {
+    fn undefined_token(span: &Span, name: &str) -> Self {
         Diagnostic::error()
-            .with_code("E004")
-            .with_message(format!("use of undefined {def_kind} `{name}`"))
+            .with_code(UNDEFINED_TOKEN)
+            .with_message(format!("use of undefined token `{name}`"))
             .with_labels(vec![Label::primary((), span.clone())])
     }
 
     fn redefinition(span: &Span, binding: &str, old_span: &Span) -> Self {
         Diagnostic::error()
-            .with_code("E005")
+            .with_code(REDEFINITION)
             .with_message(format!("redefinition of {}", binding,))
             .with_labels(vec![
                 Label::primary((), span.clone()),
@@ -77,7 +98,7 @@ impl<'a> LanguageErrors<'a> for Diagnostic {
 
     fn uppercase_rule(span: &Span, name: &str) -> Self {
         Diagnostic::error()
-            .with_code("E006")
+            .with_code(UPPERCASE_RULE)
             .with_message("rule name starts with upper case letter")
             .with_labels(vec![Label::primary((), span.clone()).with_message(
                 format!(
@@ -93,7 +114,7 @@ impl<'a> LanguageErrors<'a> for Diagnostic {
 
     fn lowercase_token(span: &Span, name: &str) -> Self {
         Diagnostic::error()
-            .with_code("E007")
+            .with_code(LOWERCASE_TOKEN)
             .with_message("token name starts with lower case letter")
             .with_labels(vec![Label::primary((), span.clone()).with_message(
                 format!(
@@ -109,7 +130,7 @@ impl<'a> LanguageErrors<'a> for Diagnostic {
 
     fn missing_start_rule() -> Self {
         Diagnostic::error()
-            .with_code("E008")
+            .with_code(MISSING_START_RULE)
             .with_message("missing start rule")
             .with_notes(vec![
                 "help: specify the start rule with\n\nstart rule_name;".to_string(),
@@ -118,32 +139,20 @@ impl<'a> LanguageErrors<'a> for Diagnostic {
 
     fn reference_start_rule(span: &Span) -> Self {
         Diagnostic::error()
-            .with_code("E009")
+            .with_code(REFERENCE_START_RULE)
             .with_message("cannot reference start rule in regex")
             .with_labels(vec![Label::primary((), span.clone())])
     }
 
     fn predefined_token_name(span: &Span) -> Self {
         Diagnostic::error()
-            .with_code("E010")
+            .with_code(PREDEFINED_TOKEN_NAME)
             .with_message("use of predefined token name")
             .with_labels(vec![Label::primary((), span.clone())])
             .with_notes(vec![
                 "note: the token name `EOF` is reserved".to_string(),
                 "note: there is no need for an explicit EOF token".to_string(),
             ])
-    }
-
-    fn unused_rule(span: &Span) -> Self {
-        Diagnostic::warning()
-            .with_message("unused rule")
-            .with_labels(vec![Label::primary((), span.clone())])
-    }
-
-    fn unused_token(span: &Span) -> Self {
-        Diagnostic::warning()
-            .with_message("unused token")
-            .with_labels(vec![Label::primary((), span.clone())])
     }
 
     fn ll1_conflict_alt(span: &Span, conflicting: Vec<(Span, String)>) -> Self {
@@ -154,7 +163,7 @@ impl<'a> LanguageErrors<'a> for Diagnostic {
                 .map(|(span, msg)| Label::secondary((), span).with_message(msg)),
         );
         Diagnostic::error()
-            .with_code("E011")
+            .with_code(LL1_CONFLICT_ALT)
             .with_message("LL(1) conflict in alternation")
             .with_labels(labels)
             .with_notes(vec![
@@ -170,14 +179,14 @@ impl<'a> LanguageErrors<'a> for Diagnostic {
                 .map(|(span, msg)| Label::secondary((), span).with_message(msg)),
         );
         Diagnostic::error()
-            .with_code("E012")
+            .with_code(LL1_CONFLICT_LEFT_REC)
             .with_message("LL(1) conflict in left recursive rule")
             .with_labels(labels)
     }
 
     fn ll1_conflict_rep(span: &Span, conflicting: String) -> Self {
         Diagnostic::error()
-            .with_code("E013")
+            .with_code(LL1_CONFLICT_REP)
             .with_message("LL(1) conflict in repetition")
             .with_labels(vec![
                 Label::primary((), span.clone()).with_message(conflicting)
@@ -190,7 +199,7 @@ impl<'a> LanguageErrors<'a> for Diagnostic {
 
     fn ll1_conflict_opt(span: &Span, conflicting: String) -> Self {
         Diagnostic::error()
-            .with_code("E014")
+            .with_code(LL1_CONFLICT_OPT)
             .with_message("LL(1) conflict in option")
             .with_labels(vec![
                 Label::primary((), span.clone()).with_message(conflicting)
@@ -203,7 +212,7 @@ impl<'a> LanguageErrors<'a> for Diagnostic {
 
     fn consume_tokens(span: &Span) -> Self {
         Diagnostic::error()
-            .with_code("E015")
+            .with_code(CONSUME_TOKENS)
             .with_message("no tokens consumed")
             .with_labels(vec![Label::primary((), span.clone())])
             .with_notes(vec![
@@ -213,29 +222,43 @@ impl<'a> LanguageErrors<'a> for Diagnostic {
 
     fn redefine_as_skipped(span: &Span) -> Self {
         Diagnostic::error()
-            .with_code("E016")
+            .with_code(REDEFINE_AS_SKIPPED)
             .with_message("token is already skipped")
             .with_labels(vec![Label::primary((), span.clone())])
     }
 
     fn used_skipped(span: &Span) -> Self {
         Diagnostic::error()
-            .with_code("E017")
+            .with_code(USED_SKIPPED)
             .with_message("skipped token cannot be used in regex")
             .with_labels(vec![Label::primary((), span.clone())])
     }
 
     fn expected_token(span: &Span) -> Self {
         Diagnostic::error()
-            .with_code("E018")
+            .with_code(EXPECTED_TOKEN)
             .with_message("expected token")
             .with_labels(vec![Label::primary((), span.clone())])
     }
 
     fn redefine_as_right(span: &Span) -> Self {
         Diagnostic::error()
-            .with_code("E019")
+            .with_code(REDEFINE_AS_RIGHT)
             .with_message("token is already right associative")
+            .with_labels(vec![Label::primary((), span.clone())])
+    }
+
+    fn unused_rule(span: &Span) -> Self {
+        Diagnostic::warning()
+            .with_code(UNUSED_RULE)
+            .with_message("unused rule")
+            .with_labels(vec![Label::primary((), span.clone())])
+    }
+
+    fn unused_token(span: &Span) -> Self {
+        Diagnostic::warning()
+            .with_code(UNUSED_TOKEN)
+            .with_message("unused token")
             .with_labels(vec![Label::primary((), span.clone())])
     }
 }

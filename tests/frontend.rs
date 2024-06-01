@@ -189,7 +189,7 @@ fn syntax_error() {
     assert_eq!(lines.next().unwrap(), "tests/frontend/syntax_error.llw:2:1: error: invalid syntax, expected one of: '=', <identifier>, ';'");
     assert_eq!(lines.next().unwrap(), "tests/frontend/syntax_error.llw:8:1: error: invalid syntax, expected: ')'");
     assert_eq!(lines.next().unwrap(), "tests/frontend/syntax_error.llw:13:2: error: invalid syntax, expected one of: <semantic action>, <binding>, <close node mark>, <identifier>, '[', '(', <open node mark>, '|', <semantic predicate>, ']', ')', ';', <string literal>");
-    assert_eq!(lines.next().unwrap(), "tests/frontend/syntax_error.llw:13:1: error[E004]: use of undefined rule `b`");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/syntax_error.llw:13:1: error[E003]: use of undefined rule `b`");
     assert_eq!(lines.next(), None);
 }
 
@@ -200,9 +200,9 @@ fn undefined() {
     let mut lines = diags.lines();
 
     assert_eq!(lines.next().unwrap(), "tests/frontend/undefined.llw:4:3: error[E004]: use of undefined token `A`");
-    assert_eq!(lines.next().unwrap(), "tests/frontend/undefined.llw:4:5: error[E004]: use of undefined rule `b`");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/undefined.llw:4:5: error[E003]: use of undefined rule `b`");
     assert_eq!(lines.next().unwrap(), "tests/frontend/undefined.llw:4:7: error[E004]: use of undefined token `C`");
-    assert_eq!(lines.next().unwrap(), "tests/frontend/undefined.llw:4:9: error[E004]: use of undefined rule `d`");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/undefined.llw:4:9: error[E003]: use of undefined rule `d`");
     assert_eq!(lines.next(), None);
 }
 

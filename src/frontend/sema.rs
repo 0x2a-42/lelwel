@@ -113,14 +113,18 @@ impl<'a> GeneralCheck<'a> {
     fn get_symbol_binding(
         &mut self,
         name: &'a str,
-        binding: &str,
+        rule_binding: bool,
         span: Span,
         diags: &mut Vec<Diagnostic>,
     ) -> Option<NodeRef> {
         self.symbol_table
             .get(name)
             .or_else(|| {
-                diags.push(Diagnostic::missing_definition(&span, binding, name));
+                if rule_binding {
+                    diags.push(Diagnostic::undefined_rule(&span, name));
+                } else {
+                    diags.push(Diagnostic::undefined_token(&span, name));
+                }
                 None
             })
             .copied()
@@ -208,7 +212,7 @@ impl<'a> GeneralCheck<'a> {
     ) {
         if let Some(rule_decl) = start_decl
             .rule_name(cst)
-            .and_then(|(name, name_span)| self.get_symbol_binding(name, "rule", name_span, diags))
+            .and_then(|(name, name_span)| self.get_symbol_binding(name, true, name_span, diags))
             .and_then(|node| RuleDecl::cast(cst, node))
         {
             sema.start = Some(rule_decl);
@@ -222,7 +226,7 @@ impl<'a> GeneralCheck<'a> {
         sema: &mut SemanticData<'a>,
     ) {
         right_decl.token_names(cst, |(name, name_span)| {
-            if let Some(node) = self.get_symbol_binding(name, "token", name_span.clone(), diags) {
+            if let Some(node) = self.get_symbol_binding(name, false, name_span.clone(), diags) {
                 if let Some(token_decl) = TokenDecl::cast(cst, node) {
                     if let Some((name, _)) = token_decl.name(cst) {
                         if sema.right_associative.contains(&name) {
@@ -245,7 +249,7 @@ impl<'a> GeneralCheck<'a> {
         sema: &mut SemanticData<'a>,
     ) {
         skip_decl.token_names(cst, |(name, name_span)| {
-            if let Some(node) = self.get_symbol_binding(name, "token", name_span.clone(), diags) {
+            if let Some(node) = self.get_symbol_binding(name, false, name_span.clone(), diags) {
                 if let Some(token_decl) = TokenDecl::cast(cst, node) {
                     if sema.skipped.contains(&token_decl) {
                         diags.push(Diagnostic::redefine_as_skipped(&name_span));
@@ -313,13 +317,9 @@ impl<'a> GeneralCheck<'a> {
             }
             Regex::Name(regex) => {
                 if let Some((name, name_span)) = regex.value(cst) {
-                    let kind = if name.starts_with(|c: char| c.is_uppercase()) {
-                        "token"
-                    } else {
-                        "rule"
-                    };
+                    let rule_binding = name.starts_with(|c: char| c.is_lowercase());
                     if let Some(decl) =
-                        self.get_symbol_binding(name, kind, name_span.clone(), diags)
+                        self.get_symbol_binding(name, rule_binding, name_span.clone(), diags)
                     {
                         if let Some(token) = TokenDecl::cast(cst, decl) {
                             if sema.skipped.contains(&token) {
@@ -333,7 +333,7 @@ impl<'a> GeneralCheck<'a> {
             Regex::Symbol(regex) => {
                 if let Some((name, name_span)) = regex.value(cst) {
                     if let Some(decl) =
-                        self.get_symbol_binding(name, "token", name_span.clone(), diags)
+                        self.get_symbol_binding(name, false, name_span.clone(), diags)
                     {
                         if let Some(token) = TokenDecl::cast(cst, decl) {
                             if sema.skipped.contains(&token) {
