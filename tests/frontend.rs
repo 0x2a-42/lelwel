@@ -212,11 +212,11 @@ fn unused_element() {
     let diags = gen_diags("tests/frontend/unused_element.llw");
     let mut lines = diags.lines();
 
-    assert_eq!(lines.next().unwrap(), "tests/frontend/unused_element.llw:9:1: warning: unused rule");
-    assert_eq!(lines.next().unwrap(), "tests/frontend/unused_element.llw:13:1: warning: unused rule");
-    assert_eq!(lines.next().unwrap(), "tests/frontend/unused_element.llw:23:1: warning: unused rule");
-    assert_eq!(lines.next().unwrap(), "tests/frontend/unused_element.llw:1:7: warning: unused token");
-    assert_eq!(lines.next().unwrap(), "tests/frontend/unused_element.llw:1:11: warning: unused token");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/unused_element.llw:9:1: warning[W001]: unused rule");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/unused_element.llw:13:1: warning[W001]: unused rule");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/unused_element.llw:23:1: warning[W001]: unused rule");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/unused_element.llw:1:7: warning[W002]: unused token");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/unused_element.llw:1:11: warning[W002]: unused token");
     assert_eq!(lines.next(), None);
 }
 
