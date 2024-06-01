@@ -31,6 +31,7 @@ impl LanguageServer for Backend {
                 text_document_sync: Some(TextDocumentSyncCapability::Kind(
                     TextDocumentSyncKind::FULL,
                 )),
+                completion_provider: Some(CompletionOptions::default()),
                 definition_provider: Some(OneOf::Left(true)),
                 references_provider: Some(OneOf::Left(true)),
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
@@ -113,5 +114,10 @@ impl LanguageServer for Backend {
             .references(&uri, pos, with_decl)
             .await;
         Ok(Some(locs))
+    }
+
+    async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
+        let resp = self.cache.write().await.completion(params).await;
+        Ok(resp)
     }
 }

@@ -1,7 +1,6 @@
 #![cfg(feature = "lsp")]
 
-use crate::frontend::ast::{AstNode, Regex, RuleDecl};
-use crate::{tokenize, Cst, NodeRef, Parser, Rule, SemanticData, SemanticPass, Token};
+use crate::{tokenize, Parser, SemanticPass, Token};
 use codespan_reporting::diagnostic::{LabelStyle, Severity};
 use codespan_reporting::files::SimpleFile;
 use logos::{Logos, Span};
@@ -10,8 +9,12 @@ use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tower_lsp::lsp_types::*;
 
+use self::completion::*;
+use self::hover::*;
 use self::lookup::*;
 
+mod completion;
+mod hover;
 mod lookup;
 
 struct Analyzer {
@@ -93,6 +96,23 @@ impl Cache {
             vec![]
         }
     }
+    pub async fn completion(&mut self, params: CompletionParams) -> Option<CompletionResponse> {
+        let analyzer = self
+            .analyzers
+            .get_mut(&params.text_document_position.text_document.uri)
+            .unwrap();
+        assert!(!analyzer.handle.is_finished());
+        analyzer
+            .req_tx
+            .send(Request::Completion(params))
+            .await
+            .unwrap();
+        if let Some(Notification::Completion(resp)) = analyzer.noti_rx.recv().await {
+            resp
+        } else {
+            None
+        }
+    }
 }
 
 enum Request {
@@ -100,6 +120,7 @@ enum Request {
     Hover(Position),
     GotoDefinition(Position),
     References(Position, bool),
+    Completion(CompletionParams),
 }
 
 enum Notification {
@@ -107,6 +128,7 @@ enum Notification {
     Hover(Option<(String, Range)>),
     GotoDefinition(Option<Range>),
     References(Vec<Location>),
+    Completion(Option<CompletionResponse>),
 }
 
 async fn analyze(
@@ -163,112 +185,14 @@ async fn analyze(
                     .collect();
                 noti.send(Notification::References(ranges)).await.unwrap();
             }
-        }
-    }
-    while let Some(req) = req.recv().await {
-        if let Request::Diagnostic = req {
-            let mut diags = diags
-                .iter()
-                .map(|diag| to_lsp_diag(&file, &uri, diag))
-                .collect::<Vec<_>>();
-            let mut hints = related_as_hints(&diags);
-            diags.append(&mut hints);
-            noti.send(Notification::PublishDiagnostics(diags))
-                .await
-                .unwrap();
-        }
-    }
-}
-
-fn hover(cst: &Cst, sema: &SemanticData, pos: usize) -> Option<(String, Span)> {
-    let node = lookup_node(cst, NodeRef::ROOT, pos)?;
-    let span = cst.get_span(node)?;
-
-    if let Some(regex) = Regex::cast(cst, node) {
-        let first = &sema
-            .first_sets
-            .get(&regex.syntax())
-            .map_or("{}".to_string(), |s| format!("{s:?}"));
-        let follow = &sema
-            .follow_sets
-            .get(&regex.syntax())
-            .map_or("{}".to_string(), |s| format!("{s:?}"));
-        let predict = &sema
-            .predict_sets
-            .get(&regex.syntax())
-            .map_or("{}".to_string(), |s| format!("{s:?}"));
-
-        match regex {
-            Regex::Star(_) | Regex::Plus(_) => {
-                let recovery = &sema
-                    .recovery_sets
-                    .get(&regex.syntax())
-                    .map_or("{}".to_string(), |s| format!("{s:?}"));
-                Some((format!(
-                    "**First:** {first}\n**Follow:** {follow}\n**Predict:** {predict}\n**Recovery:** {recovery}\n"
-                ), span))
+            Request::Completion(params) => {
+                let pos =
+                    compat::position_to_offset(&file, &params.text_document_position.position);
+                noti.send(Notification::Completion(completion(&cst, pos)))
+                    .await
+                    .unwrap();
             }
-            Regex::Name(_) | Regex::Symbol(_) => {
-                let comment_attached_node = sema
-                    .decl_bindings
-                    .get(&node)
-                    .and_then(|decl| cst.get_span(*decl))
-                    .and_then(|span| {
-                        find_node(cst, NodeRef::ROOT, span.start, |r| {
-                            r == Rule::TokenList || r == Rule::RuleDecl
-                        })
-                    });
-                let mut comment_nodes = vec![];
-                if let Some(comment_attached_node) = comment_attached_node {
-                    for i in 1.. {
-                        if let Some(node) = cst.get_token(
-                            NodeRef(comment_attached_node.0.saturating_sub(i)),
-                            Token::DocComment,
-                        ) {
-                            comment_nodes.push(node);
-                        } else {
-                            break;
-                        }
-                    }
-                }
-                let mut comment = String::new();
-                for (val, _) in comment_nodes.iter().rev() {
-                    comment.push_str(val.strip_prefix("///").unwrap().trim_start());
-                }
-                if !comment.is_empty() {
-                    comment.push_str("---\n")
-                }
-                Some((
-                    format!("{comment}**First:** {first}\n**Follow:** {follow}\n**Predict:** {predict}\n"),
-                    span,
-                ))
-            }
-            _ => Some((
-                format!("**First:** {first}\n**Follow:** {follow}\n**Predict:** {predict}\n"),
-                span,
-            )),
         }
-    } else if let Some(rule) = RuleDecl::cast(cst, node) {
-        let regex = rule.regex(cst)?;
-        let first = &sema
-            .first_sets
-            .get(&regex.syntax())
-            .map_or("{}".to_string(), |s| format!("{s:?}"));
-        let follow = &sema
-            .follow_sets
-            .get(&regex.syntax())
-            .map_or("{}".to_string(), |s| format!("{s:?}"));
-        let predict = &sema
-            .predict_sets
-            .get(&regex.syntax())
-            .map_or("{}".to_string(), |s| format!("{s:?}"));
-        let pattern = sema
-            .patterns
-            .get(&rule)
-            .map_or("None".to_string(), |pattern| format!("{pattern:?}"));
-        Some((format!("**Pattern:** {pattern}\n**First:** {first}\n**Follow:** {follow}\n**Predict:** {predict}\n"), span))
-    } else {
-        None
     }
 }
 
