@@ -155,7 +155,7 @@ A token list definition introduces a list of tokens (terminals) to the grammar.
 It starts with the `token` keyword, ends with a `;` and contains a list of token names and corresponding token symbols.
 
 A token name must start with a capital letter.
-The token symbol is optional and delimited by single quatation marks.
+The token symbol is optional and delimited by single quotation marks.
 It is used in error messages and the generator of the `parser.rs` file.
 In a regex a token can be referenced by its name or symbol.
 
