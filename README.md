@@ -103,7 +103,7 @@ expr_paren: '(' expr ')';
    codespan-reporting = "0.11.1"
 
    [build-dependencies]
-   lelwel = "0.6.0"
+   lelwel = "0.6.1"
    ```
    ```rust
    fn main() {
