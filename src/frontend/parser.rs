@@ -67,9 +67,7 @@ fn parse_string(lexer: &mut Lexer<'_, Token>) -> Result<(), LexerError> {
                 lexer.bump(1);
                 return Ok(());
             }
-            '\n' => {
-                return Err(LexerError::UnterminatedString)
-            }
+            '\n' => return Err(LexerError::UnterminatedString),
             '\\' => {
                 lexer.bump(1);
                 if let Some(c) = it.next() {

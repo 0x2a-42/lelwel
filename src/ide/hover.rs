@@ -95,5 +95,3 @@ pub fn hover(cst: &Cst, sema: &SemanticData, pos: usize) -> Option<(String, Span
         None
     }
 }
-
-

@@ -50,7 +50,6 @@ pub trait LanguageErrors<'a> {
 }
 
 impl<'a> LanguageErrors<'a> for Diagnostic {
-
     fn invalid_binding_pos(span: &Span) -> Self {
         Diagnostic::error()
             .with_code(INVALID_BINDING_POS)
