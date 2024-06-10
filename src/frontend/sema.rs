@@ -66,8 +66,8 @@ pub struct SemanticData<'a> {
     pub right_associative: HashSet<&'a str>,
     pub skipped: BTreeSet<TokenDecl>,
     pub start: Option<RuleDecl>,
-    pub predicates: BTreeMap<&'a str, &'a str>,
-    pub actions: BTreeMap<&'a str, &'a str>,
+    pub predicates: BTreeMap<NodeRef, (&'a str, &'a str)>,
+    pub actions: BTreeMap<NodeRef, (&'a str, &'a str)>,
     pub rule_bindings: BTreeSet<&'a str>,
     pub first_sets: HashMap<NodeRef, BTreeSet<TokenName<'a>>>,
     pub follow_sets: HashMap<NodeRef, BTreeSet<TokenName<'a>>>,
@@ -353,7 +353,7 @@ impl<'a> GeneralCheck<'a> {
                         .current_rule
                         .and_then(|rule| rule.name(cst).map(|(name, _)| name))
                     {
-                        sema.predicates.insert(rule_name, &value[1..]);
+                        sema.predicates.insert(regex.syntax(), (rule_name, &value[1..]));
                     }
                 }
             }
@@ -363,7 +363,7 @@ impl<'a> GeneralCheck<'a> {
                         .current_rule
                         .and_then(|rule| rule.name(cst).map(|(name, _)| name))
                     {
-                        sema.actions.insert(rule_name, &value[1..]);
+                        sema.actions.insert(regex.syntax(), (rule_name, &value[1..]));
                     }
                 }
             }

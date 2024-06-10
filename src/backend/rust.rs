@@ -108,7 +108,7 @@ impl RustOutput {
             b"impl<'a> Parser<'a> {\
             \n    fn build(&mut self, rule: Rule, node: NodeRef, diags: &mut Vec<Diagnostic>) {}\n",
         )?;
-        for (rule, num) in sema.predicates.iter() {
+        for (rule, num) in sema.predicates.values() {
             parser_file.write_all(
                 format!(
                     "    fn predicate_{rule}_{num}(&self) -> bool {{\n        todo!()\n    }}\n"
@@ -116,7 +116,7 @@ impl RustOutput {
                 .as_bytes(),
             )?;
         }
-        for (rule, num) in sema.actions.iter() {
+        for (rule, num) in sema.actions.values() {
             parser_file.write_all(
                 format!("    fn action_{rule}_{num}(&mut self, diags: &mut Vec<Diagnostic>) {{\n        todo!()\n    }}\n")
                     .as_bytes(),
