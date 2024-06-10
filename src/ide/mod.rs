@@ -224,6 +224,17 @@ fn to_lsp_diag(
             }
         })
         .collect::<Vec<_>>();
+
+    let mut message = diag.message.clone();
+    if let Some(primary_label_message) = diag.labels.iter().find_map(|label| {
+        (label.style == LabelStyle::Primary && !label.message.is_empty())
+            .then_some(label.message.as_str())
+    }) {
+        // append message of primary label if it is not empty
+        message.push(' ');
+        message.push_str(primary_label_message);
+    }
+
     Diagnostic::new(
         diag.labels
             .first()
@@ -237,7 +248,7 @@ fn to_lsp_diag(
         }),
         diag.code.clone().map(NumberOrString::String),
         None,
-        diag.message.clone(),
+        message,
         Some(related),
         None,
     )
