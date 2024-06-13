@@ -1,3 +1,6 @@
+use codespan_reporting::files::{Files, SimpleFile};
+use tower_lsp::lsp_types::{Location, Url};
+
 use crate::frontend::parser::Span;
 use crate::{Cst, Node, NodeRef, Rule, SemanticData};
 
@@ -35,8 +38,29 @@ pub fn find_node<P: Fn(Rule) -> bool>(
         .and_then(|node| find_node(cst, node, pos, pred).or(Some(node)))
 }
 
-pub fn lookup_definition(cst: &Cst, sema: &SemanticData, pos: usize) -> Option<NodeRef> {
-    lookup_node(cst, NodeRef::ROOT, pos).and_then(|node| sema.decl_bindings.get(&node).copied())
+pub fn lookup_definition(
+    cst: &Cst,
+    sema: &SemanticData,
+    pos: usize,
+    uri: &Url,
+    file: &SimpleFile<&str, &str>,
+    parser_path: &std::path::Path,
+) -> Option<Location> {
+    lookup_node(cst, NodeRef::ROOT, pos).and_then(|node| {
+        if let Some((rule_name, number)) = sema.predicates.get(&node) {
+            lookup_parser_impl_definition("predicate", rule_name, number, parser_path)
+        } else if let Some((rule_name, number)) = sema.actions.get(&node) {
+            lookup_parser_impl_definition("action", rule_name, number, parser_path)
+        } else {
+            sema.decl_bindings
+                .get(&node)
+                .and_then(|node| cst.get_span(*node))
+                .map(|span| Location {
+                    uri: uri.clone(),
+                    range: super::compat::span_to_range(file, &span),
+                })
+        }
+    })
 }
 
 pub fn lookup_references(
@@ -58,4 +82,31 @@ pub fn lookup_references(
     } else {
         vec![]
     }
+}
+
+/// Heuristic search for predicate or action implementation in the parser.rs file.
+/// This doesn't work if these definitions are moved to another file and it doesn't
+/// consider comments or definitions outside of the Parser impl.
+fn lookup_parser_impl_definition(
+    kind: &str,
+    rule_name: &str,
+    number: &str,
+    parser_path: &std::path::Path,
+) -> Option<Location> {
+    let uri = Url::from_file_path(parser_path).ok()?;
+    let source = std::fs::read_to_string(parser_path).ok()?;
+    let file = SimpleFile::new(parser_path.to_str()?, source.as_str());
+    source
+        .find(&format!("fn {kind}_{rule_name}_{number}"))
+        .and_then(|offset| file.location((), offset).ok())
+        .map(|loc| {
+            let pos = tower_lsp::lsp_types::Position::new(
+                (loc.line_number - 1) as u32,
+                (loc.column_number - 1) as u32,
+            );
+            Location {
+                uri,
+                range: tower_lsp::lsp_types::Range::new(pos, pos),
+            }
+        })
 }

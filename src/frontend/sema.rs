@@ -353,7 +353,8 @@ impl<'a> GeneralCheck<'a> {
                         .current_rule
                         .and_then(|rule| rule.name(cst).map(|(name, _)| name))
                     {
-                        sema.predicates.insert(regex.syntax(), (rule_name, &value[1..]));
+                        sema.predicates
+                            .insert(regex.syntax(), (rule_name, &value[1..]));
                     }
                 }
             }
@@ -363,7 +364,8 @@ impl<'a> GeneralCheck<'a> {
                         .current_rule
                         .and_then(|rule| rule.name(cst).map(|(name, _)| name))
                     {
-                        sema.actions.insert(regex.syntax(), (rule_name, &value[1..]));
+                        sema.actions
+                            .insert(regex.syntax(), (rule_name, &value[1..]));
                     }
                 }
             }

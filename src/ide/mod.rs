@@ -68,7 +68,7 @@ impl Cache {
             None
         }
     }
-    pub async fn goto_definition(&mut self, uri: &Url, pos: Position) -> Option<Range> {
+    pub async fn goto_definition(&mut self, uri: &Url, pos: Position) -> Option<Location> {
         let analyzer = self.analyzers.get_mut(uri).unwrap();
         assert!(!analyzer.handle.is_finished());
         analyzer
@@ -76,8 +76,8 @@ impl Cache {
             .send(Request::GotoDefinition(pos))
             .await
             .unwrap();
-        if let Some(Notification::GotoDefinition(hover)) = analyzer.noti_rx.recv().await {
-            hover
+        if let Some(Notification::GotoDefinition(location)) = analyzer.noti_rx.recv().await {
+            location
         } else {
             None
         }
@@ -126,7 +126,7 @@ enum Request {
 enum Notification {
     PublishDiagnostics(Vec<Diagnostic>),
     Hover(Option<(String, Range)>),
-    GotoDefinition(Option<Range>),
+    GotoDefinition(Option<Location>),
     References(Vec<Location>),
     Completion(Option<CompletionResponse>),
 }
@@ -137,13 +137,14 @@ async fn analyze(
     mut req: mpsc::Receiver<Request>,
     noti: mpsc::Sender<Notification>,
 ) {
-    let path = uri.as_str();
+    let path = uri.to_file_path().unwrap();
+    let parser_path = path.parent().unwrap().join("parser.rs");
     let mut diags = vec![];
 
     let (tokens, ranges) = tokenize(Token::lexer(&source), &mut diags);
     let cst = Parser::parse(&source, tokens, ranges, &mut diags);
     let sema = SemanticPass::run(&cst, &mut diags);
-    let file = SimpleFile::new(path, source.as_str());
+    let file = SimpleFile::new(path.to_str().unwrap(), source.as_str());
 
     while let Some(req) = req.recv().await {
         match req {
@@ -166,9 +167,8 @@ async fn analyze(
             }
             Request::GotoDefinition(pos) => {
                 let pos = compat::position_to_offset(&file, &pos);
-                let range = lookup_definition(&cst, &sema, pos)
-                    .map(|node| compat::span_to_range(&file, &cst.get_span(node).unwrap()));
-                noti.send(Notification::GotoDefinition(range))
+                let location = lookup_definition(&cst, &sema, pos, &uri, &file, &parser_path);
+                noti.send(Notification::GotoDefinition(location))
                     .await
                     .unwrap();
             }

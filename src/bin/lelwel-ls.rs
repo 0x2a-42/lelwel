@@ -94,11 +94,8 @@ impl LanguageServer for Backend {
     ) -> Result<Option<GotoDefinitionResponse>> {
         let uri = params.text_document_position_params.text_document.uri;
         let pos = params.text_document_position_params.position;
-        if let Some(range) = self.cache.write().await.goto_definition(&uri, pos).await {
-            Ok(Some(GotoDefinitionResponse::Scalar(Location {
-                uri,
-                range,
-            })))
+        if let Some(location) = self.cache.write().await.goto_definition(&uri, pos).await {
+            Ok(Some(GotoDefinitionResponse::Scalar(location)))
         } else {
             Ok(None)
         }
