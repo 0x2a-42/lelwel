@@ -7,32 +7,9 @@ pub type Diagnostic = codespan_reporting::diagnostic::Diagnostic<()>;
 
 macro_rules! err {
     [$span:expr, $($tk:literal),*] => {
-        {
-            let expected = [$($tk),*];
-            let mut msg = "invalid syntax, expected".to_string();
-            if expected.len() > 1 {
-                msg.push_str(" one of: ");
-            } else {
-                msg.push_str(": ");
-            }
-            let mut count = 0;
-            for e in expected {
-                count += 1;
-                let s = format!("{}", e);
-                let s = if s.starts_with('<') && s.ends_with('>') && s.len() > 2 {
-                    s
-                } else {
-                    format!("'{}'", s)
-                };
-                msg.push_str(&s);
-                if count < expected.len() {
-                    msg.push_str(", ");
-                }
-            }
-            Diagnostic::error()
-                .with_message(msg)
-                .with_labels(vec![Label::primary((), $span.start as usize..$span.end as usize)])
-        }
+        Diagnostic::error()
+            .with_message(syntax_error_message!($span, $($tk),*))
+            .with_labels(vec![Label::primary((), $span.start as usize..$span.end as usize)])
     }
 }
 
