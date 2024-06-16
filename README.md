@@ -36,7 +36,7 @@ By default the generated parser uses [Logos](https://github.com/maciejhirsz/logo
 * **Easy to Debug:** The generated parser is easy to understand and can be debugged with standard tools.
 
 #### Why LL(1) and not a more general CFL or PEG parser?
-* **Error Resillience:** It seems to be the case that LL parsers are better suited than LR parsers for generating meaningful syntax trees from incomplete source code.
+* **Error Resilience:** It seems to be the case that LL parsers are better suited than LR parsers for generating meaningful syntax trees from incomplete source code.
 * **Runtime Complexity:** More general parsers such as GLR/GLL or ALL(*) can have a runtime complexity of $O(n^3)$ or $O(n^4)$ respectively for certain grammars. With LL(1) parsers you are guaranteed to have linear runtime complexity as long as your semantic actions and predicates have a constant runtime complexity.
 * **Ambiguity:** The decision problem of whether an arbitrary context free grammar is ambiguous is undecidable. Warnings of a general parser generator therefore may contain false positives. In the worst case ambiguities may be found at runtime.
 The PEG formalism just defines ambiguity away, which may cause the parser to parse a different language than you think.
@@ -178,7 +178,7 @@ The following special regex patterns for rules are recognized.
   A rule that has direct left recursion.
   The rule must consist of a top level alternation.
   There may be multiple recursive and non-recursive branches.
-  A node in the syntax tree is only created if a recursive branch is taken.
+  A node in the syntax tree is not created if a non-recursive branch is taken that consists of a single rule reference.
 
   **Example:**
   ```antlr
@@ -234,7 +234,7 @@ The following special regex patterns for rules are recognized.
 - **Right Recursive Forwarding:**
 
   The rule must consist of a top level alternation with at least one right recursive branch and at least one branch that references a rule.
-  A node in the syntax tree is only created if a right recursive branch is taken.
+  A node in the syntax tree is not created if a non-recursive branch is taken that consists of a single rule reference.
 
   **Example:**
   ```antlr
