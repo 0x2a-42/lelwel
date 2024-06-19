@@ -107,9 +107,7 @@ pub fn tokenize(
     (tokens, ranges)
 }
 
-impl<'a> Parser<'a> {
-    #[allow(clippy::ptr_arg)]
-    fn build(&mut self, _rule: Rule, _node: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+impl<'a> PredicatesAndActions for Parser<'a> {
     fn predicate_param_list_1(&self) -> bool {
         self.peek(1) != Token::RPar
     }

@@ -186,7 +186,4 @@ pub fn tokenize(
 
 include!("./generated.rs");
 
-impl Parser<'_> {
-    #[allow(clippy::ptr_arg)]
-    fn build(&mut self, _rule: Rule, _node: NodeRef, _diags: &mut Vec<Diagnostic>) {}
-}
+impl PredicatesAndActions for Parser<'_> {}

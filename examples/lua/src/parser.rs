@@ -260,7 +260,7 @@ pub fn tokenize(
 
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 
-impl<'a> Parser<'a> {
+impl<'a> PredicatesAndActions for Parser<'a> {
     fn build(&mut self, rule: Rule, node: NodeRef, diags: &mut Vec<Diagnostic>) {
         match rule {
             Rule::Expstat => {

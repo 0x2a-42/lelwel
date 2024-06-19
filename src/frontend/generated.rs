@@ -814,3 +814,9 @@ impl<'a> Parser<'a> {
         self.close(m, Rule::Atomic, diags);
     }
 }
+
+trait PredicatesAndActions {
+    /// Called when a new syntax tree node is created
+    #[allow(clippy::ptr_arg)]
+    fn build(&mut self, _rule: Rule, _node: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+}

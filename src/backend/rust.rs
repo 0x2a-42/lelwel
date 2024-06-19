@@ -104,26 +104,59 @@ impl RustOutput {
 
         parser_file.write_all(template.as_bytes())?;
 
-        parser_file.write_all(
-            b"impl<'a> Parser<'a> {\
-            \n    fn build(&mut self, rule: Rule, node: NodeRef, diags: &mut Vec<Diagnostic>) {}\n",
-        )?;
+        Self::output_predicates_and_actions(&mut parser_file, sema, false)
+    }
+
+    fn output_predicates_and_actions(
+        output: &mut std::fs::File,
+        sema: &SemanticData,
+        is_trait: bool,
+    ) -> std::io::Result<()> {
+        output.write_all(if is_trait {
+            b"trait PredicatesAndActions {\
+            \n    /// Called when a new syntax tree node is created\
+            \n    #[allow(clippy::ptr_arg)]\
+            \n    fn build(&mut self, _rule: Rule, _node: NodeRef, _diags: &mut Vec<Diagnostic>) {}\n"
+        } else {
+            b"impl<'a> PredicatesAndActions for Parser<'a> {\n"
+        })?;
+        let mut predicates = HashSet::new();
         for (rule, num) in sema.predicates.values() {
-            parser_file.write_all(
+            if predicates.contains(&(rule, num)) {
+                continue;
+            }
+            predicates.insert((rule, num));
+            output.write_all(
                 format!(
-                    "    fn predicate_{rule}_{num}(&self) -> bool {{\n        todo!()\n    }}\n"
+                    "    fn predicate_{rule}_{num}(&self) -> bool{}\n",
+                    if is_trait {
+                        ";"
+                    } else {
+                        " {\n        todo!()\n    }"
+                    }
                 )
                 .as_bytes(),
             )?;
         }
+        let mut actions = HashSet::new();
         for (rule, num) in sema.actions.values() {
-            parser_file.write_all(
-                format!("    fn action_{rule}_{num}(&mut self, diags: &mut Vec<Diagnostic>) {{\n        todo!()\n    }}\n")
-                    .as_bytes(),
+            if actions.contains(&(rule, num)) {
+                continue;
+            }
+            actions.insert((rule, num));
+            output.write_all(
+                format!(
+                    "    fn action_{rule}_{num}(&mut self, diags: &mut Vec<Diagnostic>){}\n",
+                    if is_trait {
+                        ";"
+                    } else {
+                        " {\n        todo!()\n    }"
+                    }
+                )
+                .as_bytes(),
             )?;
         }
-        parser_file.write_all(b"}\n")?;
-        Ok(())
+        output.write_all(b"}\n")
     }
 
     fn output_node_kind_decl(
@@ -1005,6 +1038,8 @@ impl RustOutput {
         for rule in file.rule_decls(cst) {
             Self::output_rule(cst, sema, rule, output, &token_symbols)?;
         }
-        output.write_all(b"}\n")
+        output.write_all(b"}\n\n")?;
+
+        Self::output_predicates_and_actions(output, sema, true)
     }
 }

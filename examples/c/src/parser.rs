@@ -481,7 +481,6 @@ pub fn tokenize(
 
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 
-#[allow(clippy::ptr_arg)]
 impl<'a> Parser<'a> {
     fn check_missing_type_specifier(
         &self,
@@ -507,6 +506,69 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn is_type_name(&self, pos: usize) -> bool {
+        let range = &self.cst.ranges[pos];
+        let name = &self.cst.source[range.start..range.end];
+        for scopes in self.context.scopes.iter().rev() {
+            if let Some(is_type) = scopes.declared_names.get(name) {
+                return *is_type;
+            }
+        }
+        false
+    }
+
+    fn is_parenthesized_type(&self) -> bool {
+        let lookahead = self.peek(1);
+        if matches!(
+            lookahead,
+            Token::Alignas
+                | Token::Atomic
+                | Token::Attribute
+                | Token::Bool
+                | Token::Char
+                | Token::Complex
+                | Token::Const
+                | Token::Double
+                | Token::Enum
+                | Token::Float
+                | Token::Imaginary
+                | Token::Int
+                | Token::Int128
+                | Token::Long
+                | Token::Restrict
+                | Token::Short
+                | Token::Signed
+                | Token::Struct
+                | Token::TypeOf
+                | Token::Union
+                | Token::Unsigned
+                | Token::Void
+                | Token::Volatile
+        ) {
+            return true;
+        }
+        if lookahead == Token::Identifier {
+            self.cst.tokens[self.pos..]
+                .iter()
+                .enumerate()
+                .filter_map(|(i, tok)| {
+                    if !Self::is_skipped(*tok) {
+                        Some(i)
+                    } else {
+                        None
+                    }
+                })
+                .nth(1)
+                .map_or(false, |i| self.is_type_name(self.pos + i))
+        } else {
+            false
+        }
+    }
+
+}
+
+#[allow(clippy::ptr_arg)]
+impl<'a> PredicatesAndActions for Parser<'a> {
     fn build(&mut self, rule: Rule, node: NodeRef, diags: &mut Vec<Diagnostic>) {
         match rule {
             Rule::Declaration => {
@@ -580,65 +642,6 @@ impl<'a> Parser<'a> {
                 }
             }
             _ => {}
-        }
-    }
-
-    fn is_type_name(&self, pos: usize) -> bool {
-        let range = &self.cst.ranges[pos];
-        let name = &self.cst.source[range.start..range.end];
-        for scopes in self.context.scopes.iter().rev() {
-            if let Some(is_type) = scopes.declared_names.get(name) {
-                return *is_type;
-            }
-        }
-        false
-    }
-
-    fn is_parenthesized_type(&self) -> bool {
-        let lookahead = self.peek(1);
-        if matches!(
-            lookahead,
-            Token::Alignas
-                | Token::Atomic
-                | Token::Attribute
-                | Token::Bool
-                | Token::Char
-                | Token::Complex
-                | Token::Const
-                | Token::Double
-                | Token::Enum
-                | Token::Float
-                | Token::Imaginary
-                | Token::Int
-                | Token::Int128
-                | Token::Long
-                | Token::Restrict
-                | Token::Short
-                | Token::Signed
-                | Token::Struct
-                | Token::TypeOf
-                | Token::Union
-                | Token::Unsigned
-                | Token::Void
-                | Token::Volatile
-        ) {
-            return true;
-        }
-        if lookahead == Token::Identifier {
-            self.cst.tokens[self.pos..]
-                .iter()
-                .enumerate()
-                .filter_map(|(i, tok)| {
-                    if !Self::is_skipped(*tok) {
-                        Some(i)
-                    } else {
-                        None
-                    }
-                })
-                .nth(1)
-                .map_or(false, |i| self.is_type_name(self.pos + i))
-        } else {
-            false
         }
     }
 
