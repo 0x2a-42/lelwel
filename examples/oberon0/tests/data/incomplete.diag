@@ -1,0 +1,12 @@
+error: invalid syntax, expected one of: '+', '&', ',', 'DIV', 'DO', 'ELSE', 'ELSIF', 'END', '=', '>=', '>', '#', '<=', '<', 'MOD', '*', 'OF', 'OR', ']', ')', ';', '-', 'THEN', 'UNTIL'
+  ┌─ <input>:6:7
+  │
+6 │     x := 2 +
+  │       ^^
+
+error: invalid syntax, expected one of: <identifier>, '(', '~', <number>
+  ┌─ <input>:7:3
+  │
+7 │   END f;
+  │   ^^^
+

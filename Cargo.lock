@@ -377,6 +377,65 @@ dependencies = [
 ]
 
 [[package]]
+name = "lelwel-c"
+version = "0.0.0"
+dependencies = [
+ "codespan-reporting",
+ "lelwel",
+ "logos",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "lelwel-calc"
+version = "0.0.0"
+dependencies = [
+ "codespan-reporting",
+ "lelwel",
+ "logos",
+]
+
+[[package]]
+name = "lelwel-json"
+version = "0.0.0"
+dependencies = [
+ "codespan-reporting",
+ "lelwel",
+ "logos",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "lelwel-l"
+version = "0.0.0"
+dependencies = [
+ "codespan-reporting",
+ "lelwel",
+ "logos",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "lelwel-lua"
+version = "0.0.0"
+dependencies = [
+ "codespan-reporting",
+ "lelwel",
+ "logos",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "lelwel-oberon0"
+version = "0.0.0"
+dependencies = [
+ "codespan-reporting",
+ "lelwel",
+ "logos",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.155"
 source = "registry+https://github.com/rust-lang/crates.io-index"

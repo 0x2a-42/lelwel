@@ -1,0 +1,12 @@
+error: invalid syntax, expected one of: 'false', <int>, '(', <name>, 'true'
+  ┌─ <input>:3:3
+  │
+3 │   let x = 2 +
+  │   ^^^
+
+error: invalid syntax, expected one of: 'false', <int>, '(', <name>, 'true'
+  ┌─ <input>:4:1
+  │
+4 │ }
+  │ ^
+

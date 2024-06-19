@@ -19,4 +19,4 @@ jobs:
     - name: Build
       run: cargo build --features="cli","lsp" --verbose
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo test --verbose --workspace

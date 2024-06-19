@@ -564,7 +564,6 @@ impl<'a> Parser<'a> {
             false
         }
     }
-
 }
 
 #[allow(clippy::ptr_arg)]

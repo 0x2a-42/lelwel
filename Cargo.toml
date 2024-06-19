@@ -34,3 +34,13 @@ required-features = ["lsp"]
 
 [lib]
 crate-type = ["lib", "cdylib"]
+
+[workspace]
+members = [
+    "examples/c",
+    "examples/calc",
+    "examples/json",
+    "examples/l",
+    "examples/lua",
+    "examples/oberon0",
+]

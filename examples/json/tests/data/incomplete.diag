@@ -1,0 +1,18 @@
+error: invalid syntax, expected: ':'
+  ┌─ <input>:1:7
+  │
+1 │ { "a" [1 2, 3], "b": "c", }
+  │       ^
+
+error: invalid syntax, expected one of: ',', ']'
+  ┌─ <input>:1:10
+  │
+1 │ { "a" [1 2, 3], "b": "c", }
+  │          ^
+
+error: invalid syntax, expected: <string>
+  ┌─ <input>:1:27
+  │
+1 │ { "a" [1 2, 3], "b": "c", }
+  │                           ^
+

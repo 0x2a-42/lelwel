@@ -1,0 +1,12 @@
+error: invalid syntax, expected one of: '...', 'false', 'function', '#', '{', '(', <string>, '-', <name>, 'nil', 'not', <numeral>, '~', 'true'
+  ┌─ <input>:3:3
+  │
+3 │   local x = 2 +
+  │   ^^^^^
+
+error: invalid syntax, expected one of: '...', 'false', 'function', '#', '{', '(', <string>, '-', <name>, 'nil', 'not', <numeral>, '~', 'true'
+  ┌─ <input>:4:1
+  │
+4 │ end
+  │ ^^^
+
