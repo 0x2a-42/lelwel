@@ -557,7 +557,6 @@ impl RustOutput {
             return Ok(());
         }
         let name = rule.name(cst).unwrap().0;
-        let regex = rule.regex(cst).unwrap();
         let pattern = sema.patterns.get(&rule);
         let is_start = sema.start.unwrap() == rule;
         let has_rule_binding = sema.has_rule_binding.contains(&rule);
@@ -573,35 +572,9 @@ impl RustOutput {
             )
             .as_bytes(),
         )?;
-        match pattern {
-            None => Self::output_normal_rule(
-                cst,
-                sema,
-                output,
-                token_symbols,
-                has_rule_binding,
-                name,
-                regex,
-                is_start,
-            )?,
-            Some(Pattern::LeftRecursive(branches)) => Self::output_left_recursive_rule(
-                cst,
-                sema,
-                output,
-                token_symbols,
-                has_rule_binding,
-                name,
-                regex,
-                branches,
-            )?,
-            Some(Pattern::OperatorPrecedence(branches)) => {
-                Self::output_operator_precedence_rule(cst, sema, output, name, regex, branches)?
-            }
-            Some(Pattern::UnconditionalForwarding) => {
-                Self::output_regex(cst, sema, regex, output, 2, token_symbols, false, name)?;
-            }
-            Some(Pattern::ConditionalForwarding) => {
-                Self::output_conditional_forwarding_rule(
+        if let Some(regex) = rule.regex(cst) {
+            match pattern {
+                None => Self::output_normal_rule(
                     cst,
                     sema,
                     output,
@@ -609,21 +582,9 @@ impl RustOutput {
                     has_rule_binding,
                     name,
                     regex,
-                )?;
-            }
-            Some(Pattern::MaybeEmpty) => {
-                Self::output_maybe_empty_rule(
-                    cst,
-                    sema,
-                    output,
-                    token_symbols,
-                    has_rule_binding,
-                    name,
-                    regex,
-                )?;
-            }
-            Some(Pattern::RightRecursiveForwarding(branches)) => {
-                Self::output_right_recursice_forwarding_rule(
+                    is_start,
+                )?,
+                Some(Pattern::LeftRecursive(branches)) => Self::output_left_recursive_rule(
                     cst,
                     sema,
                     output,
@@ -632,7 +593,47 @@ impl RustOutput {
                     name,
                     regex,
                     branches,
-                )?;
+                )?,
+                Some(Pattern::OperatorPrecedence(branches)) => {
+                    Self::output_operator_precedence_rule(cst, sema, output, name, regex, branches)?
+                }
+                Some(Pattern::UnconditionalForwarding) => {
+                    Self::output_regex(cst, sema, regex, output, 2, token_symbols, false, name)?;
+                }
+                Some(Pattern::ConditionalForwarding) => {
+                    Self::output_conditional_forwarding_rule(
+                        cst,
+                        sema,
+                        output,
+                        token_symbols,
+                        has_rule_binding,
+                        name,
+                        regex,
+                    )?;
+                }
+                Some(Pattern::MaybeEmpty) => {
+                    Self::output_maybe_empty_rule(
+                        cst,
+                        sema,
+                        output,
+                        token_symbols,
+                        has_rule_binding,
+                        name,
+                        regex,
+                    )?;
+                }
+                Some(Pattern::RightRecursiveForwarding(branches)) => {
+                    Self::output_right_recursice_forwarding_rule(
+                        cst,
+                        sema,
+                        output,
+                        token_symbols,
+                        has_rule_binding,
+                        name,
+                        regex,
+                        branches,
+                    )?;
+                }
             }
         }
         output.write_all(b"    }\n")?;
