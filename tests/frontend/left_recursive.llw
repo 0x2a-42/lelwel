@@ -1,0 +1,11 @@
+token A B C;
+start a;
+
+a: b;
+b:
+  b A
+| b A
+| b C
+| B
+| B
+;

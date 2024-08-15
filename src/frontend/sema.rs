@@ -1019,15 +1019,22 @@ impl<'a> LL1Validator {
                         true,
                     );
                 }
-                let is_exit_branch =
-                    |op: &Regex| !Self::has_predicate(cst, *op) && !left_recursive.contains(op);
+                let non_recursive_branches =
+                    || alt.operands(cst).filter(|op| !left_recursive.contains(op));
 
-                for (i, op) in alt.operands(cst).enumerate() {
-                    if !is_exit_branch(&op) {
+                for (i, op) in non_recursive_branches().enumerate() {
+                    if Self::has_predicate(cst, op) {
                         continue;
                     }
-                    let operands = alt.operands(cst).filter(|op| !left_recursive.contains(op));
-                    Self::check_intersection(cst, sema, diags, op, operands, i, false);
+                    Self::check_intersection(
+                        cst,
+                        sema,
+                        diags,
+                        op,
+                        non_recursive_branches(),
+                        i,
+                        false,
+                    );
                 }
                 for op in alt.operands(cst) {
                     Self::check_regex(cst, sema, diags, op, rule, &[]);

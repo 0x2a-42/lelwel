@@ -83,6 +83,17 @@ fn json() {
 
 #[test]
 #[rustfmt::skip]
+fn left_recursive() {
+    let diags = gen_diags("tests/frontend/left_recursive.llw");
+    let mut lines = diags.lines();
+
+    assert_eq!(lines.next().unwrap(), "tests/frontend/left_recursive.llw:6:5: error[E012]: LL(1) conflict in left recursive rule");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/left_recursive.llw:9:3: error[E011]: LL(1) conflict in alternation");
+    assert_eq!(lines.next(), None);
+}
+
+#[test]
+#[rustfmt::skip]
 fn lelwel() {
     let diags = gen_diags("tests/frontend/lelwel.llw");
     let mut lines = diags.lines();
