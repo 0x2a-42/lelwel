@@ -82,7 +82,7 @@ pub enum Token {
     Comment,
     #[regex(r"///[^\n]*\n")]
     DocComment,
-    #[regex(r"[ \t\n\f]+")]
+    #[regex(r"[ \t\r\n\f]+")]
     Whitespace,
     #[token("token")]
     Token,
