@@ -99,11 +99,11 @@ expr_paren: '(' expr ')';
 1. Add the following to your `Cargo.toml` and  `build.rs` files.
    ```toml
    [dependencies]
-   logos = "0.14.0"
+   logos = "0.14.2"
    codespan-reporting = "0.11.1"
 
    [build-dependencies]
-   lelwel = "0.6.2"
+   lelwel = "0.6.3"
    ```
    ```rust
    fn main() {

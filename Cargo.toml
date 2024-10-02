@@ -1,6 +1,6 @@
 [package]
 name = "lelwel"
-version = "0.6.2"
+version = "0.6.3"
 description = "Resilient LL(1) parser generator"
 repository = "https://github.com/0x2a-42/lelwel"
 readme = "README.md"
