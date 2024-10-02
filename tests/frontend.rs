@@ -33,7 +33,7 @@ fn gen_diags(input: &str) -> String {
 #[test]
 #[rustfmt::skip]
 fn calc() {
-    let diags = gen_diags("tests/frontend/calc.llw");
+    let diags = gen_diags("examples/calc/src/calc.llw");
     let mut lines = diags.lines();
 
     assert_eq!(lines.next(), None);
@@ -42,7 +42,7 @@ fn calc() {
 #[test]
 #[rustfmt::skip]
 fn c() {
-    let diags = gen_diags("tests/frontend/c.llw");
+    let diags = gen_diags("examples/c/src/c.llw");
     let mut lines = diags.lines();
 
     assert_eq!(lines.next(), None);
@@ -75,7 +75,7 @@ fn invalid_token() {
 #[test]
 #[rustfmt::skip]
 fn json() {
-    let diags = gen_diags("tests/frontend/json.llw");
+    let diags = gen_diags("examples/json/src/json.llw");
     let mut lines = diags.lines();
 
     assert_eq!(lines.next(), None);
@@ -95,7 +95,7 @@ fn left_recursive() {
 #[test]
 #[rustfmt::skip]
 fn lelwel() {
-    let diags = gen_diags("tests/frontend/lelwel.llw");
+    let diags = gen_diags("src/frontend/lelwel.llw");
     let mut lines = diags.lines();
 
     assert_eq!(lines.next(), None);
@@ -120,7 +120,7 @@ fn ll1_conflict() {
 #[test]
 #[rustfmt::skip]
 fn l() {
-    let diags = gen_diags("tests/frontend/l.llw");
+    let diags = gen_diags("examples/l/src/l.llw");
     let mut lines = diags.lines();
 
     assert_eq!(lines.next(), None);
@@ -140,7 +140,7 @@ fn lowercase_token() {
 #[test]
 #[rustfmt::skip]
 fn lua() {
-    let diags = gen_diags("tests/frontend/lua.llw");
+    let diags = gen_diags("examples/lua/src/lua.llw");
     let mut lines = diags.lines();
 
     assert_eq!(lines.next(), None);
@@ -149,7 +149,7 @@ fn lua() {
 #[test]
 #[rustfmt::skip]
 fn oberon0() {
-    let diags = gen_diags("tests/frontend/oberon0.llw");
+    let diags = gen_diags("examples/oberon0/src/oberon0.llw");
     let mut lines = diags.lines();
 
     assert_eq!(lines.next(), None);

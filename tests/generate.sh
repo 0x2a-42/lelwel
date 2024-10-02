@@ -40,6 +40,7 @@ fn gen_diags(input: &str) -> String {
 EOF
 
 for path in tests/frontend/*.llw; do
+  path="$(realpath --relative-to=. "$path")"
   file=${path##*/}
   cat << EOF >> $output
 
