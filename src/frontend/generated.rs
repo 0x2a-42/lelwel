@@ -253,21 +253,18 @@ pub struct Parser<'a> {
     pos: usize,
     current: Token,
     error_cooldown: bool,
+    last_error_span: Span,
     max_offset: usize,
     #[allow(dead_code)]
     context: Context<'a>,
 }
 #[allow(clippy::while_let_loop, dead_code)]
 impl<'a> Parser<'a> {
-    fn error(&self, diags: &mut Vec<Diagnostic>, diag: Diagnostic) {
-        if self.error_cooldown {
+    fn error(&mut self, diags: &mut Vec<Diagnostic>, diag: Diagnostic) {
+        if self.error_cooldown || self.last_error_span == self.span() {
             return;
         }
-        if let Some(last) = diags.last() {
-            if last.labels.first().unwrap().range == diag.labels.first().unwrap().range {
-                return;
-            }
-        }
+        self.last_error_span = self.span();
         diags.push(diag);
     }
     fn advance(&mut self, error: bool) {
@@ -359,6 +356,7 @@ impl<'a> Parser<'a> {
             cst: Cst::new(source, tokens, ranges),
             pos: 0,
             error_cooldown: false,
+            last_error_span: Span::default(),
             max_offset,
             context: Context::default(),
         };
