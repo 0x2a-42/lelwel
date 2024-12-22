@@ -19,7 +19,7 @@
 
 The parser creates a homogeneous, lossless, concrete syntax tree (CST) that can be used to construct an abstract syntax tree (AST).
 Certain patterns are detected to avoid CST nodes for rules that only forward to other rules.
-Special node rename, elision, marker, and creation operators allow fine grained control over how the CST is built for certain parses.
+Special node rename, elision, marker, and creation operators allow fine-grained control over how the CST is built for certain parses.
 
 The error recovery and tree construction is inspired by Alex Kladov's (matklad) [Resilient LL Parsing Tutorial](https://matklad.github.io/2023/05/21/resilient-ll-parsing-tutorial.html).
 Lelwel uses a (to my knowledge) novel heuristic to automatically calculate the recovery sets, by using the follow sets of the dominators in the directed graph induced by the grammar.
