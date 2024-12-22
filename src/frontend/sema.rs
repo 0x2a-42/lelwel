@@ -370,6 +370,11 @@ impl<'a> GeneralCheck<'a> {
                             self.check_regex(cst, rule, regex, diags, sema, in_alt, in_loop);
                         in_alt = false;
                         in_loop = false;
+                        if (acc == RuleNodeElision::Unconditional || rule.is_elided(cst))
+                            && matches!(regex, Regex::NodeElision(_))
+                        {
+                            diags.push(Diagnostic::redundant_elision(&regex.span(cst)));
+                        }
                         acc.concat(elision)
                     })
             }

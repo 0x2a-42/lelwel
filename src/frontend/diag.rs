@@ -31,6 +31,7 @@ pub const CREATE_RULE_NODE_LEFT_REC: &str = "E025";
 pub const UNUSED_RULE: &str = "W001";
 pub const UNUSED_TOKEN: &str = "W002";
 pub const UNUSED_OPEN_NODE: &str = "W003";
+pub const REDUNDANT_ELISION: &str = "W004";
 
 pub trait LanguageErrors {
     fn invalid_binding_pos(span: &Span) -> Self;
@@ -61,6 +62,7 @@ pub trait LanguageErrors {
     fn invalid_create_node(span: &Span, open_span: &Span) -> Self;
     fn create_rule_node_left_rec(span: &Span) -> Self;
     fn unused_node_marker(span: &Span) -> Self;
+    fn redundant_elision(span: &Span) -> Self;
 }
 
 impl LanguageErrors for Diagnostic {
@@ -330,6 +332,13 @@ impl LanguageErrors for Diagnostic {
         Diagnostic::warning()
             .with_code(UNUSED_OPEN_NODE)
             .with_message("unused node marker")
+            .with_labels(vec![Label::primary((), span.clone())])
+    }
+
+    fn redundant_elision(span: &Span) -> Self {
+        Diagnostic::warning()
+            .with_code(REDUNDANT_ELISION)
+            .with_message("node elision is redundant")
             .with_labels(vec![Label::primary((), span.clone())])
     }
 }
