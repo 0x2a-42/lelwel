@@ -296,7 +296,7 @@ impl DebugPrinter {
             Regex::NodeRename(rename) => {
                 let value = rename.value(cst).map_or("", |(val, _)| val);
                 println!(
-                    "NodeRename{} {} {} {} {}",
+                    "NodeRename {} {} {} {} {}",
                     member!(value),
                     set!(first),
                     set!(follow),
