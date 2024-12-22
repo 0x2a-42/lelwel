@@ -60,6 +60,16 @@ fn empty() {
 
 #[test]
 #[rustfmt::skip]
+fn invalid_node_create() {
+    let diags = gen_diags("tests/frontend/invalid_node_create.llw");
+    let mut lines = diags.lines();
+
+    assert_eq!(lines.next().unwrap(), "tests/frontend/invalid_node_create.llw:6:5: error[E024]: node marker is not visited before node creation");
+    assert_eq!(lines.next(), None);
+}
+
+#[test]
+#[rustfmt::skip]
 fn invalid_token() {
     let diags = gen_diags("tests/frontend/invalid_token.llw");
     let mut lines = diags.lines();
@@ -78,6 +88,27 @@ fn json() {
     let diags = gen_diags("examples/json/src/json.llw");
     let mut lines = diags.lines();
 
+    assert_eq!(lines.next(), None);
+}
+
+#[test]
+#[rustfmt::skip]
+fn left_rec_elision() {
+    let diags = gen_diags("tests/frontend/left_rec_elision.llw");
+    let mut lines = diags.lines();
+
+    assert_eq!(lines.next().unwrap(), "tests/frontend/left_rec_elision.llw:6:3: error[E021]: left recursive rule branch cannot be elided");
+    assert_eq!(lines.next(), None);
+}
+
+#[test]
+#[rustfmt::skip]
+fn left_rec_node_create() {
+    let diags = gen_diags("tests/frontend/left_rec_node_create.llw");
+    let mut lines = diags.lines();
+
+    assert_eq!(lines.next().unwrap(), "tests/frontend/left_rec_node_create.llw:6:9: error[E025]: node creation without index is not allowed in left recursive rules");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/left_rec_node_create.llw:7:5: error[E025]: node creation without index is not allowed in left recursive rules");
     assert_eq!(lines.next(), None);
 }
 
@@ -148,6 +179,25 @@ fn lua() {
 
 #[test]
 #[rustfmt::skip]
+fn mixing_assoc() {
+    let diags = gen_diags("tests/frontend/mixing_assoc.llw");
+    let mut lines = diags.lines();
+
+    assert_eq!(lines.next().unwrap(), "tests/frontend/mixing_assoc.llw:7:8: error[E020]: mixed associativity in infix operator branch");
+    assert_eq!(lines.next(), None);
+}
+
+#[test]
+#[rustfmt::skip]
+fn node_rename() {
+    let diags = gen_diags("tests/frontend/node_rename.llw");
+    let mut lines = diags.lines();
+
+    assert_eq!(lines.next(), None);
+}
+
+#[test]
+#[rustfmt::skip]
 fn oberon0() {
     let diags = gen_diags("examples/oberon0/src/oberon0.llw");
     let mut lines = diags.lines();
@@ -193,6 +243,30 @@ fn redefinition() {
 
 #[test]
 #[rustfmt::skip]
+fn redef_node_marker() {
+    let diags = gen_diags("tests/frontend/redef_node_marker.llw");
+    let mut lines = diags.lines();
+
+    assert_eq!(lines.next().unwrap(), "tests/frontend/redef_node_marker.llw:6:3: error[E022]: node marker was already defined");
+    assert_eq!(lines.next(), None);
+}
+
+#[test]
+#[rustfmt::skip]
+fn redundant_elision() {
+    let diags = gen_diags("tests/frontend/redundant_elision.llw");
+    let mut lines = diags.lines();
+
+    assert_eq!(lines.next().unwrap(), "tests/frontend/redundant_elision.llw:4:11: warning[W004]: node elision is redundant");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/redundant_elision.llw:5:9: warning[W004]: node elision is redundant");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/redundant_elision.llw:5:11: warning[W004]: node elision is redundant");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/redundant_elision.llw:5:21: warning[W004]: node elision is redundant");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/redundant_elision.llw:1:13: warning[W002]: unused token");
+    assert_eq!(lines.next(), None);
+}
+
+#[test]
+#[rustfmt::skip]
 fn syntax_error() {
     let diags = gen_diags("tests/frontend/syntax_error.llw");
     let mut lines = diags.lines();
@@ -219,6 +293,16 @@ fn undefined() {
 
 #[test]
 #[rustfmt::skip]
+fn undef_node_create() {
+    let diags = gen_diags("tests/frontend/undef_node_create.llw");
+    let mut lines = diags.lines();
+
+    assert_eq!(lines.next().unwrap(), "tests/frontend/undef_node_create.llw:4:9: error[E023]: node creation with undefined node marker");
+    assert_eq!(lines.next(), None);
+}
+
+#[test]
+#[rustfmt::skip]
 fn unused_element() {
     let diags = gen_diags("tests/frontend/unused_element.llw");
     let mut lines = diags.lines();
@@ -228,6 +312,16 @@ fn unused_element() {
     assert_eq!(lines.next().unwrap(), "tests/frontend/unused_element.llw:23:1: warning[W001]: unused rule");
     assert_eq!(lines.next().unwrap(), "tests/frontend/unused_element.llw:1:7: warning[W002]: unused token");
     assert_eq!(lines.next().unwrap(), "tests/frontend/unused_element.llw:1:11: warning[W002]: unused token");
+    assert_eq!(lines.next(), None);
+}
+
+#[test]
+#[rustfmt::skip]
+fn unused_node_marker() {
+    let diags = gen_diags("tests/frontend/unused_node_marker.llw");
+    let mut lines = diags.lines();
+
+    assert_eq!(lines.next().unwrap(), "tests/frontend/unused_node_marker.llw:4:7: warning[W003]: unused node marker");
     assert_eq!(lines.next(), None);
 }
 

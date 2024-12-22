@@ -1,0 +1,7 @@
+token A B;
+start test;
+
+test:
+  <1 A
+| B 1>
+;

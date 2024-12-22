@@ -1,0 +1,8 @@
+token A B;
+start test;
+
+test: foo;
+foo:
+  foo A ^
+| B ^
+;

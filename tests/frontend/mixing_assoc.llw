@@ -1,0 +1,9 @@
+token Num Plus='+' Eq='=';
+right '=';
+start test;
+
+test: expr;
+expr:
+  expr ('+' | '=') expr
+| Num
+;

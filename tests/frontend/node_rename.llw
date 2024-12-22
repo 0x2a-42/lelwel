@@ -1,0 +1,7 @@
+token A B;
+start test;
+
+test:
+  @foo A
+| B @bar
+;
