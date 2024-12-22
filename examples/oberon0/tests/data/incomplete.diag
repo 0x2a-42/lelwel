@@ -1,4 +1,4 @@
-error: invalid syntax, expected one of: '+', '&', ',', 'DIV', 'DO', 'ELSE', 'ELSIF', 'END', '=', '>=', '>', '#', '<=', '<', 'MOD', '*', 'OF', 'OR', ']', ')', ';', '-', 'THEN', 'UNTIL'
+error: invalid syntax, expected one of: '+', '&', ',', 'DIV', 'DO', '.', 'ELSE', 'ELSIF', 'END', '=', '>=', '>', '#', '[', '<=', '<', 'MOD', '*', 'OF', 'OR', ']', ')', ';', '-', 'THEN', 'UNTIL'
   ┌─ <input>:6:7
   │
 6 │     x := 2 +

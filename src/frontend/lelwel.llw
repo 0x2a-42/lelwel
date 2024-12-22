@@ -2,18 +2,18 @@
 token Token='token' Start='start' Right='right' Skip='skip';
 /// Punctuator
 token Colon=':' Semi=';' Equal='=' LPar='(' RPar=')' LBrak='[' RBrak=']'
-      Or='|' Star='*' Plus='+';
+      Or='|' Star='*' Plus='+' Hat='^';
 /// Identifier for rules and tokens
 token Id='<identifier>' Str='<string literal>';
-token Predicate='<semantic predicate>' Action='<semantic action>' Binding='<binding>';
-token OpenNode='<open node mark>' CloseNode='<close node mark>';
+token Predicate='<semantic predicate>' Action='<semantic action>' NodeRename='<node rename>';
+token NodeMarker='<node marker>' NodeCreation='<node creation>';
 token Comment DocComment Whitespace;
 
 start file;
 skip Comment DocComment Whitespace;
 
 file: decl*;
-decl:
+decl^:
   token_list
 | rule_decl
 | start_decl
@@ -25,16 +25,16 @@ right_decl: 'right' (Id | Str)+ ';';
 skip_decl: 'skip' (Id | Str)+ ';';
 token_list: 'token' token_decl+ ';';
 token_decl: Id ['=' Str];
-rule_decl: Id ':' [regex] ';';
+rule_decl: Id ['^'] ':' [regex] ';';
 
-regex: alternation;
-alternation: concat ('|' concat)*;
-concat: postfix postfix*;
+regex^: alternation;
+alternation^: concat [('|' concat)+ >];
+concat^: postfix [postfix+ >];
 postfix:
   postfix ('*' | '+')
-| atomic
-| paren
-| optional
+| atomic ^
+| paren ^
+| optional ^
 ;
 paren: '(' regex ')';
 optional: '[' regex ']';
@@ -43,7 +43,8 @@ atomic:
 | Str
 | Predicate
 | Action
-| Binding
-| OpenNode
-| CloseNode
+| NodeRename
+| NodeMarker
+| NodeCreation
+| '^'
 ;

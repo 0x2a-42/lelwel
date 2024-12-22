@@ -15,22 +15,22 @@ skip Comment Whitespace;
 start module;
 
 selector:
-  ('.' Ident | '[' expression ']')*
+  ('.' Ident | '[' expression ']')+
 ;
 factor:
-  Ident selector | Number | '(' expression ')' | '~' factor
+  Ident [selector] | Number | '(' expression ')' | '~' factor
 ;
-term:
-  factor (('*' | 'DIV' | 'MOD' | '&') factor)*
+term^:
+  factor [(('*' | 'DIV' | 'MOD' | '&') factor)+ >]
 ;
 simple_expression:
   ['+' | '-'] term (('+' | '-' | 'OR') term)*
 ;
-expression:
-  simple_expression [('=' | '#' | '<' | '<=' | '>' | '>=') simple_expression]
+expression^:
+  simple_expression [('=' | '#' | '<' | '<=' | '>' | '>=') simple_expression >]
 ;
 assignment_or_procedure_call:
-  Ident selector (':=' expression @assignment | [actual_parameters] @procedure_call)
+  Ident [selector] (':=' expression @assignment | [actual_parameters] @procedure_call)
 ;
 actual_parameters: '(' [expression (',' expression)*] ')';
 if_statement:
@@ -44,7 +44,7 @@ while_statement:
 repeat_statement:
   'REPEAT' statement_sequence 'UNTIL' expression
 ;
-statement:
+statement^:
   [assignment_or_procedure_call | if_statement | while_statement | repeat_statement]
 ;
 statement_sequence: statement (';' statement)*;

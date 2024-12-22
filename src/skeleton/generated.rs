@@ -58,7 +58,7 @@ pub struct CstChildren<'a> {{
     offset: CstIndex,
 }}
 #[allow(clippy::unnecessary_cast)]
-impl<'a> Iterator for CstChildren<'a> {{
+impl Iterator for CstChildren<'_> {{
     type Item = NodeRef;
 
     fn next(&mut self) -> Option<Self::Item> {{

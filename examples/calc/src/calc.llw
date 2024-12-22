@@ -1,18 +1,18 @@
 token Num='<number>';
-token Plus='+' Minus='-' Star='*' Slash='/';
+token Plus='+' Minus='-' Star='*' Slash='/' Pow='^';
 token LPar='(' RPar=')';
 token Whitespace;
 
 skip Whitespace;
-
+right '^';
 start calc;
 
-calc: expr;
+calc^: expr;
 expr:
-  expr ('*' | '/') expr
-| expr ('+' | '-') expr
-| atomic
+  expr '^' expr @binary_expr
+| expr ('*' | '/') expr @binary_expr
+| expr ('+' | '-') expr @binary_expr
+| ('-' | '+') expr @unary_expr
+| Num @literal_expr
+| '(' expr ')' @paren_expr
 ;
-atomic: literal | paren;
-literal: Num;
-paren: '(' expr ')';

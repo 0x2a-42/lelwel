@@ -86,11 +86,10 @@ pub fn hover(cst: &Cst, sema: &SemanticData, pos: usize) -> Option<(String, Span
             .predict_sets
             .get(&regex.syntax())
             .map_or("{}".to_string(), |s| format!("{s:?}"));
-        let pattern = sema
-            .patterns
-            .get(&rule)
-            .map_or("None".to_string(), |pattern| format!("{pattern:?}"));
-        Some((format!("**Pattern:** {pattern}\n**First:** {first}\n**Follow:** {follow}\n**Predict:** {predict}\n"), span))
+        Some((
+            format!("**First:** {first}\n**Follow:** {follow}\n**Predict:** {predict}\n"),
+            span,
+        ))
     } else {
         None
     }

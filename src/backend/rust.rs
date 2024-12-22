@@ -39,7 +39,7 @@ trait Generator {
     fn error(&self, level: usize, token_symbols: &HashMap<&str, &str>) -> String;
 }
 
-impl<'a> Generator for std::collections::BTreeSet<TokenName<'a>> {
+impl Generator for std::collections::BTreeSet<TokenName<'_>> {
     fn pattern(&self, level: usize) -> String {
         let symbols: Vec<_> = self.iter().map(|s| format!("Token::{}", s.0)).collect();
         symbols.join(&format!("\n{}| ", "    ".repeat(level)))
@@ -161,12 +161,12 @@ impl RustOutput {
 
     fn output_node_kind_decl(
         output: &mut std::fs::File,
-        has_rule_binding: bool,
+        has_rule_rename: bool,
         name: &str,
         level: usize,
         is_decl: bool,
     ) -> std::io::Result<()> {
-        if has_rule_binding {
+        if has_rule_rename {
             output.write_all(
                 format!(
                     "{}node_kind = Rule::{};\n",
@@ -182,22 +182,23 @@ impl RustOutput {
 
     fn output_cst_close(
         output: &mut std::fs::File,
-        has_rule_binding: bool,
+        has_rule_rename: bool,
         name: &str,
         level: usize,
         assign_lhs: bool,
+        parser_name: &str,
     ) -> std::io::Result<()> {
         let lhs = if assign_lhs { "lhs = " } else { "" };
-        if has_rule_binding {
+        if has_rule_rename {
             output.write_all(
-                format!("{lhs}self.close(m, node_kind, diags);\n")
+                format!("{lhs}{parser_name}.close(m, node_kind, diags);\n")
                     .indent(level)
                     .as_bytes(),
             )
         } else {
             output.write_all(
                 format!(
-                    "{lhs}self.close(m, Rule::{}, diags);\n",
+                    "{lhs}{parser_name}.close(m, Rule::{}, diags);\n",
                     Self::snake_to_pascal_case(name),
                 )
                 .indent(level)
@@ -212,17 +213,41 @@ impl RustOutput {
         sema: &SemanticData,
         output: &mut std::fs::File,
         token_symbols: &HashMap<&str, &str>,
-        has_rule_binding: bool,
+        has_rule_rename: bool,
+        has_rule_creation: bool,
         name: &str,
         regex: Regex,
         is_start: bool,
+        elision: RuleNodeElision,
     ) -> std::io::Result<()> {
-        output.write_all(b"        let m = self.cst.open();\n")?;
-        Self::output_node_kind_decl(output, has_rule_binding, name, 2, true)?;
+        match elision {
+            RuleNodeElision::None => output.write_all(b"        let m = self.cst.open();\n")?,
+            RuleNodeElision::Conditional => output.write_all(
+                b"        let start = self.cst.mark();\
+                \n        let mut elide = false;\n",
+            )?,
+            RuleNodeElision::Unconditional => {
+                if has_rule_creation {
+                    output.write_all(b"        let start = self.cst.mark();\n")?;
+                }
+            }
+        }
+        Self::output_node_kind_decl(output, has_rule_rename, name, 2, true)?;
         if is_start {
             output.write_all(b"        self.init_skip();\n")?;
         }
-        Self::output_regex(cst, sema, regex, output, 2, token_symbols, false, name)?;
+        Self::output_regex(
+            cst,
+            sema,
+            regex,
+            output,
+            2,
+            token_symbols,
+            false,
+            name,
+            elision,
+            "self",
+        )?;
         if is_start {
             output.write_all(
                 b"        if self.current != Token::EOF {\
@@ -239,7 +264,20 @@ impl RustOutput {
                 \n        }\n",
             )?;
         }
-        Self::output_cst_close(output, has_rule_binding, name, 2, false)
+        match elision {
+            RuleNodeElision::None => {
+                Self::output_cst_close(output, has_rule_rename, name, 2, false, "self")
+            }
+            RuleNodeElision::Conditional => {
+                output.write_all(
+                    b"        if !elide {\
+                                 \n            let m = self.cst.open_before(start);\n",
+                )?;
+                Self::output_cst_close(output, has_rule_rename, name, 3, false, "self")?;
+                output.write_all(b"        }\n")
+            }
+            RuleNodeElision::Unconditional => Ok(()),
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -248,301 +286,201 @@ impl RustOutput {
         sema: &SemanticData,
         output: &mut std::fs::File,
         token_symbols: &HashMap<&str, &str>,
-        has_rule_binding: bool,
+        has_rule_rename: bool,
         name: &str,
         regex: Regex,
-        branches: &[Regex],
+        recursive: &RecursiveBranches,
     ) -> std::io::Result<()> {
         let ops = if let Regex::Alternation(alt) = regex {
             alt.operands(cst)
         } else {
             unreachable!();
         };
-        Self::output_node_kind_decl(output, has_rule_binding, name, 2, true)?;
         output.write_all(
-            b"        let mut lhs = self.cst.mark();\
-            \n        match self.current {\n",
+            b"        fn rec(\
+            \n            parser: &mut Parser,\
+            \n            diags: &mut Vec<Diagnostic>,\
+            \n            min_bp: usize,\
+            \n            mut lhs: MarkClosed,\
+            \n        ) {\n",
         )?;
-        for op in ops {
-            if branches.contains(&op) {
+
+        // right recursive or non-recursive branches
+        Self::output_node_kind_decl(output, has_rule_rename, name, 3, true)?;
+        output.write_all(b"            match parser.current {\n")?;
+        for alt_op in ops {
+            let branch = recursive.get_branch(alt_op);
+            if !matches!(branch, None | Some(Recursion::Right(..))) {
                 continue;
             }
             output.write_all(
                 format!(
                     "{}{} => {{\n",
-                    sema.predict_sets[&op.syntax()].pattern(0),
-                    Self::get_predicate(cst, name, op)
+                    sema.predict_sets[&alt_op.syntax()].pattern(0),
+                    Self::get_predicate(cst, name, alt_op, "parser")
                 )
-                .indent(3)
+                .indent(4)
                 .as_bytes(),
             )?;
-            let is_forwarding = if let Regex::Name(name) = op {
-                sema.decl_bindings
-                    .get(&name.syntax())
-                    .map_or(false, |n| RuleDecl::cast(cst, *n).is_some())
-            } else {
-                false
-            };
-            if is_forwarding {
-                Self::output_regex(cst, sema, op, output, 5, token_symbols, false, name)?;
-            } else {
-                output.write_all(b"                    let m = self.cst.open();\n")?;
-                Self::output_regex(cst, sema, op, output, 5, token_symbols, false, name)?;
-                Self::output_cst_close(output, has_rule_binding, name, 5, false)?;
+
+            let elision = *sema.elision.get(&alt_op.syntax()).unwrap();
+            if elision != RuleNodeElision::Unconditional {
+                output.write_all(b"                    let m = parser.cst.open();\n")?;
             }
-            output.write_all("}\n".indent(3).as_bytes())?;
+            if let Some(Recursion::Right(_, index)) = branch {
+                let Regex::Concat(concat) = alt_op else {
+                    unreachable!()
+                };
+                for (i, concat_op) in concat.operands(cst).enumerate() {
+                    if i == index {
+                        let binding_power = recursive.binding_power(alt_op).0;
+                        output.write_all(
+                            format!(
+                                "let lhs = parser.cst.mark();\
+                               \nrec(parser, diags, {binding_power}, lhs);\n"
+                            )
+                            .indent(5)
+                            .as_bytes(),
+                        )?;
+                    } else {
+                        Self::output_regex(
+                            cst,
+                            sema,
+                            concat_op,
+                            output,
+                            5,
+                            token_symbols,
+                            false,
+                            name,
+                            elision,
+                            "parser",
+                        )?;
+                    }
+                }
+            } else {
+                Self::output_regex(
+                    cst,
+                    sema,
+                    alt_op,
+                    output,
+                    5,
+                    token_symbols,
+                    false,
+                    name,
+                    elision,
+                    "parser",
+                )?;
+            }
+            if elision != RuleNodeElision::Unconditional {
+                Self::output_cst_close(output, has_rule_rename, name, 5, false, "parser")?;
+            }
+            output.write_all("}\n".indent(4).as_bytes())?;
         }
         output.write_all(
             format!(
                 "    _ => {{\
-               \n        self.error(diags, err![self.span(), {}]);\
+               \n        parser.error(diags, err![parser.span(), {}]);\
                \n    }}\
                \n}}\n",
                 sema.predict_sets[&regex.syntax()].error(5, token_symbols)
             )
-            .indent(2)
+            .indent(3)
             .as_bytes(),
         )?;
-        output.write_all(b"        loop {\n")?;
-        Self::output_node_kind_decl(output, has_rule_binding, name, 3, false)?;
-        output.write_all(b"            match self.current {\n")?;
-        for branch in branches {
-            let ops = if let Regex::Concat(concat) = branch {
-                concat.operands(cst)
-            } else {
-                unreachable!()
+
+        // left recursive branches
+        output.write_all(b"            loop {\n")?;
+        Self::output_node_kind_decl(output, has_rule_rename, name, 4, false)?;
+        output.write_all(b"                match parser.current {\n")?;
+        for branch in recursive.branches() {
+            let (concat, left_index, right_index) = match branch {
+                Recursion::Left(Regex::Concat(concat), index) => (concat, *index, None),
+                Recursion::LeftRight(Regex::Concat(concat), left_index, right_index) => {
+                    (concat, *left_index, Some(*right_index))
+                }
+                _ => continue,
             };
-            for (i, op) in ops
-                .filter(|op| !matches!(op, Regex::Predicate(_)))
-                .skip(1)
-                .enumerate()
-            {
-                if i == 0 {
+            let binding_power = recursive.binding_power(branch.regex());
+            let mut is_first = true;
+            for (i, concat_op) in concat.operands(cst).enumerate() {
+                if let Regex::Predicate(..) = concat_op {
+                    continue;
+                }
+                if i == left_index {
+                    continue;
+                }
+                if is_first {
+                    is_first = false;
                     output.write_all(
                         format!(
                             "{}{} => {{\n",
-                            sema.predict_sets[&op.syntax()].pattern(0),
-                            Self::get_predicate(cst, name, *branch)
+                            sema.predict_sets[&concat_op.syntax()].pattern(0),
+                            Self::get_predicate(cst, name, branch.regex(), "parser")
                         )
-                        .indent(4)
+                        .indent(5)
                         .as_bytes(),
                     )?;
-                    output
-                        .write_all("let m = self.cst.open_before(lhs);\n".indent(5).as_bytes())?;
+                    let binding_power = binding_power.0;
+                    output.write_all(
+                        format!(
+                            "if {binding_power} < min_bp {{\
+                           \n    break;\
+                           \n}}\n"
+                        )
+                        .indent(6)
+                        .as_bytes(),
+                    )?;
+                    output.write_all(
+                        "let m = parser.cst.open_before(lhs);\n"
+                            .indent(6)
+                            .as_bytes(),
+                    )?;
                 }
-                Self::output_regex(cst, sema, op, output, 5, token_symbols, false, name)?;
+                if right_index == Some(i) {
+                    let binding_power = binding_power.1;
+                    output.write_all(
+                        format!(
+                            "let rhs = parser.cst.mark();\
+                           \nrec(parser, diags, {binding_power}, rhs);\n"
+                        )
+                        .indent(6)
+                        .as_bytes(),
+                    )?;
+                } else {
+                    Self::output_regex(
+                        cst,
+                        sema,
+                        concat_op,
+                        output,
+                        6,
+                        token_symbols,
+                        false,
+                        name,
+                        RuleNodeElision::None,
+                        "parser",
+                    )?;
+                }
             }
-            Self::output_cst_close(output, has_rule_binding, name, 5, true)?;
-            output.write_all(b"                }\n")?;
+            Self::output_cst_close(output, has_rule_rename, name, 6, true, "parser")?;
+            output.write_all(b"                        continue;\n")?;
+            output.write_all(b"                    }\n")?;
         }
         output.write_all(
             "    _ => {\
            \n        break;\
            \n    }\
            \n}\n"
-                .indent(3)
+                .indent(4)
                 .as_bytes(),
         )?;
-        output.write_all("}\n".indent(2).as_bytes())
-    }
-
-    fn output_operator_precedence_rule(
-        cst: &Cst,
-        sema: &SemanticData,
-        output: &mut std::fs::File,
-        name: &str,
-        regex: Regex,
-        branches: &[Regex],
-    ) -> std::io::Result<()> {
-        let exit = if let Regex::Alternation(alt) = regex {
-            alt.operands(cst).find(|op| !branches.contains(op)).unwrap()
-        } else {
-            unreachable!();
-        };
-        let exit_name = if let Regex::Name(name) = exit {
-            name.value(cst).unwrap().0
-        } else {
-            unreachable!()
-        };
-        output.write_all(b"        let lhs = self.cst.mark();\n")?;
         output.write_all(
-            b"        fn rec(\
-            \n            parser: &mut Parser,\
-            \n            diags: &mut Vec<Diagnostic>,\
-            \n            min_prec: usize,\
-            \n            mut lhs: MarkClosed,\
-            \n        ) {\
-            \n            loop {\
-            \n                let prec = match parser.current {\n",
-        )?;
-        for (i, op) in branches.iter().rev().enumerate() {
-            let mut ops = if let Regex::Concat(concat) = op {
-                concat.operands(cst)
-            } else {
-                unreachable!()
-            };
-            let op = ops.nth(1).unwrap();
-            output.write_all(
-                format!("{} => {},\n", sema.predict_sets[&op.syntax()].pattern(0), i)
-                    .indent(5)
-                    .as_bytes(),
-            )?;
-        }
-        output.write_all(
-            format!(
-                "                      _ => return,\
-               \n                }};\
-               \n                if prec < min_prec {{\
-               \n                    return;\
-               \n                }}\
-               \n                parser.advance(false);\
-               \n                let m = parser.cst.open_before(lhs);\
-               \n                let rhs = parser.cst.mark();\
-               \n                parser.{exit_name}(diags);\
-               \n                loop {{\
-               \n                    let (next_prec, left_assoc) = match parser.current {{\n"
-            )
-            .as_bytes(),
-        )?;
-        for (i, op) in branches.iter().rev().enumerate() {
-            let mut ops = if let Regex::Concat(concat) = op {
-                concat.operands(cst)
-            } else {
-                unreachable!()
-            };
-            let op = ops.nth(1).unwrap();
-            for operator in sema.predict_sets[&op.syntax()].iter() {
-                output.write_all(
-                    format!(
-                        "Token::{} => ({i}, {}),\n",
-                        operator.0,
-                        !sema.right_associative.contains(operator.0),
-                    )
-                    .indent(6)
-                    .as_bytes(),
-                )?;
-            }
-        }
-        output.write_all(
-            format!(
-                "                        _ => break,\
-               \n                    }};\
-               \n                    if !(prec < next_prec || (!left_assoc && prec == next_prec)) {{\
-               \n                        break;\
-               \n                    }}\
-               \n                    rec(\
-               \n                        parser,\
-               \n                        diags,\
-               \n                        prec + if next_prec > prec {{ 1 }} else {{ 0 }},\
-               \n                        rhs,\
-               \n                    );\
-               \n                }}\
-               \n                lhs = parser.close(m, Rule::{}, diags);\
-               \n            }}\
-               \n        }}\
-               \n        self.{exit_name}(diags);\
-               \n        rec(self, diags, 0, lhs);\n",
-               Self::snake_to_pascal_case(name)
-        ).as_bytes())
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn output_right_recursice_forwarding_rule(
-        cst: &Cst,
-        sema: &SemanticData,
-        output: &mut std::fs::File,
-        token_symbols: &HashMap<&str, &str>,
-        has_rule_binding: bool,
-        name: &str,
-        regex: Regex,
-        branches: &[Regex],
-    ) -> std::io::Result<()> {
-        output.write_all(b"        let lhs = self.cst.mark();\n")?;
-        Self::output_node_kind_decl(output, has_rule_binding, name, 2, true)?;
-        if let Regex::Alternation(alt) = regex {
-            output.write_all("match self.current {\n".indent(2).as_bytes())?;
-            for op in alt.operands(cst) {
-                let is_exit = branches.contains(&op);
-                output.write_all(
-                    format!(
-                        "{}{} => {{\n",
-                        sema.predict_sets[&op.syntax()].pattern(0),
-                        Self::get_predicate(cst, name, op)
-                    )
-                    .indent(3)
-                    .as_bytes(),
-                )?;
-                if !is_exit {
-                    output.write_all(b"                let m = self.cst.open_before(lhs);\n")?;
-                }
-                Self::output_regex(cst, sema, op, output, 4, token_symbols, false, name)?;
-                if !is_exit {
-                    Self::output_cst_close(output, has_rule_binding, name, 4, false)?;
-                }
-                output.write_all("}\n".indent(3).as_bytes())?;
-            }
-            output.write_all(
-                format!(
-                    "    _ => {{\
-                   \n        self.error(diags, err![self.span(), {}]);\
-                   \n    }}\
-                   \n}}\n",
-                    sema.predict_sets[&regex.syntax()].error(5, token_symbols),
-                )
+            "    }\
+           \n}\
+           \nlet lhs = self.cst.mark();\
+           \nrec(self, diags, 0, lhs);\n"
                 .indent(2)
                 .as_bytes(),
-            )?;
-        }
-        Ok(())
-    }
-
-    fn output_conditional_forwarding_rule(
-        cst: &Cst,
-        sema: &SemanticData,
-        output: &mut std::fs::File,
-        token_symbols: &HashMap<&str, &str>,
-        has_rule_binding: bool,
-        name: &str,
-        regex: Regex,
-    ) -> std::io::Result<()> {
-        let (head, tail) = if let Regex::Concat(concat) = regex {
-            let mut ops = concat.operands(cst);
-            (ops.next().unwrap(), ops)
-        } else {
-            unreachable!();
-        };
-        output.write_all(
-            b"        let lhs = self.cst.mark();\
-            \n        let mut m = None;\n",
-        )?;
-        Self::output_node_kind_decl(output, has_rule_binding, name, 2, true)?;
-        Self::output_regex(cst, sema, head, output, 2, token_symbols, false, name)?;
-        for op in tail {
-            Self::output_regex(cst, sema, op, output, 2, token_symbols, true, name)?;
-        }
-        output.write_all(b"        if let Some(m) = m {\n")?;
-        Self::output_cst_close(output, has_rule_binding, name, 3, false)?;
-        output.write_all(b"        }\n")
-    }
-
-    fn output_maybe_empty_rule(
-        cst: &Cst,
-        sema: &SemanticData,
-        output: &mut std::fs::File,
-        token_symbols: &HashMap<&str, &str>,
-        has_rule_binding: bool,
-        name: &str,
-        regex: Regex,
-    ) -> std::io::Result<()> {
-        output.write_all(
-            b"        let lhs = self.cst.mark();\
-            \n        let mut m = None;\n",
-        )?;
-        Self::output_node_kind_decl(output, has_rule_binding, name, 2, true)?;
-        Self::output_regex(cst, sema, regex, output, 2, token_symbols, true, name)?;
-        output.write_all(b"        if let Some(m) = m {\n")?;
-        Self::output_cst_close(output, has_rule_binding, name, 3, false)?;
-        output.write_all(b"        }\n")
+        )
     }
 
     fn output_rule(
@@ -557,14 +495,22 @@ impl RustOutput {
             return Ok(());
         }
         let name = rule.name(cst).unwrap().0;
-        let pattern = sema.patterns.get(&rule);
+        let recursive = sema.recursive.get(&rule);
         let is_start = sema.start.unwrap() == rule;
-        let has_rule_binding = sema.has_rule_binding.contains(&rule);
+        let has_rule_rename = sema.has_rule_rename.contains(&rule);
+        let has_rule_creation = sema.has_rule_creation.contains(&rule);
+        let elision = if rule.is_elided(cst) {
+            &RuleNodeElision::Unconditional
+        } else {
+            rule.regex(cst)
+                .and_then(|regex| sema.elision.get(&regex.syntax()))
+                .unwrap_or(&RuleNodeElision::None)
+        };
 
         output.write_all(
             format!(
                 "    {}fn r#{name}(&mut self, diags: &mut Vec<Diagnostic>) {{\n",
-                if has_rule_binding {
+                if has_rule_rename {
                     "#[allow(unused_assignments)]\n    "
                 } else {
                     ""
@@ -573,85 +519,55 @@ impl RustOutput {
             .as_bytes(),
         )?;
         if let Some(regex) = rule.regex(cst) {
-            match pattern {
-                None => Self::output_normal_rule(
+            if recursive.map_or(false, |recursive| {
+                recursive
+                    .branches()
+                    .iter()
+                    .any(|rec| matches!(rec, Recursion::Left(..) | Recursion::LeftRight(..)))
+            }) {
+                Self::output_left_recursive_rule(
                     cst,
                     sema,
                     output,
                     token_symbols,
-                    has_rule_binding,
+                    has_rule_rename,
+                    name,
+                    regex,
+                    recursive.unwrap(),
+                )?;
+            } else {
+                Self::output_normal_rule(
+                    cst,
+                    sema,
+                    output,
+                    token_symbols,
+                    has_rule_rename,
+                    has_rule_creation,
                     name,
                     regex,
                     is_start,
-                )?,
-                Some(Pattern::LeftRecursive(branches)) => Self::output_left_recursive_rule(
-                    cst,
-                    sema,
-                    output,
-                    token_symbols,
-                    has_rule_binding,
-                    name,
-                    regex,
-                    branches,
-                )?,
-                Some(Pattern::OperatorPrecedence(branches)) => {
-                    Self::output_operator_precedence_rule(cst, sema, output, name, regex, branches)?
-                }
-                Some(Pattern::UnconditionalForwarding) => {
-                    Self::output_regex(cst, sema, regex, output, 2, token_symbols, false, name)?;
-                }
-                Some(Pattern::ConditionalForwarding) => {
-                    Self::output_conditional_forwarding_rule(
-                        cst,
-                        sema,
-                        output,
-                        token_symbols,
-                        has_rule_binding,
-                        name,
-                        regex,
-                    )?;
-                }
-                Some(Pattern::MaybeEmpty) => {
-                    Self::output_maybe_empty_rule(
-                        cst,
-                        sema,
-                        output,
-                        token_symbols,
-                        has_rule_binding,
-                        name,
-                        regex,
-                    )?;
-                }
-                Some(Pattern::RightRecursiveForwarding(branches)) => {
-                    Self::output_right_recursice_forwarding_rule(
-                        cst,
-                        sema,
-                        output,
-                        token_symbols,
-                        has_rule_binding,
-                        name,
-                        regex,
-                        branches,
-                    )?;
-                }
+                    *elision,
+                )?;
             }
         }
         output.write_all(b"    }\n")?;
         Ok(())
     }
 
-    fn get_predicate(cst: &Cst, rule_name: &str, regex: Regex) -> String {
+    fn get_predicate(cst: &Cst, rule_name: &str, regex: Regex, parser_name: &str) -> String {
         match regex {
             Regex::Concat(concat) => match concat.operands(cst).next().unwrap() {
                 Regex::Predicate(pred) => {
                     format!(
-                        " if self.predicate_{rule_name}_{}()",
+                        " if {parser_name}.predicate_{rule_name}_{}()",
                         &pred.value(cst).unwrap().0[1..]
                     )
                 }
                 _ => "".to_string(),
             },
-            Regex::Paren(paren) => Self::get_predicate(cst, rule_name, paren.inner(cst).unwrap()),
+            Regex::Paren(paren) => {
+                Self::get_predicate(cst, rule_name, paren.inner(cst).unwrap(), parser_name)
+            }
             _ => "".to_string(),
         }
     }
@@ -666,21 +582,26 @@ impl RustOutput {
         token_symbols: &HashMap<&str, &str>,
         open_before: bool,
         rule_name: &str,
+        rule_elision: RuleNodeElision,
+        parser_name: &str,
     ) -> std::io::Result<()> {
         match regex {
             Regex::Name(name) => {
                 let decl = sema.decl_bindings[&name.syntax()];
                 if let Some(rule) = RuleDecl::cast(cst, decl) {
                     let name = rule.name(cst).unwrap().0;
-                    output
-                        .write_all(format!("self.r#{name}(diags);\n").indent(level).as_bytes())?;
+                    output.write_all(
+                        format!("{parser_name}.r#{name}(diags);\n")
+                            .indent(level)
+                            .as_bytes(),
+                    )?;
                 } else if let Some(token) = TokenDecl::cast(cst, decl) {
                     let name = token.name(cst).unwrap().0;
                     let sym = token
                         .symbol(cst)
                         .map_or(name, |(sym, _)| &sym[1..sym.len() - 1]);
                     output.write_all(
-                        format!("expect!({name}, \"{sym}\", self, diags);\n",)
+                        format!("expect!({name}, \"{sym}\", {parser_name}, diags);\n",)
                             .indent(level)
                             .as_bytes(),
                     )?;
@@ -693,7 +614,7 @@ impl RustOutput {
                     let sym = token.symbol(cst).unwrap().0;
                     let sym = &sym[1..sym.len() - 1];
                     output.write_all(
-                        format!("expect!({name}, \"{sym}\", self, diags);\n",)
+                        format!("expect!({name}, \"{sym}\", {parser_name}, diags);\n",)
                             .indent(level)
                             .as_bytes(),
                     )?;
@@ -710,17 +631,23 @@ impl RustOutput {
                         token_symbols,
                         false,
                         rule_name,
+                        rule_elision,
+                        parser_name,
                     )?;
                 }
             }
             Regex::Alternation(alt) => {
-                output.write_all("match self.current {\n".indent(level).as_bytes())?;
+                output.write_all(
+                    format!("match {parser_name}.current {{\n")
+                        .indent(level)
+                        .as_bytes(),
+                )?;
                 for op in alt.operands(cst) {
                     output.write_all(
                         format!(
                             "{}{} => {{\n",
                             sema.predict_sets[&op.syntax()].pattern(0),
-                            Self::get_predicate(cst, rule_name, op)
+                            Self::get_predicate(cst, rule_name, op, parser_name)
                         )
                         .indent(level + 1)
                         .as_bytes(),
@@ -734,13 +661,15 @@ impl RustOutput {
                         token_symbols,
                         false,
                         rule_name,
+                        rule_elision,
+                        parser_name,
                     )?;
                     output.write_all("}\n".indent(level + 1).as_bytes())?;
                 }
                 output.write_all(
                     format!(
                         "    _ => {{\
-                       \n        self.error(diags, err![self.span(), {}]);\
+                       \n        {parser_name}.error(diags, err![{parser_name}.span(), {}]);\
                        \n    }}\
                        \n}}\n",
                         sema.predict_sets[&regex.syntax()].error(5, token_symbols),
@@ -754,21 +683,23 @@ impl RustOutput {
                 output.write_all(
                     format!(
                         "loop {{\
-                       \n    match self.current {{\
+                       \n    match {parser_name}.current {{\
                        \n        {}{} => {{\n",
                         sema.first_sets[&op.syntax()].pattern(2),
-                        Self::get_predicate(cst, rule_name, op)
+                        Self::get_predicate(cst, rule_name, op, parser_name)
                     )
                     .indent(level)
                     .as_bytes(),
                 )?;
                 if open_before {
                     output.write_all(
-                        "if m.is_none() {\
-                       \n    m = Some(self.cst.open_before(lhs));\
-                       \n}\n"
-                            .indent(5)
-                            .as_bytes(),
+                        format!(
+                            "if m.is_none() {{\
+                           \n    m = Some({parser_name}.cst.open_before(lhs));\
+                           \n}}\n"
+                        )
+                        .indent(5)
+                        .as_bytes(),
                     )?;
                 }
                 Self::output_regex(
@@ -780,6 +711,8 @@ impl RustOutput {
                     token_symbols,
                     false,
                     rule_name,
+                    rule_elision,
+                    parser_name,
                 )?;
                 let recovery = &sema.recovery_sets[&regex.syntax()];
                 output.write_all(
@@ -787,7 +720,7 @@ impl RustOutput {
                         "        }}\
                        \n        {}{}{} => break,\
                        \n        _ => {{\
-                       \n            self.advance_with_error(diags, err![self.span(), {}]);\
+                       \n            {parser_name}.advance_with_error(diags, err![{parser_name}.span(), {}]);\
                        \n        }}\
                        \n    }}\
                        \n}}\n",
@@ -815,25 +748,29 @@ impl RustOutput {
                     token_symbols,
                     false,
                     rule_name,
+                    rule_elision,
+                    parser_name,
                 )?;
                 output.write_all(
                     format!(
                         "loop {{\
-                       \n    match self.current {{\
+                       \n    match {parser_name}.current {{\
                        \n        {}{} => {{\n",
                         sema.first_sets[&op.syntax()].pattern(2),
-                        Self::get_predicate(cst, rule_name, op)
+                        Self::get_predicate(cst, rule_name, op, parser_name)
                     )
                     .indent(level)
                     .as_bytes(),
                 )?;
                 if open_before {
                     output.write_all(
-                        "if m.is_none() {\
-                       \n    m = Some(self.cst.open_before(lhs));\
-                       \n}\n"
-                            .indent(5)
-                            .as_bytes(),
+                        format!(
+                            "if m.is_none() {{\
+                           \n    m = Some({parser_name}.cst.open_before(lhs));\
+                           \n}}\n"
+                        )
+                        .indent(5)
+                        .as_bytes(),
                     )?;
                 }
                 Self::output_regex(
@@ -845,6 +782,8 @@ impl RustOutput {
                     token_symbols,
                     false,
                     rule_name,
+                    rule_elision,
+                    parser_name,
                 )?;
                 let recovery = &sema.recovery_sets[&regex.syntax()];
                 output.write_all(
@@ -852,7 +791,7 @@ impl RustOutput {
                         "        }}\
                        \n        {}{}{} => break,\
                        \n        _ => {{\
-                       \n            self.advance_with_error(diags, err![self.span(), {}]);\
+                       \n            {parser_name}.advance_with_error(diags, err![{parser_name}.span(), {}]);\
                        \n        }}\
                        \n    }}\
                        \n}}\n",
@@ -863,7 +802,7 @@ impl RustOutput {
                             "\n        | "
                         },
                         recovery.pattern(2),
-                        sema.predict_sets[&regex.syntax()].error(5, token_symbols),
+                        sema.follow_sets[&op.syntax()].error(5, token_symbols),
                     )
                     .indent(level)
                     .as_bytes(),
@@ -873,21 +812,23 @@ impl RustOutput {
                 let op = opt.operand(cst).unwrap();
                 output.write_all(
                     format!(
-                        "match self.current {{\
+                        "match {parser_name}.current {{\
                        \n    {}{} => {{\n",
                         sema.first_sets[&op.syntax()].pattern(1),
-                        Self::get_predicate(cst, rule_name, op)
+                        Self::get_predicate(cst, rule_name, op, parser_name)
                     )
                     .indent(level)
                     .as_bytes(),
                 )?;
                 if open_before {
                     output.write_all(
-                        "if m.is_none() {\
-                       \n    m = Some(self.cst.open_before(lhs));\
-                       \n}\n"
-                            .indent(4)
-                            .as_bytes(),
+                        format!(
+                            "if m.is_none() {{\
+                           \n    m = Some({parser_name}.cst.open_before(lhs));\
+                           \n}}\n"
+                        )
+                        .indent(4)
+                        .as_bytes(),
                     )?;
                 }
                 Self::output_regex(
@@ -899,13 +840,15 @@ impl RustOutput {
                     token_symbols,
                     false,
                     rule_name,
+                    rule_elision,
+                    parser_name,
                 )?;
                 output.write_all(
                     format!(
                         "    }}\
                        \n    {} => {{}}\
                        \n    _ => {{\
-                       \n        self.error(diags, err![self.span(), {}]);\
+                       \n        {parser_name}.error(diags, err![{parser_name}.span(), {}]);\
                        \n    }}\
                        \n}}\n",
                         sema.follow_sets[&regex.syntax()].pattern(1),
@@ -925,20 +868,22 @@ impl RustOutput {
                     token_symbols,
                     false,
                     rule_name,
+                    rule_elision,
+                    parser_name,
                 )?;
             }
             Regex::Action(action) => {
                 output.write_all(
                     format!(
-                        "self.action_{rule_name}_{}(diags);\n",
+                        "{parser_name}.action_{rule_name}_{}(diags);\n",
                         &action.value(cst).unwrap().0[1..]
                     )
                     .indent(level)
                     .as_bytes(),
                 )?;
             }
-            Regex::Binding(bind) => {
-                let name = &bind.value(cst).unwrap().0[1..];
+            Regex::NodeRename(rename) => {
+                let name = &rename.value(cst).unwrap().0[1..];
                 if !name.is_empty() {
                     output.write_all(
                         format!("node_kind = Rule::{};\n", Self::snake_to_pascal_case(name))
@@ -947,21 +892,30 @@ impl RustOutput {
                     )?;
                 }
             }
-            Regex::OpenNode(open) => {
-                let number = open.number(cst).unwrap();
+            Regex::NodeElision(_) => {
+                if rule_elision == RuleNodeElision::Conditional {
+                    output.write_all("elide = true;\n".indent(level).as_bytes())?;
+                }
+            }
+            Regex::NodeMarker(marker) => {
+                let number = marker.number(cst);
                 output.write_all(
-                    format!("let m{number} = self.cst.mark();\n")
+                    format!("let m{number} = {parser_name}.cst.mark();\n")
                         .indent(level)
                         .as_bytes(),
                 )?;
             }
-            Regex::CloseNode(close) => {
-                let number = close.number(cst).unwrap();
-                let node_name = close.node_name(cst).unwrap();
+            Regex::NodeCreation(creation) => {
+                let node_name = creation.node_name(cst).unwrap_or(rule_name);
+                let mark = if creation.whole_rule(cst) {
+                    "start".to_string()
+                } else {
+                    format!("m{}", creation.number(cst).unwrap())
+                };
                 output.write_all(
                     format!(
-                        "let open_node = self.cst.open_before(m{number});\
-                        \nself.close(open_node, Rule::{}, diags);\n",
+                        "let open_node = {parser_name}.cst.open_before({mark});\
+                        \n{parser_name}.close(open_node, Rule::{}, diags);\n",
                         Self::snake_to_pascal_case(node_name)
                     )
                     .indent(level)

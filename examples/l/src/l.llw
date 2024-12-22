@@ -14,28 +14,21 @@ param_list: '(' [param (?1 ',' param)* [',']] ')';
 param: Name ':' type_expr;
 type_expr: Name;
 block: '{' stmt* '}';
-stmt:
+stmt^:
   stmt_expr
 | stmt_let
-| block
 | stmt_return
 ;
 stmt_expr: expr ';';
 stmt_let: 'let' Name '=' expr ';';
 stmt_return: 'return' [expr] ';';
-expr: expr_bin;
-expr_bin:
-  expr_bin ('*' | '/') expr_bin
-| expr_bin ('+' | '-') expr_bin
-| expr_call
+expr:
+  expr ('*' | '/') expr @expr_binary
+| expr ('+' | '-') expr @expr_binary
+| expr arg_list @expr_call
+| Name @expr_name
+| '(' expr ')' @expr_paren
+| expr_literal ^
 ;
-expr_call:
-  expr_call arg_list
-| expr_literal
-| expr_name
-| expr_paren
-;
-arg_list: '(' [expr (?1 ',' expr)* [',']] ')';
 expr_literal: Int | 'true' | 'false';
-expr_name: Name;
-expr_paren: '(' expr ')';
+arg_list: '(' [expr (?1 ',' expr)* [',']] ')';

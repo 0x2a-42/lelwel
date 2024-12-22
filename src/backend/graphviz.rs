@@ -245,27 +245,30 @@ impl GraphvizOutput {
                 )
                 .as_bytes(),
             ),
-            Regex::Binding(bind) => output.write_all(
+            Regex::NodeRename(rename) => output.write_all(
                 format!(
                     "  \"{}\" [shape=box, label=\"{}\"];\n",
-                    bind.syntax().0,
-                    bind.value(cst).unwrap().0
+                    rename.syntax().0,
+                    rename.value(cst).unwrap().0
                 )
                 .as_bytes(),
             ),
-            Regex::OpenNode(open) => output.write_all(
+            Regex::NodeElision(elision) => output.write_all(
+                format!("  \"{}\" [shape=box, label=\"^\"];\n", elision.syntax().0,).as_bytes(),
+            ),
+            Regex::NodeMarker(marker) => output.write_all(
                 format!(
                     "  \"{}\" [shape=box, label=\"{}\"];\n",
-                    open.syntax().0,
-                    open.value(cst).unwrap().0
+                    marker.syntax().0,
+                    marker.value(cst).unwrap().0
                 )
                 .as_bytes(),
             ),
-            Regex::CloseNode(close) => output.write_all(
+            Regex::NodeCreation(creation) => output.write_all(
                 format!(
                     "  \"{}\" [shape=box, label=\"{}\"];\n",
-                    close.syntax().0,
-                    close.value(cst).unwrap().0
+                    creation.syntax().0,
+                    creation.value(cst).unwrap().0
                 )
                 .as_bytes(),
             ),

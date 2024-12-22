@@ -75,7 +75,7 @@ pub struct CstChildren<'a> {
     offset: CstIndex,
 }
 #[allow(clippy::unnecessary_cast)]
-impl<'a> Iterator for CstChildren<'a> {
+impl Iterator for CstChildren<'_> {
     type Item = NodeRef;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -477,7 +477,7 @@ impl<'a> Parser<'a> {
                 _ => {
                     self.advance_with_error(
                         diags,
-                        err![self.span(), "<identifier>", "<string literal>"],
+                        err![self.span(), "<identifier>", ";", "<string literal>"],
                     );
                 }
             }
@@ -521,7 +521,7 @@ impl<'a> Parser<'a> {
                 _ => {
                     self.advance_with_error(
                         diags,
-                        err![self.span(), "<identifier>", "<string literal>"],
+                        err![self.span(), "<identifier>", ";", "<string literal>"],
                     );
                 }
             }
@@ -545,7 +545,7 @@ impl<'a> Parser<'a> {
                 | Token::Start
                 | Token::Token => break,
                 _ => {
-                    self.advance_with_error(diags, err![self.span(), "<identifier>"]);
+                    self.advance_with_error(diags, err![self.span(), "<identifier>", ";"]);
                 }
             }
         }
@@ -570,15 +570,25 @@ impl<'a> Parser<'a> {
     fn r#rule_decl(&mut self, diags: &mut Vec<Diagnostic>) {
         let m = self.cst.open();
         expect!(Id, "<identifier>", self, diags);
+        match self.current {
+            Token::Hat => {
+                expect!(Hat, "^", self, diags);
+            }
+            Token::Colon => {}
+            _ => {
+                self.error(diags, err![self.span(), ":", "^"]);
+            }
+        }
         expect!(Colon, ":", self, diags);
         match self.current {
             Token::Action
-            | Token::Binding
-            | Token::CloseNode
+            | Token::Hat
             | Token::Id
             | Token::LBrak
             | Token::LPar
-            | Token::OpenNode
+            | Token::NodeCreation
+            | Token::NodeMarker
+            | Token::NodeRename
             | Token::Predicate
             | Token::Str => {
                 self.r#regex(diags);
@@ -590,12 +600,13 @@ impl<'a> Parser<'a> {
                     err![
                         self.span(),
                         "<semantic action>",
-                        "<binding>",
-                        "<close node mark>",
+                        "^",
                         "<identifier>",
                         "[",
                         "(",
-                        "<open node mark>",
+                        "<node creation>",
+                        "<node marker>",
+                        "<node rename>",
                         "<semantic predicate>",
                         ";",
                         "<string literal>"
@@ -610,150 +621,203 @@ impl<'a> Parser<'a> {
         self.r#alternation(diags);
     }
     fn r#alternation(&mut self, diags: &mut Vec<Diagnostic>) {
-        let lhs = self.cst.mark();
-        let mut m = None;
+        let start = self.cst.mark();
         self.r#concat(diags);
-        loop {
-            match self.current {
-                Token::Or => {
-                    if m.is_none() {
-                        m = Some(self.cst.open_before(lhs));
+        match self.current {
+            Token::Or => {
+                expect!(Or, "|", self, diags);
+                self.r#concat(diags);
+                loop {
+                    match self.current {
+                        Token::Or => {
+                            expect!(Or, "|", self, diags);
+                            self.r#concat(diags);
+                        }
+                        Token::RBrak
+                        | Token::RPar
+                        | Token::Semi
+                        | Token::EOF
+                        | Token::Id
+                        | Token::Right
+                        | Token::Skip
+                        | Token::Start
+                        | Token::Token => break,
+                        _ => {
+                            self.advance_with_error(diags, err![self.span(), "|", "]", ")", ";"]);
+                        }
                     }
-                    expect!(Or, "|", self, diags);
-                    self.r#concat(diags);
                 }
-                Token::RBrak
-                | Token::RPar
-                | Token::Semi
-                | Token::EOF
-                | Token::Id
-                | Token::Right
-                | Token::Skip
-                | Token::Start
-                | Token::Token => break,
-                _ => {
-                    self.advance_with_error(diags, err![self.span(), "|", "]", ")", ";"]);
-                }
+                let open_node = self.cst.open_before(start);
+                self.close(open_node, Rule::Alternation, diags);
             }
-        }
-        if let Some(m) = m {
-            self.close(m, Rule::Alternation, diags);
+            Token::RBrak | Token::RPar | Token::Semi => {}
+            _ => {
+                self.error(diags, err![self.span(), "|", "]", ")", ";"]);
+            }
         }
     }
     fn r#concat(&mut self, diags: &mut Vec<Diagnostic>) {
-        let lhs = self.cst.mark();
-        let mut m = None;
+        let start = self.cst.mark();
         self.r#postfix(diags);
-        loop {
-            match self.current {
-                Token::Action
-                | Token::Binding
-                | Token::CloseNode
-                | Token::Id
-                | Token::LBrak
-                | Token::LPar
-                | Token::OpenNode
-                | Token::Predicate
-                | Token::Str => {
-                    if m.is_none() {
-                        m = Some(self.cst.open_before(lhs));
-                    }
-                    self.r#postfix(diags);
-                }
-                Token::Or
-                | Token::RBrak
-                | Token::RPar
-                | Token::Semi
-                | Token::EOF
-                | Token::Right
-                | Token::Skip
-                | Token::Start
-                | Token::Token => break,
-                _ => {
-                    self.advance_with_error(
-                        diags,
-                        err![
-                            self.span(),
-                            "<semantic action>",
-                            "<binding>",
-                            "<close node mark>",
-                            "<identifier>",
-                            "[",
-                            "(",
-                            "<open node mark>",
-                            "|",
-                            "<semantic predicate>",
-                            "]",
-                            ")",
-                            ";",
-                            "<string literal>"
-                        ],
-                    );
-                }
-            }
-        }
-        if let Some(m) = m {
-            self.close(m, Rule::Concat, diags);
-        }
-    }
-    fn r#postfix(&mut self, diags: &mut Vec<Diagnostic>) {
-        let mut lhs = self.cst.mark();
         match self.current {
             Token::Action
-            | Token::Binding
-            | Token::CloseNode
+            | Token::Hat
             | Token::Id
-            | Token::OpenNode
+            | Token::LBrak
+            | Token::LPar
+            | Token::NodeCreation
+            | Token::NodeMarker
+            | Token::NodeRename
             | Token::Predicate
             | Token::Str => {
-                self.r#atomic(diags);
+                self.r#postfix(diags);
+                loop {
+                    match self.current {
+                        Token::Action
+                        | Token::Hat
+                        | Token::Id
+                        | Token::LBrak
+                        | Token::LPar
+                        | Token::NodeCreation
+                        | Token::NodeMarker
+                        | Token::NodeRename
+                        | Token::Predicate
+                        | Token::Str => {
+                            self.r#postfix(diags);
+                        }
+                        Token::Or
+                        | Token::RBrak
+                        | Token::RPar
+                        | Token::Semi
+                        | Token::EOF
+                        | Token::Right
+                        | Token::Skip
+                        | Token::Start
+                        | Token::Token => break,
+                        _ => {
+                            self.advance_with_error(
+                                diags,
+                                err![
+                                    self.span(),
+                                    "<semantic action>",
+                                    "^",
+                                    "<identifier>",
+                                    "[",
+                                    "(",
+                                    "<node creation>",
+                                    "<node marker>",
+                                    "<node rename>",
+                                    "|",
+                                    "<semantic predicate>",
+                                    "]",
+                                    ")",
+                                    ";",
+                                    "<string literal>"
+                                ],
+                            );
+                        }
+                    }
+                }
+                let open_node = self.cst.open_before(start);
+                self.close(open_node, Rule::Concat, diags);
             }
-            Token::LPar => {
-                self.r#paren(diags);
-            }
-            Token::LBrak => {
-                self.r#optional(diags);
-            }
+            Token::Or | Token::RBrak | Token::RPar | Token::Semi => {}
             _ => {
                 self.error(
                     diags,
                     err![
                         self.span(),
                         "<semantic action>",
-                        "<binding>",
-                        "<close node mark>",
+                        "^",
                         "<identifier>",
                         "[",
                         "(",
-                        "<open node mark>",
+                        "<node creation>",
+                        "<node marker>",
+                        "<node rename>",
+                        "|",
                         "<semantic predicate>",
+                        "]",
+                        ")",
+                        ";",
                         "<string literal>"
                     ],
                 );
             }
         }
-        loop {
-            match self.current {
-                Token::Plus | Token::Star => {
-                    let m = self.cst.open_before(lhs);
-                    match self.current {
-                        Token::Star => {
-                            expect!(Star, "*", self, diags);
-                        }
-                        Token::Plus => {
-                            expect!(Plus, "+", self, diags);
-                        }
-                        _ => {
-                            self.error(diags, err![self.span(), "+", "*"]);
-                        }
-                    }
-                    lhs = self.close(m, Rule::Postfix, diags);
+    }
+    fn r#postfix(&mut self, diags: &mut Vec<Diagnostic>) {
+        fn rec(
+            parser: &mut Parser,
+            diags: &mut Vec<Diagnostic>,
+            min_bp: usize,
+            mut lhs: MarkClosed,
+        ) {
+            match parser.current {
+                Token::Action
+                | Token::Hat
+                | Token::Id
+                | Token::NodeCreation
+                | Token::NodeMarker
+                | Token::NodeRename
+                | Token::Predicate
+                | Token::Str => {
+                    parser.r#atomic(diags);
+                }
+                Token::LPar => {
+                    parser.r#paren(diags);
+                }
+                Token::LBrak => {
+                    parser.r#optional(diags);
                 }
                 _ => {
-                    break;
+                    parser.error(
+                        diags,
+                        err![
+                            parser.span(),
+                            "<semantic action>",
+                            "^",
+                            "<identifier>",
+                            "[",
+                            "(",
+                            "<node creation>",
+                            "<node marker>",
+                            "<node rename>",
+                            "<semantic predicate>",
+                            "<string literal>"
+                        ],
+                    );
+                }
+            }
+            loop {
+                match parser.current {
+                    Token::Plus | Token::Star => {
+                        if 2 < min_bp {
+                            break;
+                        }
+                        let m = parser.cst.open_before(lhs);
+                        match parser.current {
+                            Token::Star => {
+                                expect!(Star, "*", parser, diags);
+                            }
+                            Token::Plus => {
+                                expect!(Plus, "+", parser, diags);
+                            }
+                            _ => {
+                                parser.error(diags, err![parser.span(), "+", "*"]);
+                            }
+                        }
+                        lhs = parser.close(m, Rule::Postfix, diags);
+                        continue;
+                    }
+                    _ => {
+                        break;
+                    }
                 }
             }
         }
+        let lhs = self.cst.mark();
+        rec(self, diags, 0, lhs);
     }
     fn r#paren(&mut self, diags: &mut Vec<Diagnostic>) {
         let m = self.cst.open();
@@ -784,14 +848,17 @@ impl<'a> Parser<'a> {
             Token::Action => {
                 expect!(Action, "<semantic action>", self, diags);
             }
-            Token::Binding => {
-                expect!(Binding, "<binding>", self, diags);
+            Token::NodeRename => {
+                expect!(NodeRename, "<node rename>", self, diags);
             }
-            Token::OpenNode => {
-                expect!(OpenNode, "<open node mark>", self, diags);
+            Token::NodeMarker => {
+                expect!(NodeMarker, "<node marker>", self, diags);
             }
-            Token::CloseNode => {
-                expect!(CloseNode, "<close node mark>", self, diags);
+            Token::NodeCreation => {
+                expect!(NodeCreation, "<node creation>", self, diags);
+            }
+            Token::Hat => {
+                expect!(Hat, "^", self, diags);
             }
             _ => {
                 self.error(
@@ -799,10 +866,11 @@ impl<'a> Parser<'a> {
                     err![
                         self.span(),
                         "<semantic action>",
-                        "<binding>",
-                        "<close node mark>",
+                        "^",
                         "<identifier>",
-                        "<open node mark>",
+                        "<node creation>",
+                        "<node marker>",
+                        "<node rename>",
                         "<semantic predicate>",
                         "<string literal>"
                     ],

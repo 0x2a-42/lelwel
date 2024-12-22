@@ -21,11 +21,18 @@ pub const REDEFINE_AS_SKIPPED: &str = "E016";
 pub const USED_SKIPPED: &str = "E017";
 pub const EXPECTED_TOKEN: &str = "E018";
 pub const REDEFINE_AS_RIGHT: &str = "E019";
+pub const MIXED_ASSOC: &str = "E020";
+pub const ELIDE_LEFT_REC: &str = "E021";
+pub const REDEF_OPEN_NODE: &str = "E022";
+pub const UNDEF_CLOSE_NODE: &str = "E023";
+pub const INVALID_CLOSE_NODE: &str = "E024";
+pub const CREATE_RULE_NODE_LEFT_REC: &str = "E025";
 
 pub const UNUSED_RULE: &str = "W001";
 pub const UNUSED_TOKEN: &str = "W002";
+pub const UNUSED_OPEN_NODE: &str = "W003";
 
-pub trait LanguageErrors<'a> {
+pub trait LanguageErrors {
     fn invalid_binding_pos(span: &Span) -> Self;
     fn invalid_predicate_pos(span: &Span) -> Self;
     fn undefined_rule(span: &Span, name: &str) -> Self;
@@ -47,9 +54,16 @@ pub trait LanguageErrors<'a> {
     fn used_skipped(span: &Span) -> Self;
     fn expected_token(span: &Span) -> Self;
     fn redefine_as_right(span: &Span) -> Self;
+    fn mixed_assoc(span: &Span) -> Self;
+    fn elide_left_rec(span: &Span) -> Self;
+    fn redefine_node_marker(span: &Span, old_span: &Span) -> Self;
+    fn undefined_create_node(span: &Span) -> Self;
+    fn invalid_create_node(span: &Span, open_span: &Span) -> Self;
+    fn create_rule_node_left_rec(span: &Span) -> Self;
+    fn unused_node_marker(span: &Span) -> Self;
 }
 
-impl<'a> LanguageErrors<'a> for Diagnostic {
+impl LanguageErrors for Diagnostic {
     fn invalid_binding_pos(span: &Span) -> Self {
         Diagnostic::error()
             .with_code(INVALID_BINDING_POS)
@@ -258,6 +272,64 @@ impl<'a> LanguageErrors<'a> for Diagnostic {
         Diagnostic::warning()
             .with_code(UNUSED_TOKEN)
             .with_message("unused token")
+            .with_labels(vec![Label::primary((), span.clone())])
+    }
+
+    fn mixed_assoc(span: &Span) -> Self {
+        Diagnostic::error()
+            .with_code(MIXED_ASSOC)
+            .with_message("mixed associativity in infix operator branch")
+            .with_labels(vec![Label::primary((), span.clone())])
+    }
+
+    fn elide_left_rec(span: &Span) -> Self {
+        Diagnostic::error()
+            .with_code(ELIDE_LEFT_REC)
+            .with_message("left recursive rule branch cannot be elided")
+            .with_labels(vec![Label::primary((), span.clone())])
+    }
+
+    fn redefine_node_marker(span: &Span, old_span: &Span) -> Self {
+        Diagnostic::error()
+            .with_code(REDEF_OPEN_NODE)
+            .with_message("node marker was already defined")
+            .with_labels(vec![
+                Label::primary((), span.clone()),
+                Label::secondary((), old_span.clone()).with_message("previous definition"),
+            ])
+            .with_notes(vec![
+                "note: the index of a node marker must be unique inside a rule".to_string(),
+            ])
+    }
+
+    fn undefined_create_node(span: &Span) -> Self {
+        Diagnostic::error()
+            .with_code(UNDEF_CLOSE_NODE)
+            .with_message("node creation with undefined node marker")
+            .with_labels(vec![Label::primary((), span.clone())])
+    }
+
+    fn invalid_create_node(span: &Span, open_span: &Span) -> Self {
+        Diagnostic::error()
+            .with_code(INVALID_CLOSE_NODE)
+            .with_message("node marker is not visited before node creation")
+            .with_labels(vec![
+                Label::primary((), span.clone()),
+                Label::secondary((), open_span.clone()).with_message("node marked here"),
+            ])
+    }
+
+    fn create_rule_node_left_rec(span: &Span) -> Self {
+        Diagnostic::error()
+            .with_code(CREATE_RULE_NODE_LEFT_REC)
+            .with_message("node creation without index is not allowed in left recursive rules")
+            .with_labels(vec![Label::primary((), span.clone())])
+    }
+
+    fn unused_node_marker(span: &Span) -> Self {
+        Diagnostic::warning()
+            .with_code(UNUSED_OPEN_NODE)
+            .with_message("unused node marker")
             .with_labels(vec![Label::primary((), span.clone())])
     }
 }
