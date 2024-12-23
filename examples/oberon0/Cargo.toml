@@ -9,9 +9,9 @@ edition = "2021"
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
-logos = "0.14.0"
-codespan-reporting = "0.11.1"
-wasm-bindgen = "0.2.92"
+logos = "0.15"
+codespan-reporting = "0.11"
+wasm-bindgen = "0.2"
 
 [build-dependencies]
 lelwel = { path = "../.." }
