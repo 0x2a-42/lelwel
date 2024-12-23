@@ -18,7 +18,6 @@
 [Lelwel](https://en.wikipedia.org/wiki/Lelwel_hartebeest) (**L**anguage for **E**xtended **L**L(1) parsing **W**ith **E**rror resilience and **L**ossless syntax trees) generates recursive descent parsers for Rust using [LL(1) grammars](https://en.wikipedia.org/wiki/LL_grammar) with extensions for direct left recursion, operator precedence, semantic predicates (which also enable arbitrary lookahead), and semantic actions (which allow to deal with semantic context sensitivity, e.g. type / variable name ambiguity in C).
 
 The parser creates a homogeneous, lossless, concrete syntax tree (CST) that can be used to construct an abstract syntax tree (AST).
-Certain patterns are detected to avoid CST nodes for rules that only forward to other rules.
 Special node rename, elision, marker, and creation operators allow fine-grained control over how the CST is built for certain parses.
 
 The error recovery and tree construction is inspired by Alex Kladov's (matklad) [Resilient LL Parsing Tutorial](https://matklad.github.io/2023/05/21/resilient-ll-parsing-tutorial.html).
