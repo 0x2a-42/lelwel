@@ -8,7 +8,7 @@ skip Whitespace;
 start file;
 
 file: value;
-value:
+value^:
   object
 | array
 | literal

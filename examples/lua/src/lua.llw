@@ -20,7 +20,7 @@ start chunk;
 
 chunk: block;
 block: stat* [retstat];
-stat:
+stat^:
   emptystat
 | expstat
 | label
@@ -36,7 +36,7 @@ stat:
 ;
 emptystat: ';';
 /// superset of official grammar, check in cst that syntax is valid
-expstat: prefixexp [(',' prefixexp)* '=' explist @assignstat] @;
+expstat: prefixexp [(',' prefixexp)* '=' explist @assignstat];
 
 breakstat: 'break';
 gotostat: 'goto' Name;
@@ -60,16 +60,16 @@ localstat:
   | attnamelist ['=' explist]
   )
 ;
-attnamelist: Name attrib (',' Name attrib)*;
-attrib: ['<' Name '>'];
+attnamelist: Name [attrib] (',' Name [attrib])*;
+attrib: '<' Name '>';
 retstat: 'return' [explist] [';'];
 label: '::' Name '::';
 funcname: Name ('.' Name)* [':' Name];
-namelist: Name (',' Name)* @;
-explist: exp (',' exp)* @;
+namelist: Name (',' Name)*;
+explist: exp (',' exp)*;
 args_explist: '(' [exp (',' exp)*] ')'; // extra rule for better error handling
 
-exp: binexp;
+exp^: binexp;
 binexp:
   binexp ('*' | '/' | '//' | '%') binexp
 | binexp ('+' | '-') binexp
@@ -81,14 +81,14 @@ binexp:
 | binexp ('<' | '>' | '<=' | '>=' | '~=' | '==') binexp
 | binexp 'and' binexp
 | binexp 'or' binexp
-| unaryexp
+| unaryexp ^
 ;
 unaryexp:
   ('not' | '-' | '#' | '~') unaryexp
-| powexp
+| powexp ^
 ;
-powexp:
-  (literalexp | prefixexp | tableconstructor | functiondef) ['^' unaryexp]
+powexp^:
+  (literalexp | prefixexp | tableconstructor | functiondef) ['^' unaryexp >]
 ;
 literalexp:
   'nil'
@@ -104,10 +104,10 @@ prefixexp:
   prefixexp '[' exp ']' @indexexp
 | prefixexp '.' Name @fieldexp
 | ?1 prefixexp (args | ':' Name args) @callexp // resolve ambiguity described in section 3.3.1
-| nameexp
-| parenexp
+| nameexp ^
+| parenexp ^
 ;
-args:
+args^:
   args_explist
 | tableconstructor
 | stringarg

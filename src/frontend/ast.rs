@@ -96,9 +96,10 @@ ast_node!(
         Symbol,
         Predicate,
         Action,
-        Binding,
-        OpenNode,
-        CloseNode
+        NodeRename,
+        NodeElision,
+        NodeMarker,
+        NodeCreation
     )
 );
 ast_node!(Alternation);
@@ -111,9 +112,10 @@ ast_node!(Name, Atomic, Id);
 ast_node!(Symbol, Atomic, Str);
 ast_node!(Predicate, Atomic, Predicate);
 ast_node!(Action, Atomic, Action);
-ast_node!(Binding, Atomic, Binding);
-ast_node!(OpenNode, Atomic, OpenNode);
-ast_node!(CloseNode, Atomic, CloseNode);
+ast_node!(NodeRename, Atomic, NodeRename);
+ast_node!(NodeElision, Atomic, Hat);
+ast_node!(NodeMarker, Atomic, NodeMarker);
+ast_node!(NodeCreation, Atomic, NodeCreation);
 
 impl Cst<'_> {
     fn child_node<T: AstNode>(&self, syntax: NodeRef) -> Option<T> {
@@ -134,6 +136,7 @@ pub trait Named: AstNode {
     fn name<'a>(&self, cst: &'a Cst) -> Option<(&'a str, Span)>;
 }
 impl File {
+    #[allow(clippy::type_complexity)]
     pub fn token_decls<'a>(
         &self,
         cst: &'a Cst,
@@ -191,6 +194,9 @@ impl Named for RuleDecl {
 impl RuleDecl {
     pub fn regex(&self, cst: &Cst) -> Option<Regex> {
         cst.child_node(self.syntax)
+    }
+    pub fn is_elided(&self, cst: &Cst) -> bool {
+        cst.child_token(self.syntax, Token::Hat).is_some()
     }
 }
 impl StartDecl {
@@ -274,33 +280,37 @@ impl Action {
         cst.child_token(self.syntax, Token::Action)
     }
 }
-impl Binding {
+impl NodeRename {
     pub fn value<'a>(&self, cst: &'a Cst) -> Option<(&'a str, Span)> {
-        cst.child_token(self.syntax, Token::Binding)
+        cst.child_token(self.syntax, Token::NodeRename)
     }
 }
-impl OpenNode {
+impl NodeMarker {
     pub fn value<'a>(&self, cst: &'a Cst) -> Option<(&'a str, Span)> {
-        cst.child_token(self.syntax, Token::OpenNode)
+        cst.child_token(self.syntax, Token::NodeMarker)
     }
-    pub fn number<'a>(&self, cst: &'a Cst) -> Option<&'a str> {
+    pub fn number<'a>(&self, cst: &'a Cst) -> &'a str {
         self.value(cst)
             .and_then(|(s, _)| s.split_once('<'))
             .map(|(_, r)| r)
+            .unwrap()
     }
 }
-impl CloseNode {
+impl NodeCreation {
     pub fn value<'a>(&self, cst: &'a Cst) -> Option<(&'a str, Span)> {
-        cst.child_token(self.syntax, Token::CloseNode)
+        cst.child_token(self.syntax, Token::NodeCreation)
     }
     pub fn number<'a>(&self, cst: &'a Cst) -> Option<&'a str> {
         self.value(cst)
             .and_then(|(s, _)| s.split_once('>'))
-            .map(|(l, _)| l)
+            .and_then(|(l, _)| (!l.is_empty()).then_some(l))
     }
     pub fn node_name<'a>(&self, cst: &'a Cst) -> Option<&'a str> {
         self.value(cst)
             .and_then(|(s, _)| s.split_once('>'))
-            .map(|(_, r)| r)
+            .and_then(|(_, r)| (!r.is_empty()).then_some(r))
+    }
+    pub fn whole_rule(&self, cst: &Cst) -> bool {
+        self.number(cst).is_none()
     }
 }

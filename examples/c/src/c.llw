@@ -53,7 +53,7 @@ string_literal:
 ;
 /// 6.5.1.1
 generic_assoc_list:
-  generic_association (',' generic_association)* @
+  generic_association (',' generic_association)*
 ;
 /// 6.5.1.1
 generic_association:
@@ -70,15 +70,15 @@ postfix_expr:
   | '--' @post_dec_expr
   )
 | ?1 '(' type_name ')' '{' [initializer_list [',']] '}' @compound_literal
-| primary_expr
+| primary_expr ^
 ;
 /// 6.5.2
 argument_expression_list:
-  assignment_expr (',' assignment_expr)* @
+  assignment_expr (',' assignment_expr)*
 ;
 /// 6.5.3
 unary_expr:
-  postfix_expr
+  postfix_expr ^
 | '++' unary_expr @pre_inc_expr
 | '--' unary_expr @pre_dec_expr
 | '__extension__' cast_expr @extension_expr // GNU extension
@@ -93,7 +93,7 @@ unary_expr:
 /// 6.5.4
 cast_expr:
   ?1 '(' type_name ')' cast_expr
-| unary_expr
+| unary_expr ^
 ;
 /// 6.5.5 - 6.5.14
 bin_expr:
@@ -107,27 +107,27 @@ bin_expr:
 | bin_expr '|' bin_expr
 | bin_expr '&&' bin_expr
 | bin_expr '||' bin_expr
-| cast_expr
+| cast_expr ^
 ;
 /// 6.5.15 (empty second argument is GNU extension)
-conditional_expr:
-  bin_expr ['?' [expr] ':' conditional_expr]
+conditional_expr^:
+  bin_expr ['?' [expr] ':' conditional_expr >]
 ;
 /// 6.5.16
-assignment_expr:
-  conditional_expr [('=' | '*=' | '/=' | '%=' | '+=' | '-=' | '<<=' | '>>=' | '&=' | '^=' | '|=') assignment_expr]
+assignment_expr^:
+  conditional_expr [('=' | '*=' | '/=' | '%=' | '+=' | '-=' | '<<=' | '>>=' | '&=' | '^=' | '|=') assignment_expr >]
 ;
 /// 6.5.17
-expr:
+expr^:
   comma_expr
 ;
 /// 6.5.17
 comma_expr:
   comma_expr ',' assignment_expr
-| assignment_expr
+| assignment_expr ^
 ;
 /// 6.6
-constant_expr:
+constant_expr^:
   conditional_expr
 ;
 
@@ -145,11 +145,11 @@ declaration_specifiers:
 ;
 /// 6.7
 init_declarator_list:
-  init_declarator (',' gnu_attributes init_declarator)* @
+  init_declarator (',' gnu_attributes init_declarator)*
 ;
 /// 6.7
 init_declarator:
-  declarator [gnu_asm] gnu_attributes ['=' initializer] @
+  declarator [gnu_asm] gnu_attributes ['=' initializer]
 ;
 /// 6.7.1
 storage_class_specifier:
@@ -183,7 +183,7 @@ specifier_qualifier_list:
 ;
 /// 6.7.2.1
 struct_declarator_list:
-  struct_declarator (',' gnu_attributes struct_declarator)* @
+  struct_declarator (',' gnu_attributes struct_declarator)*
 ;
 /// 6.7.2.1
 struct_declarator:
@@ -202,7 +202,7 @@ typeof_specifier:
 ;
 /// 6.7.2.2
 enumerator_list:
-  enumerator (?1 ',' enumerator)* @
+  enumerator (?1 ',' enumerator)*
 ;
 /// 6.7.2.2
 enumerator:
@@ -250,7 +250,7 @@ parameter_type_list:
 ;
 /// 6.7.6
 parameter_list:
-  parameter_declaration (?1 ',' parameter_declaration)* @
+  parameter_declaration (?1 ',' parameter_declaration)*
 ;
 /// 6.7.6
 parameter_declaration:
@@ -258,7 +258,7 @@ parameter_declaration:
 ;
 /// 6.7.6
 identifier_list:
-  Identifier (',' Identifier)* @
+  Identifier (',' Identifier)*
 ;
 /// 6.7.7
 type_name:
@@ -313,7 +313,7 @@ static_assert_declaration:
 // A.2.3 Statements
 
 /// 6.8
-statement:
+statement^:
   ?1 labeled_statement
 | compound_statement
 | expression_statement
@@ -341,7 +341,7 @@ compound_statement:
   '{' #1 block_item* #2 '}'
 ;
 /// 6.8.2
-block_item:
+block_item^:
   ?1 declaration | statement
 ;
 /// 6.8.3
@@ -422,14 +422,14 @@ declaration_list:
 
 
 // GNU attribute extension
-gnu_attributes:
-  (?1 gnu_attribute)*
+gnu_attributes^:
+  [?1 (?1 gnu_attribute)+ >]
 ;
 gnu_attribute:
   '__attribute__' '(' '(' attribute_list ')' ')'
 ;
 attribute_list:
-  attrib (',' attrib)* @
+  attrib (',' attrib)*
 ;
 attrib:
   [attrib_name ['(' [?1 Identifier [',' constant_expr (',' constant_expr)*] | argument_expression_list] ')']]

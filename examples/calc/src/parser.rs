@@ -37,6 +37,8 @@ pub enum Token {
     Whitespace,
     #[regex(r"[0-9]+(\.[0-9]+)?")]
     Num,
+    #[token("^")]
+    Pow,
     #[token("+")]
     Plus,
     #[token("-")]
@@ -49,7 +51,7 @@ pub enum Token {
     LPar,
     #[token(")")]
     RPar,
-    #[regex(r"[^0-9 \t\n\f\+\-\*/\(\)]+", |_| false)]
+    #[regex(r"[^0-9 \t\n\f\+\-\*/\(\)^]+", |_| false)]
     Error,
 }
 

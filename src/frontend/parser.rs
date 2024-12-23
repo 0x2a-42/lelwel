@@ -112,6 +112,8 @@ pub enum Token {
     Star,
     #[token("+")]
     Plus,
+    #[token("^")]
+    Hat,
     #[regex("[a-zA-Z][a-zA-Z_0-9]*")]
     Id,
     #[regex("'", parse_string)]
@@ -120,12 +122,12 @@ pub enum Token {
     Predicate,
     #[regex(r"#[0-9]+")]
     Action,
-    #[regex(r"@([a-zA-Z][a-zA-Z_0-9]*)?")]
-    Binding,
+    #[regex(r"@[a-zA-Z][a-zA-Z_0-9]*")]
+    NodeRename,
     #[regex("<[0-9]+")]
-    OpenNode,
-    #[regex("[0-9]+>([a-zA-Z][a-zA-Z_0-9]*)")]
-    CloseNode,
+    NodeMarker,
+    #[regex("[0-9]*>([a-zA-Z][a-zA-Z_0-9]*)?")]
+    NodeCreation,
     Error,
 }
 

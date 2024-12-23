@@ -672,7 +672,7 @@ impl<'a> PredicatesAndActions for Parser<'a> {
     }
     fn predicate_cast_expr_1(&self) -> bool {
         if self.is_parenthesized_type() {
-            // check this is not a compund literal
+            // check this is not a compound literal
             let mut it = self.cst.tokens[self.pos..].iter().skip(1);
             let mut paren_depth = 1;
             loop {

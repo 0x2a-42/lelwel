@@ -120,11 +120,9 @@ impl DebugPrinter {
     }
     fn print_rule_decl(&mut self, cst: &Cst, sema: &SemanticData, decl: RuleDecl) {
         let name = decl.name(cst).map_or("", |(val, _)| val);
-        let pattern = sema.patterns.get(&decl);
         println!(
-            "Rule {} {} {} {}",
+            "Rule {} {} {}",
             member!(name),
-            member!(pattern),
             pos!(decl.span(cst)),
             syntax!(decl.syntax().0),
         );
@@ -295,37 +293,47 @@ impl DebugPrinter {
                     syntax!(alt.syntax().0),
                 );
             }
-            Regex::Binding(bind) => {
-                let value = bind.value(cst).map_or("", |(val, _)| val);
+            Regex::NodeRename(rename) => {
+                let value = rename.value(cst).map_or("", |(val, _)| val);
                 println!(
-                    "Binding {} {} {} {} {}",
+                    "NodeRename {} {} {} {} {}",
                     member!(value),
                     set!(first),
                     set!(follow),
-                    pos!(bind.span(cst)),
-                    syntax!(bind.syntax().0),
+                    pos!(rename.span(cst)),
+                    syntax!(rename.syntax().0),
                 );
             }
-            Regex::OpenNode(open) => {
-                let value = open.value(cst).map_or("", |(val, _)| val);
+            Regex::NodeElision(elision) => {
                 println!(
-                    "OpenNode {} {} {} {} {}",
-                    member!(value),
+                    "NodeElision {} {} {} {} {}",
                     set!(first),
                     set!(follow),
-                    pos!(open.span(cst)),
-                    syntax!(open.syntax().0),
+                    set!(recovery),
+                    pos!(elision.span(cst)),
+                    syntax!(elision.syntax().0),
                 );
             }
-            Regex::CloseNode(close) => {
-                let value = close.value(cst).map_or("", |(val, _)| val);
+            Regex::NodeMarker(marker) => {
+                let value = marker.value(cst).map_or("", |(val, _)| val);
                 println!(
-                    "CloseNode {} {} {} {} {}",
+                    "NodeMarker {} {} {} {} {}",
                     member!(value),
                     set!(first),
                     set!(follow),
-                    pos!(close.span(cst)),
-                    syntax!(close.syntax().0),
+                    pos!(marker.span(cst)),
+                    syntax!(marker.syntax().0),
+                );
+            }
+            Regex::NodeCreation(creation) => {
+                let value = creation.value(cst).map_or("", |(val, _)| val);
+                println!(
+                    "NodeCreation {} {} {} {} {}",
+                    member!(value),
+                    set!(first),
+                    set!(follow),
+                    pos!(creation.span(cst)),
+                    syntax!(creation.syntax().0),
                 );
             }
         }
