@@ -723,7 +723,7 @@ impl<'a> PredicatesAndActions for Parser<'a> {
     }
     fn predicate_direct_declarator_2(&self) -> bool {
         // use extra lookahead
-        self.peek(1) != Token::RBrak
+        self.peek(1) == Token::RBrak
     }
     fn predicate_parameter_list_1(&self) -> bool {
         // use extra lookahead
@@ -770,11 +770,7 @@ impl<'a> PredicatesAndActions for Parser<'a> {
     }
     fn predicate_direct_abstract_declarator_1(&self) -> bool {
         // use extra lookahead
-        self.peek(1) != Token::RBrak
-    }
-    fn predicate_direct_abstract_declarator_2(&self) -> bool {
-        // use extra lookahead
-        self.peek(1) != Token::RBrak
+        self.peek(1) == Token::RBrak
     }
     fn predicate_initializer_list_1(&self) -> bool {
         // use extra lookahead

@@ -281,10 +281,13 @@ direct_abstract_declarator:
 | '[' [
     'static' type_qualifier* assignment_expr
   | type_qualifier+ ['static' assignment_expr]
-  | ?2 '*'
+  | ?1 '*'
   | assignment_expr
   ] ']' @abstract_array_declarator
-| '(' [parameter_type_list @abstract_function_declarator | abstract_declarator] ')'
+| '(' [
+    parameter_type_list @abstract_function_declarator
+  | abstract_declarator @abstract_paren_declarator
+  ] ')'
 ;
 /// 6.7.9
 initializer:
