@@ -291,23 +291,47 @@ impl RustOutput {
         regex: Regex,
         recursive: &RecursiveBranches,
     ) -> std::io::Result<()> {
+        // binding power is not required if there is only one recursive branch or
+        // if there are only left recursive branches
+        let requires_bp = recursive.branches().len() > 1
+            && recursive
+                .branches()
+                .iter()
+                .any(|branch| matches!(branch, Recursion::Right(..) | Recursion::LeftRight(..)));
+        if requires_bp {
+            output.write_all(
+                b"        fn rec(\
+                \n            parser: &mut Parser,\
+                \n            diags: &mut Vec<Diagnostic>,\
+                \n            min_bp: usize,\
+                \n            mut lhs: MarkClosed,\
+                \n        ) {\n",
+            )?;
+        } else {
+            output.write_all(
+                b"        fn rec(\
+                \n            parser: &mut Parser,\
+                \n            diags: &mut Vec<Diagnostic>,\
+                \n            mut lhs: MarkClosed,\
+                \n        ) {\n",
+            )?;
+        }
+        let call_rec = |parser, binding_power, marker| {
+            if requires_bp {
+                format!("rec({parser}, diags, {binding_power}, {marker});\n")
+            } else {
+                format!("rec({parser}, diags, {marker});\n")
+            }
+        };
+
+        // right recursive or non-recursive branches
+        Self::output_node_kind_decl(output, has_rule_rename, name, 3, true)?;
+        output.write_all(b"            match parser.current {\n")?;
         let ops = if let Regex::Alternation(alt) = regex {
             alt.operands(cst)
         } else {
             unreachable!();
         };
-        output.write_all(
-            b"        fn rec(\
-            \n            parser: &mut Parser,\
-            \n            diags: &mut Vec<Diagnostic>,\
-            \n            min_bp: usize,\
-            \n            mut lhs: MarkClosed,\
-            \n        ) {\n",
-        )?;
-
-        // right recursive or non-recursive branches
-        Self::output_node_kind_decl(output, has_rule_rename, name, 3, true)?;
-        output.write_all(b"            match parser.current {\n")?;
         for alt_op in ops {
             let branch = recursive.get_branch(alt_op);
             if !matches!(branch, None | Some(Recursion::Right(..))) {
@@ -328,16 +352,16 @@ impl RustOutput {
                 output.write_all(b"                    let m = parser.cst.open();\n")?;
             }
             if let Some(Recursion::Right(_, index)) = branch {
+                let binding_power = recursive.binding_power(alt_op).0;
                 let Regex::Concat(concat) = alt_op else {
                     unreachable!()
                 };
                 for (i, concat_op) in concat.operands(cst).enumerate() {
                     if i == index {
-                        let binding_power = recursive.binding_power(alt_op).0;
                         output.write_all(
                             format!(
-                                "let lhs = parser.cst.mark();\
-                               \nrec(parser, diags, {binding_power}, lhs);\n"
+                                "let lhs = parser.cst.mark();\n{}",
+                                call_rec("parser", binding_power, "lhs")
                             )
                             .indent(5)
                             .as_bytes(),
@@ -420,16 +444,18 @@ impl RustOutput {
                         .indent(5)
                         .as_bytes(),
                     )?;
-                    let binding_power = binding_power.0;
-                    output.write_all(
-                        format!(
-                            "if {binding_power} < min_bp {{\
-                           \n    break;\
-                           \n}}\n"
-                        )
-                        .indent(6)
-                        .as_bytes(),
-                    )?;
+                    if requires_bp {
+                        let binding_power = binding_power.0;
+                        output.write_all(
+                            format!(
+                                "if {binding_power} < min_bp {{\
+                               \n    break;\
+                               \n}}\n"
+                            )
+                            .indent(6)
+                            .as_bytes(),
+                        )?;
+                    }
                     output.write_all(
                         "let m = parser.cst.open_before(lhs);\n"
                             .indent(6)
@@ -440,8 +466,8 @@ impl RustOutput {
                     let binding_power = binding_power.1;
                     output.write_all(
                         format!(
-                            "let rhs = parser.cst.mark();\
-                           \nrec(parser, diags, {binding_power}, rhs);\n"
+                            "let rhs = parser.cst.mark();\n{}",
+                            call_rec("parser", binding_power, "rhs")
                         )
                         .indent(6)
                         .as_bytes(),
@@ -474,12 +500,14 @@ impl RustOutput {
                 .as_bytes(),
         )?;
         output.write_all(
-            "    }\
-           \n}\
-           \nlet lhs = self.cst.mark();\
-           \nrec(self, diags, 0, lhs);\n"
-                .indent(2)
-                .as_bytes(),
+            format!(
+                "    }}\
+               \n}}\
+               \nlet lhs = self.cst.mark();\n{}",
+                call_rec("self", 0, "lhs")
+            )
+            .indent(2)
+            .as_bytes(),
         )
     }
 

@@ -747,12 +747,7 @@ impl<'a> Parser<'a> {
         }
     }
     fn r#postfix(&mut self, diags: &mut Vec<Diagnostic>) {
-        fn rec(
-            parser: &mut Parser,
-            diags: &mut Vec<Diagnostic>,
-            min_bp: usize,
-            mut lhs: MarkClosed,
-        ) {
+        fn rec(parser: &mut Parser, diags: &mut Vec<Diagnostic>, mut lhs: MarkClosed) {
             match parser.current {
                 Token::Action
                 | Token::Hat
@@ -792,9 +787,6 @@ impl<'a> Parser<'a> {
             loop {
                 match parser.current {
                     Token::Plus | Token::Star => {
-                        if 2 < min_bp {
-                            break;
-                        }
                         let m = parser.cst.open_before(lhs);
                         match parser.current {
                             Token::Star => {
@@ -817,7 +809,7 @@ impl<'a> Parser<'a> {
             }
         }
         let lhs = self.cst.mark();
-        rec(self, diags, 0, lhs);
+        rec(self, diags, lhs);
     }
     fn r#paren(&mut self, diags: &mut Vec<Diagnostic>) {
         let m = self.cst.open();
