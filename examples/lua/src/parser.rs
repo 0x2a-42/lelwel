@@ -82,7 +82,7 @@ fn parse_comments(lexer: &mut Lexer<'_, Token>) -> Result<(), LexerError> {
     if lexer
         .remainder()
         .find(&closing)
-        .map(|i| lexer.bump(i + prefix_len))
+        .map(|i| lexer.bump(i + closing.len()))
         .is_some()
     {
         Ok(())
@@ -90,6 +90,13 @@ fn parse_comments(lexer: &mut Lexer<'_, Token>) -> Result<(), LexerError> {
         lexer.bump(lexer.remainder().len());
         Err(LexerError::UnterminatedComment)
     }
+}
+fn parse_first_line_comment(lexer: &mut Lexer<'_, Token>) -> Token {
+    if lexer.span().start == 0 {
+        lexer.remainder().find('\n').map(|i| lexer.bump(i + 1));
+        return Token::FirstLineComment;
+    }
+    Token::Hash
 }
 
 #[allow(clippy::upper_case_acronyms)]
@@ -198,8 +205,9 @@ pub enum Token {
     EqualEqual,
     #[token("~=")]
     TildeEqual,
-    #[token("#")]
+    #[token("#", parse_first_line_comment)]
     Hash,
+    FirstLineComment,
     #[token("[")]
     LBrak,
     #[token("]")]

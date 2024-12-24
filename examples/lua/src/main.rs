@@ -14,12 +14,7 @@ fn main() -> std::io::Result<()> {
         std::process::exit(1);
     }
 
-    let mut source = std::fs::read_to_string(&args[1])?;
-    if source.starts_with('#') {
-        // remove special first line comment
-        let offset = source.find('\n').unwrap_or(source.len());
-        source.replace_range(..offset, &" ".repeat(offset));
-    };
+    let source = std::fs::read_to_string(&args[1])?;
     let mut diags = vec![];
     let (tokens, ranges) = tokenize(Token::lexer(&source), &mut diags);
     let cst = Parser::parse(&source, tokens, ranges, &mut diags);

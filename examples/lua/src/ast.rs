@@ -80,7 +80,6 @@ ast_node!(
 );
 ast_node!(Binexp);
 ast_node!(Unaryexp);
-ast_node!(Powexp);
 ast_node!(Literalexp);
 ast_node!(Nameexp);
 ast_node!(Parenexp);
@@ -94,7 +93,6 @@ ast_node!(
     (
         Binexp,
         Unaryexp,
-        Powexp,
         Literalexp,
         Nameexp,
         Parenexp,

@@ -11,14 +11,15 @@ token Semi=';' ColonColon='::' Colon=':' Dot='.' Comma=',' Ellipsis='...'
 token LBrak='[' RBrak=']' LParen='(' RParen=')' LBrace='{' RBrace='}';
 token Name='<name>' LiteralString='<string>'
       Numeral='<numeral>';
-token Comment Whitespace;
+token Comment FirstLineComment Whitespace;
 
-skip Comment Whitespace;
-right '..';
+skip Comment FirstLineComment Whitespace;
+right '..' '^';
 
 start chunk;
 
-chunk: block;
+chunk: chunk_block;
+chunk_block: stat* [retstat] @block; // extra rule for better error handling
 block: stat* [retstat];
 stat^:
   emptystat
@@ -56,39 +57,37 @@ forstat:
 funcstat: 'function' funcname pars funcbody;
 localstat:
   'local' (
-    'function' Name pars funcbody
-  | attnamelist ['=' explist]
+    'function' Name pars funcbody @localfuncstat
+  | attname (',' attname)* ['=' explist]
   )
 ;
-attnamelist: Name [attrib] (',' Name [attrib])*;
+attname: Name [attrib];
 attrib: '<' Name '>';
 retstat: 'return' [explist] [';'];
 label: '::' Name '::';
-funcname: Name ('.' Name)* [':' Name];
+funcname: qualname [':' Name];
+qualname: Name ('.' Name)*;
 namelist: Name (',' Name)*;
 explist: exp (',' exp)*;
 args_explist: '(' [exp (',' exp)*] ')'; // extra rule for better error handling
 
-exp^: binexp;
-binexp:
-  binexp ('*' | '/' | '//' | '%') binexp
-| binexp ('+' | '-') binexp
-| binexp '..' binexp
-| binexp ('<<' | '>>') binexp
-| binexp '&' binexp
-| binexp '~' binexp
-| binexp '|' binexp
-| binexp ('<' | '>' | '<=' | '>=' | '~=' | '==') binexp
-| binexp 'and' binexp
-| binexp 'or' binexp
-| unaryexp ^
-;
-unaryexp:
-  ('not' | '-' | '#' | '~') unaryexp
-| powexp ^
-;
-powexp^:
-  (literalexp | prefixexp | tableconstructor | functiondef) ['^' unaryexp >]
+exp:
+  exp '^' exp @binexp
+| ('not' | '-' | '#' | '~') exp @unaryexp
+| exp ('*' | '/' | '//' | '%') exp @binexp
+| exp ('+' | '-') exp @binexp
+| exp '..' exp @binexp
+| exp ('<<' | '>>') exp @binexp
+| exp '&' exp @binexp
+| exp '~' exp @binexp
+| exp '|' exp @binexp
+| exp ('<' | '>' | '<=' | '>=' | '~=' | '==') exp @binexp
+| exp 'and' exp @binexp
+| exp 'or' exp @binexp
+| literalexp ^
+| prefixexp ^
+| tableconstructor ^
+| functiondef ^
 ;
 literalexp:
   'nil'
@@ -98,14 +97,12 @@ literalexp:
 | Numeral
 | LiteralString
 ;
-nameexp: Name;
-parenexp: '(' exp ')';
 prefixexp:
   prefixexp '[' exp ']' @indexexp
 | prefixexp '.' Name @fieldexp
 | ?1 prefixexp (args | ':' Name args) @callexp // resolve ambiguity described in section 3.3.1
-| nameexp ^
-| parenexp ^
+| Name @nameexp
+| '(' exp ')' @parenexp
 ;
 args^:
   args_explist
