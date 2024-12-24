@@ -7,6 +7,7 @@ use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use codespan_reporting::term::{self, Config};
 use logos::Logos;
 use parser::*;
+use std::io::Read;
 
 fn main() -> std::io::Result<()> {
     let args: Vec<String> = std::env::args().collect();
@@ -14,7 +15,15 @@ fn main() -> std::io::Result<()> {
         std::process::exit(1);
     }
 
-    let source = std::fs::read_to_string(&args[1])?;
+    let mut buf = Vec::new();
+    std::fs::File::open(&args[1])?.read_to_end(&mut buf)?;
+    let source = if std::str::from_utf8(&buf).is_ok() {
+        unsafe { String::from_utf8_unchecked(buf) }
+    } else {
+        // ISO 8859-1
+        buf.iter().map(|&c| c as char).collect()
+    };
+
     let mut diags = vec![];
     let (tokens, ranges) = tokenize(Token::lexer(&source), &mut diags);
     let cst = Parser::parse(&source, tokens, ranges, &mut diags);
