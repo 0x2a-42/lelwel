@@ -10,9 +10,9 @@ start calc;
 calc^: expr;
 expr:
   expr '^' expr @binary_expr
+| ('-' | '+') expr @unary_expr
 | expr ('*' | '/') expr @binary_expr
 | expr ('+' | '-') expr @binary_expr
-| ('-' | '+') expr @unary_expr
 | Num @literal_expr
 | '(' expr ')' @paren_expr
 ;

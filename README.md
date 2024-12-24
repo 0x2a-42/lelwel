@@ -332,13 +332,16 @@ The binding power decreases from the first to the last branch.
 In a left recursive branch the follow set of the first concatenation element defines the operator tokens.
 Otherwise in a right recursive branch the first set of the first concatenation element defines the operator tokens.
 
+> [!TIP]
+> Use a Pratt parser for expressions, as it improves readability and efficiency compared to an encoding of operator precedence in grammar rules.
+
 > **Example**
 > ```antlr
 > expr:
 >   expr '^' expr
+> | ('-' | '+') expr
 > | expr ('*' | '/') expr
 > | expr ('+' | '-') expr
-> | ('-' | '+') expr
 > | Num
 > | '(' expr ')'
 > ;
