@@ -50,7 +50,7 @@ fn ${file%.llw}() {
     let diags = gen_diags("$path");
     let mut lines = diags.lines();
 EOF
-  diag=$(llw -cs "$path" 2>&1 > /dev/null)
+  diag=$(cargo run --quiet --features=cli --bin=llw -- -cs "$path" 2>&1 > /dev/null)
   echo >> $output
   echo "$diag" | while read -r line ; do
     if [ ! -z "$line" ]; then
