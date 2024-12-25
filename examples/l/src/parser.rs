@@ -107,7 +107,7 @@ pub fn tokenize(
     (tokens, ranges)
 }
 
-impl<'a> PredicatesAndActions for Parser<'a> {
+impl PredicatesAndActions for Parser<'_> {
     fn predicate_param_list_1(&self) -> bool {
         self.peek(1) != Token::RPar
     }

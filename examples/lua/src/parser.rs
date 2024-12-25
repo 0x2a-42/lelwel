@@ -93,7 +93,9 @@ fn parse_comments(lexer: &mut Lexer<'_, Token>) -> Result<(), LexerError> {
 }
 fn parse_first_line_comment(lexer: &mut Lexer<'_, Token>) -> Token {
     if lexer.span().start == 0 {
-        lexer.remainder().find('\n').map(|i| lexer.bump(i + 1));
+        if let Some(i) = lexer.remainder().find('\n') {
+            lexer.bump(i + 1)
+        }
         return Token::FirstLineComment;
     }
     Token::Hash
@@ -268,7 +270,7 @@ pub fn tokenize(
 
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 
-impl<'a> PredicatesAndActions for Parser<'a> {
+impl PredicatesAndActions for Parser<'_> {
     fn build(&mut self, rule: Rule, node: NodeRef, diags: &mut Vec<Diagnostic>) {
         match rule {
             Rule::Expstat => {
