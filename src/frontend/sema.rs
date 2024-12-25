@@ -1030,11 +1030,11 @@ impl<'a> LL1Validator {
                 for (i, branch) in recursive
                     .branches
                     .iter()
-                    .enumerate()
-                    .filter_map(|(i, rec)| match rec {
-                        Recursion::Left(op, ..) | Recursion::LeftRight(op, ..) => Some((i, op)),
+                    .filter_map(|rec| match rec {
+                        Recursion::Left(op, ..) | Recursion::LeftRight(op, ..) => Some(op),
                         _ => None,
                     })
+                    .enumerate()
                 {
                     let op = Self::skip_first(cst, *branch);
 
@@ -1072,10 +1072,13 @@ impl<'a> LL1Validator {
                         true,
                     );
                 }
-                let non_recursive_branches =
-                    || alt.operands(cst).filter(|op| !recursive.contains(*op));
+                let non_left_recursive_branches = || {
+                    alt.operands(cst).filter(|op| {
+                        matches!(recursive.get_branch(*op), None | Some(Recursion::Right(..)))
+                    })
+                };
 
-                for (i, op) in non_recursive_branches().enumerate() {
+                for (i, op) in non_left_recursive_branches().enumerate() {
                     if Self::has_predicate(cst, op) {
                         continue;
                     }
@@ -1084,7 +1087,7 @@ impl<'a> LL1Validator {
                         sema,
                         diags,
                         op,
-                        non_recursive_branches(),
+                        non_left_recursive_branches(),
                         i,
                         false,
                     );

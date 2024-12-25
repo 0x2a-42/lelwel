@@ -120,6 +120,8 @@ fn left_recursive() {
 
     assert_eq!(lines.next().unwrap(), "tests/frontend/left_recursive.llw:6:5: error[E012]: LL(1) conflict in left recursive rule");
     assert_eq!(lines.next().unwrap(), "tests/frontend/left_recursive.llw:9:3: error[E011]: LL(1) conflict in alternation");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/left_recursive.llw:15:5: error[E012]: LL(1) conflict in left recursive rule");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/left_recursive.llw:13:3: error[E011]: LL(1) conflict in alternation");
     assert_eq!(lines.next(), None);
 }
 

@@ -1,11 +1,18 @@
-token A B C;
+token A B C D E F;
 start a;
 
-a: b;
+a: b c;
 b:
   b A
 | b A
 | b C
 | B
 | B
+;
+c:
+  D c
+| D c
+| c E c
+| c E c
+| F
 ;
