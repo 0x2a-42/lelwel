@@ -42,7 +42,7 @@ By default the generated parser uses [Logos](https://github.com/maciejhirsz/logo
 The PEG formalism just defines ambiguity away, which may cause the parser to parse a different language than you think.
 
 ## Error Resilience
-The following example shows the difference between [Lelwel](https://0x2a-42.github.io/playground.html) and [Tree-sitter](https://tree-sitter.github.io/tree-sitter/playground), a GLR parser generator with sophisticated error recovery, when parsing certain incomplete C source code.
+The following example shows the difference between [Lelwel](https://0x2a-42.github.io/playground.html) and [Tree-sitter](https://tree-sitter.github.io/tree-sitter/7-playground.html), a GLR parser generator with sophisticated error recovery, when parsing certain incomplete C source code.
 
 ```c
 void f() {
@@ -114,16 +114,24 @@ translation_unit [0, 0] - [4, 0]
     declarator: function_declarator [0, 5] - [0, 8]
       declarator: identifier [0, 5] - [0, 6]
       parameters: parameter_list [0, 6] - [0, 8]
+        ( [0, 6] - [0, 7]
+        ) [0, 7] - [0, 8]
     body: compound_statement [0, 9] - [3, 1]
+      { [0, 9] - [0, 10]
       ERROR [1, 2] - [2, 11]
         identifier [1, 2] - [1, 3]
+        ( [1, 3] - [1, 4]
         number_literal [1, 4] - [1, 5]
+        , [1, 5] - [1, 6]
         assignment_expression [2, 2] - [2, 11]
           left: identifier [2, 2] - [2, 5]
           ERROR [2, 6] - [2, 7]
             identifier [2, 6] - [2, 7]
+          operator: = [2, 8] - [2, 9]
           right: number_literal [2, 10] - [2, 11]
       ERROR [2, 12] - [2, 13]
+        + [2, 12] - [2, 13]
+      } [3, 0] - [3, 1]
 ```
 </details>
 
