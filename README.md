@@ -369,7 +369,7 @@ Mixing left and right associative operators in the same branch is not allowed.
 
 #### Semantic Actions and Predicates
 Semantic actions can be defined at any point in a regex.
-Semantic predicated can be defined at the beginning of an alternation branch, an optional or a repetition.
+Semantic predicates can be defined at the beginning of an alternation branch, an optional or a repetition.
 The index of actions and predicates can be used multiple times in a rule.
 
 When the semantic action or predicate is visited in a parse it will execute the rust code of the corresponding associated function in the `PredicatesAndActions` trait implementation of the `Parser` type.
