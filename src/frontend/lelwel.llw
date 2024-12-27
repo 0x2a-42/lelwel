@@ -31,20 +31,16 @@ regex^: alternation;
 alternation^: concat [('|' concat)+ >];
 concat^: postfix [postfix+ >];
 postfix:
-  postfix ('*' | '+')
-| atomic ^
-| paren ^
-| optional ^
-;
-paren: '(' regex ')';
-optional: '[' regex ']';
-atomic:
-  Id
-| Str
-| Predicate
-| Action
-| NodeRename
-| NodeMarker
-| NodeCreation
-| '^'
+  postfix '*' @star
+| postfix '+' @plus
+| '(' regex ')' @paren
+| '[' regex ']' @optional
+| Id @name
+| Str @symbol
+| Predicate @predicate
+| Action @action
+| NodeRename @node_rename
+| NodeMarker @node_marker
+| NodeCreation @node_creation
+| '^' @node_elision
 ;

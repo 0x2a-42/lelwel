@@ -30,30 +30,6 @@ macro_rules! ast_node {
             }
         }
     };
-    ($node_name:ident, $rule_name:ident, $token_name:ident) => {
-        #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, Ord, PartialOrd)]
-        pub struct $node_name {
-            syntax: NodeRef,
-        }
-        impl AstNode for $node_name {
-            fn cast(cst: &Cst, syntax: NodeRef) -> Option<Self> {
-                match cst.get(syntax) {
-                    Node::Rule(Rule::$rule_name, _)
-                        if cst
-                            .children(syntax)
-                            .find_map(|n| cst.get_token(n, Token::$token_name))
-                            .is_some() =>
-                    {
-                        Some(Self { syntax })
-                    }
-                    _ => None,
-                }
-            }
-            fn syntax(&self) -> NodeRef {
-                self.syntax
-            }
-        }
-    };
     ($node_name:ident, ($($node_names:ident),+)) => {
         #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, Ord, PartialOrd)]
         pub enum $node_name {
@@ -106,16 +82,16 @@ ast_node!(Alternation);
 ast_node!(Concat);
 ast_node!(Paren);
 ast_node!(Optional);
-ast_node!(Star, Postfix, Star);
-ast_node!(Plus, Postfix, Plus);
-ast_node!(Name, Atomic, Id);
-ast_node!(Symbol, Atomic, Str);
-ast_node!(Predicate, Atomic, Predicate);
-ast_node!(Action, Atomic, Action);
-ast_node!(NodeRename, Atomic, NodeRename);
-ast_node!(NodeElision, Atomic, Hat);
-ast_node!(NodeMarker, Atomic, NodeMarker);
-ast_node!(NodeCreation, Atomic, NodeCreation);
+ast_node!(Star);
+ast_node!(Plus);
+ast_node!(Name);
+ast_node!(Symbol);
+ast_node!(Predicate);
+ast_node!(Action);
+ast_node!(NodeRename);
+ast_node!(NodeElision);
+ast_node!(NodeMarker);
+ast_node!(NodeCreation);
 
 impl Cst<'_> {
     fn child_node<T: AstNode>(&self, syntax: NodeRef) -> Option<T> {

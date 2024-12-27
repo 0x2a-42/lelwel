@@ -46,9 +46,18 @@ pub enum Rule {
     Alternation,
     Concat,
     Postfix,
-    Paren,
+    Action,
+    Name,
+    NodeCreation,
+    NodeElision,
+    NodeMarker,
+    NodeRename,
     Optional,
-    Atomic,
+    Paren,
+    Plus,
+    Predicate,
+    Star,
+    Symbol,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
@@ -746,24 +755,74 @@ impl<'a> Parser<'a> {
             }
         }
     }
+    #[allow(unused_assignments)]
     fn r#postfix(&mut self, diags: &mut Vec<Diagnostic>) {
         fn rec(parser: &mut Parser, diags: &mut Vec<Diagnostic>, mut lhs: MarkClosed) {
+            let mut node_kind = Rule::Postfix;
             match parser.current {
-                Token::Action
-                | Token::Hat
-                | Token::Id
-                | Token::NodeCreation
-                | Token::NodeMarker
-                | Token::NodeRename
-                | Token::Predicate
-                | Token::Str => {
-                    parser.r#atomic(diags);
-                }
                 Token::LPar => {
-                    parser.r#paren(diags);
+                    let m = parser.cst.open();
+                    expect!(LPar, "(", parser, diags);
+                    parser.r#regex(diags);
+                    expect!(RPar, ")", parser, diags);
+                    node_kind = Rule::Paren;
+                    parser.close(m, node_kind, diags);
                 }
                 Token::LBrak => {
-                    parser.r#optional(diags);
+                    let m = parser.cst.open();
+                    expect!(LBrak, "[", parser, diags);
+                    parser.r#regex(diags);
+                    expect!(RBrak, "]", parser, diags);
+                    node_kind = Rule::Optional;
+                    parser.close(m, node_kind, diags);
+                }
+                Token::Id => {
+                    let m = parser.cst.open();
+                    expect!(Id, "<identifier>", parser, diags);
+                    node_kind = Rule::Name;
+                    parser.close(m, node_kind, diags);
+                }
+                Token::Str => {
+                    let m = parser.cst.open();
+                    expect!(Str, "<string literal>", parser, diags);
+                    node_kind = Rule::Symbol;
+                    parser.close(m, node_kind, diags);
+                }
+                Token::Predicate => {
+                    let m = parser.cst.open();
+                    expect!(Predicate, "<semantic predicate>", parser, diags);
+                    node_kind = Rule::Predicate;
+                    parser.close(m, node_kind, diags);
+                }
+                Token::Action => {
+                    let m = parser.cst.open();
+                    expect!(Action, "<semantic action>", parser, diags);
+                    node_kind = Rule::Action;
+                    parser.close(m, node_kind, diags);
+                }
+                Token::NodeRename => {
+                    let m = parser.cst.open();
+                    expect!(NodeRename, "<node rename>", parser, diags);
+                    node_kind = Rule::NodeRename;
+                    parser.close(m, node_kind, diags);
+                }
+                Token::NodeMarker => {
+                    let m = parser.cst.open();
+                    expect!(NodeMarker, "<node marker>", parser, diags);
+                    node_kind = Rule::NodeMarker;
+                    parser.close(m, node_kind, diags);
+                }
+                Token::NodeCreation => {
+                    let m = parser.cst.open();
+                    expect!(NodeCreation, "<node creation>", parser, diags);
+                    node_kind = Rule::NodeCreation;
+                    parser.close(m, node_kind, diags);
+                }
+                Token::Hat => {
+                    let m = parser.cst.open();
+                    expect!(Hat, "^", parser, diags);
+                    node_kind = Rule::NodeElision;
+                    parser.close(m, node_kind, diags);
                 }
                 _ => {
                     parser.error(
@@ -785,21 +844,20 @@ impl<'a> Parser<'a> {
                 }
             }
             loop {
+                node_kind = Rule::Postfix;
                 match parser.current {
-                    Token::Plus | Token::Star => {
+                    Token::Star => {
                         let m = parser.cst.open_before(lhs);
-                        match parser.current {
-                            Token::Star => {
-                                expect!(Star, "*", parser, diags);
-                            }
-                            Token::Plus => {
-                                expect!(Plus, "+", parser, diags);
-                            }
-                            _ => {
-                                parser.error(diags, err![parser.span(), "+", "*"]);
-                            }
-                        }
-                        lhs = parser.close(m, Rule::Postfix, diags);
+                        expect!(Star, "*", parser, diags);
+                        node_kind = Rule::Star;
+                        lhs = parser.close(m, node_kind, diags);
+                        continue;
+                    }
+                    Token::Plus => {
+                        let m = parser.cst.open_before(lhs);
+                        expect!(Plus, "+", parser, diags);
+                        node_kind = Rule::Plus;
+                        lhs = parser.close(m, node_kind, diags);
                         continue;
                     }
                     _ => {
@@ -810,66 +868,6 @@ impl<'a> Parser<'a> {
         }
         let lhs = self.cst.mark();
         rec(self, diags, lhs);
-    }
-    fn r#paren(&mut self, diags: &mut Vec<Diagnostic>) {
-        let m = self.cst.open();
-        expect!(LPar, "(", self, diags);
-        self.r#regex(diags);
-        expect!(RPar, ")", self, diags);
-        self.close(m, Rule::Paren, diags);
-    }
-    fn r#optional(&mut self, diags: &mut Vec<Diagnostic>) {
-        let m = self.cst.open();
-        expect!(LBrak, "[", self, diags);
-        self.r#regex(diags);
-        expect!(RBrak, "]", self, diags);
-        self.close(m, Rule::Optional, diags);
-    }
-    fn r#atomic(&mut self, diags: &mut Vec<Diagnostic>) {
-        let m = self.cst.open();
-        match self.current {
-            Token::Id => {
-                expect!(Id, "<identifier>", self, diags);
-            }
-            Token::Str => {
-                expect!(Str, "<string literal>", self, diags);
-            }
-            Token::Predicate => {
-                expect!(Predicate, "<semantic predicate>", self, diags);
-            }
-            Token::Action => {
-                expect!(Action, "<semantic action>", self, diags);
-            }
-            Token::NodeRename => {
-                expect!(NodeRename, "<node rename>", self, diags);
-            }
-            Token::NodeMarker => {
-                expect!(NodeMarker, "<node marker>", self, diags);
-            }
-            Token::NodeCreation => {
-                expect!(NodeCreation, "<node creation>", self, diags);
-            }
-            Token::Hat => {
-                expect!(Hat, "^", self, diags);
-            }
-            _ => {
-                self.error(
-                    diags,
-                    err![
-                        self.span(),
-                        "<semantic action>",
-                        "^",
-                        "<identifier>",
-                        "<node creation>",
-                        "<node marker>",
-                        "<node rename>",
-                        "<semantic predicate>",
-                        "<string literal>"
-                    ],
-                );
-            }
-        }
-        self.close(m, Rule::Atomic, diags);
     }
 }
 
