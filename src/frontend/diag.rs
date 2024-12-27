@@ -27,6 +27,7 @@ pub const REDEF_OPEN_NODE: &str = "E022";
 pub const UNDEF_CLOSE_NODE: &str = "E023";
 pub const INVALID_CLOSE_NODE: &str = "E024";
 pub const CREATE_RULE_NODE_LEFT_REC: &str = "E025";
+pub const EXPECTED_RULE: &str = "E026";
 
 pub const UNUSED_RULE: &str = "W001";
 pub const UNUSED_TOKEN: &str = "W002";
@@ -63,6 +64,7 @@ pub trait LanguageErrors {
     fn create_rule_node_left_rec(span: &Span) -> Self;
     fn unused_node_marker(span: &Span) -> Self;
     fn redundant_elision(span: &Span) -> Self;
+    fn expected_rule(span: &Span) -> Self;
 }
 
 impl LanguageErrors for Diagnostic {
@@ -339,6 +341,13 @@ impl LanguageErrors for Diagnostic {
         Diagnostic::warning()
             .with_code(REDUNDANT_ELISION)
             .with_message("node elision is redundant")
+            .with_labels(vec![Label::primary((), span.clone())])
+    }
+
+    fn expected_rule(span: &Span) -> Self {
+        Diagnostic::error()
+            .with_code(EXPECTED_RULE)
+            .with_message("expected rule")
             .with_labels(vec![Label::primary((), span.clone())])
     }
 }
