@@ -116,10 +116,17 @@ pub fn completion(cst: &Cst, pos: usize) -> Option<CompletionResponse> {
             Node::Rule(
                 Rule::Alternation
                 | Rule::Concat
-                | Rule::Postfix
+                | Rule::Star
+                | Rule::Plus
                 | Rule::Paren
                 | Rule::Optional
-                | Rule::Atomic,
+                | Rule::Name
+                | Rule::Symbol
+                | Rule::Predicate
+                | Rule::NodeRename
+                | Rule::NodeMarker
+                | Rule::NodeCreation
+                | Rule::NodeElision,
                 _,
             ) => {
                 add_reference_items(cst, file, &mut items, true, true);
