@@ -1,7 +1,7 @@
 use tower_lsp::lsp_types::*;
 
 use super::lookup::*;
-use crate::frontend::ast::{AstNode, File, Named};
+use crate::frontend::ast::{AstNode, File, Name, Named};
 use crate::{Cst, Node, NodeRef, Rule, SemanticData, Token};
 
 /// Suggests a token name for a given token symbol.
@@ -180,6 +180,7 @@ fn add_reference_items(
     items: &mut Vec<CompletionItem>,
     with_rules: bool,
     with_tokens: bool,
+    ignore: Option<&str>,
 ) {
     if with_rules {
         for rule in file.rule_decls(cst) {
@@ -200,14 +201,16 @@ fn add_reference_items(
             });
         }
         for rule_name in sema.undefined_rules.iter() {
-            items.push(CompletionItem {
-                label: rule_name.to_string(),
-                label_details: Some(CompletionItemLabelDetails {
-                    description: Some("Rule".to_string()),
+            if ignore != Some(rule_name) {
+                items.push(CompletionItem {
+                    label: rule_name.to_string(),
+                    label_details: Some(CompletionItemLabelDetails {
+                        description: Some("Rule".to_string()),
+                        ..Default::default()
+                    }),
                     ..Default::default()
-                }),
-                ..Default::default()
-            });
+                });
+            }
         }
     }
     if with_tokens {
@@ -233,15 +236,17 @@ fn add_reference_items(
                 });
             }
         }
-        for token_name_or_symbol in sema.undefined_rules.iter() {
-            items.push(CompletionItem {
-                label: token_name_or_symbol.to_string(),
-                label_details: Some(CompletionItemLabelDetails {
-                    description: Some("Token".to_string()),
+        for token_name_or_symbol in sema.undefined_tokens.iter() {
+            if ignore != Some(token_name_or_symbol) {
+                items.push(CompletionItem {
+                    label: token_name_or_symbol.to_string(),
+                    label_details: Some(CompletionItemLabelDetails {
+                        description: Some("Token".to_string()),
+                        ..Default::default()
+                    }),
                     ..Default::default()
-                }),
-                ..Default::default()
-            });
+                });
+            }
         }
     }
     if with_rules && with_tokens {
@@ -294,10 +299,20 @@ pub fn completion(cst: &Cst, pos: usize, sema: &SemanticData) -> Option<Completi
                 | Rule::NodeElision,
                 _,
             ) => {
-                add_reference_items(cst, file, sema, &mut items, true, true);
+                add_reference_items(
+                    cst,
+                    file,
+                    sema,
+                    &mut items,
+                    true,
+                    true,
+                    Name::cast(cst, node)
+                        .and_then(|name_ref| name_ref.value(cst))
+                        .map(|(name, _)| name),
+                );
             }
             Node::Rule(Rule::NodeCreation | Rule::NodeRename, _) => {
-                add_reference_items(cst, file, sema, &mut items, true, false);
+                add_reference_items(cst, file, sema, &mut items, true, false, None);
             }
             Node::Rule(Rule::RuleDecl, _) => {
                 if inside_decl(cst, node, pos) {
@@ -306,7 +321,7 @@ pub fn completion(cst: &Cst, pos: usize, sema: &SemanticData) -> Option<Completi
                         .find_map(|n| cst.get_token(n, Token::Colon))
                     {
                         if pos > range.start {
-                            add_reference_items(cst, file, sema, &mut items, true, true);
+                            add_reference_items(cst, file, sema, &mut items, true, true, None);
                         }
                     } else {
                         add_top_level_items(cst, file, sema, &mut items);
@@ -317,14 +332,14 @@ pub fn completion(cst: &Cst, pos: usize, sema: &SemanticData) -> Option<Completi
             }
             Node::Rule(Rule::SkipDecl | Rule::RightDecl, _) => {
                 if inside_decl(cst, node, pos) {
-                    add_reference_items(cst, file, sema, &mut items, false, true);
+                    add_reference_items(cst, file, sema, &mut items, false, true, None);
                 } else {
                     add_top_level_items(cst, file, sema, &mut items);
                 }
             }
             Node::Rule(Rule::StartDecl, _) => {
                 if inside_decl(cst, node, pos) {
-                    add_reference_items(cst, file, sema, &mut items, true, false);
+                    add_reference_items(cst, file, sema, &mut items, true, false, None);
                 } else {
                     add_top_level_items(cst, file, sema, &mut items);
                 }
