@@ -122,7 +122,7 @@ pub enum Token {
     Predicate,
     #[regex(r"#[0-9]+")]
     Action,
-    #[regex(r"@[a-zA-Z][a-zA-Z_0-9]*")]
+    #[regex(r"@([a-zA-Z][a-zA-Z_0-9]*)?")]
     NodeRename,
     #[regex("<[0-9]+")]
     NodeMarker,

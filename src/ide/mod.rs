@@ -188,7 +188,7 @@ async fn analyze(
             Request::Completion(params) => {
                 let pos =
                     compat::position_to_offset(&file, &params.text_document_position.position);
-                noti.send(Notification::Completion(completion(&cst, pos)))
+                noti.send(Notification::Completion(completion(&cst, pos, &sema)))
                     .await
                     .unwrap();
             }
