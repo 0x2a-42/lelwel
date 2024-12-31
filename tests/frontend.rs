@@ -167,6 +167,7 @@ fn lowercase_token() {
 
     assert_eq!(lines.next().unwrap(), "tests/frontend/lowercase_token.llw:1:7: error[E007]: token name starts with lower case letter");
     assert_eq!(lines.next().unwrap(), "tests/frontend/lowercase_token.llw:1:9: error[E007]: token name starts with lower case letter");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/lowercase_token.llw:4:1: warning[W005]: empty rule");
     assert_eq!(lines.next(), None);
 }
 
@@ -239,6 +240,10 @@ fn redefinition() {
     assert_eq!(lines.next().unwrap(), "tests/frontend/redefinition.llw:14:1: error[E005]: redefinition of rule");
     assert_eq!(lines.next().unwrap(), "tests/frontend/redefinition.llw:1:9: error[E005]: redefinition of token");
     assert_eq!(lines.next().unwrap(), "tests/frontend/redefinition.llw:1:13: error[E005]: redefinition of token");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/redefinition.llw:6:1: warning[W005]: empty rule");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/redefinition.llw:9:1: warning[W005]: empty rule");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/redefinition.llw:12:1: warning[W005]: empty rule");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/redefinition.llw:14:1: warning[W005]: empty rule");
     assert_eq!(lines.next().unwrap(), "error[E008]: missing start rule");
     assert_eq!(lines.next(), None);
 }
@@ -309,6 +314,9 @@ fn unused_element() {
     let diags = gen_diags("tests/frontend/unused_element.llw");
     let mut lines = diags.lines();
 
+    assert_eq!(lines.next().unwrap(), "tests/frontend/unused_element.llw:13:1: warning[W005]: empty rule");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/unused_element.llw:20:1: warning[W005]: empty rule");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/unused_element.llw:23:1: warning[W005]: empty rule");
     assert_eq!(lines.next().unwrap(), "tests/frontend/unused_element.llw:9:1: warning[W001]: unused rule");
     assert_eq!(lines.next().unwrap(), "tests/frontend/unused_element.llw:13:1: warning[W001]: unused rule");
     assert_eq!(lines.next().unwrap(), "tests/frontend/unused_element.llw:23:1: warning[W001]: unused rule");
@@ -335,5 +343,10 @@ fn uppercase_rule() {
 
     assert_eq!(lines.next().unwrap(), "tests/frontend/uppercase_rule.llw:6:1: error[E006]: rule name starts with upper case letter");
     assert_eq!(lines.next().unwrap(), "tests/frontend/uppercase_rule.llw:9:1: error[E006]: rule name starts with upper case letter");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/uppercase_rule.llw:3:1: warning[W005]: empty rule");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/uppercase_rule.llw:6:1: warning[W005]: empty rule");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/uppercase_rule.llw:9:1: warning[W005]: empty rule");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/uppercase_rule.llw:12:1: warning[W005]: empty rule");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/uppercase_rule.llw:15:1: warning[W005]: empty rule");
     assert_eq!(lines.next(), None);
 }

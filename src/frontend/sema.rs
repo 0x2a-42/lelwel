@@ -258,8 +258,11 @@ impl<'a> GeneralCheck<'a> {
         diags: &mut Vec<Diagnostic>,
         sema: &mut SemanticData<'a>,
     ) {
-        rule.regex(cst)
-            .map(|regex| self.check_regex(cst, rule, regex, diags, sema, false, false));
+        if let Some(regex) = rule.regex(cst) {
+            self.check_regex(cst, rule, regex, diags, sema, false, false);
+        } else {
+            diags.push(Diagnostic::empty_rule(&rule.span(cst)));
+        }
         self.check_recursive(cst, sema, rule, diags);
         if let Some(regex) = rule.regex(cst) {
             let mut open = HashSet::new();

@@ -34,6 +34,7 @@ pub const UNUSED_RULE: &str = "W001";
 pub const UNUSED_TOKEN: &str = "W002";
 pub const UNUSED_OPEN_NODE: &str = "W003";
 pub const REDUNDANT_ELISION: &str = "W004";
+pub const EMPTY_RULE: &str = "W005";
 
 pub trait LanguageErrors {
     fn invalid_binding_pos(span: &Span) -> Self;
@@ -67,6 +68,7 @@ pub trait LanguageErrors {
     fn redundant_elision(span: &Span) -> Self;
     fn expected_rule(span: &Span) -> Self;
     fn missing_node_name(span: &Span) -> Self;
+    fn empty_rule(span: &Span) -> Self;
 }
 
 impl LanguageErrors for Diagnostic {
@@ -357,6 +359,13 @@ impl LanguageErrors for Diagnostic {
         Diagnostic::error()
             .with_code(MISSING_NODE_NAME)
             .with_message("missing node name")
+            .with_labels(vec![Label::primary((), span.clone())])
+    }
+
+    fn empty_rule(span: &Span) -> Self {
+        Diagnostic::warning()
+            .with_code(EMPTY_RULE)
+            .with_message("empty rule")
             .with_labels(vec![Label::primary((), span.clone())])
     }
 }
