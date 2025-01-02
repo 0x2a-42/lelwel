@@ -2,7 +2,7 @@ use crate::frontend::ast::*;
 use crate::frontend::parser::{Cst, NodeRef};
 use crate::frontend::sema::*;
 use crate::VERSION;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::io::Write;
 use std::path::Path;
 
@@ -332,19 +332,23 @@ impl RustOutput {
         } else {
             unreachable!();
         };
+        let mut advance_error_set = BTreeSet::new();
         for alt_op in ops {
             let branch = recursive.get_branch(alt_op);
             if !matches!(branch, None | Some(Recursion::Right(..))) {
                 continue;
             }
+            let predict = &sema.predict_sets[&alt_op.syntax()];
+            let predicate = Self::get_predicate(cst, name, alt_op, "parser");
+            advance_error_set = if predicate.is_empty() {
+                advance_error_set.difference(predict).cloned().collect()
+            } else {
+                advance_error_set.union(predict).cloned().collect()
+            };
             output.write_all(
-                format!(
-                    "{}{} => {{\n",
-                    sema.predict_sets[&alt_op.syntax()].pattern(0),
-                    Self::get_predicate(cst, name, alt_op, "parser")
-                )
-                .indent(4)
-                .as_bytes(),
+                format!("{}{predicate} => {{\n", predict.pattern(0),)
+                    .indent(4)
+                    .as_bytes(),
             )?;
 
             let elision = *sema.elision.get(&alt_op.syntax()).unwrap();
@@ -399,6 +403,18 @@ impl RustOutput {
                 Self::output_cst_close(output, has_rule_rename, name, 5, false, "parser")?;
             }
             output.write_all("}\n".indent(4).as_bytes())?;
+        }
+        if !advance_error_set.is_empty() {
+            output.write_all(
+                format!(
+                    "    {} => {{\
+                   \n        parser.advance_with_error(diags, err![parser.span(),]);\
+                   \n    }}\n",
+                    advance_error_set.pattern(0)
+                )
+                .indent(3)
+                .as_bytes(),
+            )?;
         }
         output.write_all(
             format!(
@@ -670,15 +686,19 @@ impl RustOutput {
                         .indent(level)
                         .as_bytes(),
                 )?;
+                let mut advance_error_set = BTreeSet::new();
                 for op in alt.operands(cst) {
+                    let predict = &sema.predict_sets[&op.syntax()];
+                    let predicate = Self::get_predicate(cst, rule_name, op, parser_name);
+                    advance_error_set = if predicate.is_empty() {
+                        advance_error_set.difference(predict).cloned().collect()
+                    } else {
+                        advance_error_set.union(predict).cloned().collect()
+                    };
                     output.write_all(
-                        format!(
-                            "{}{} => {{\n",
-                            sema.predict_sets[&op.syntax()].pattern(0),
-                            Self::get_predicate(cst, rule_name, op, parser_name)
-                        )
-                        .indent(level + 1)
-                        .as_bytes(),
+                        format!("{}{predicate} => {{\n", predict.pattern(0))
+                            .indent(level + 1)
+                            .as_bytes(),
                     )?;
                     Self::output_regex(
                         cst,
@@ -693,6 +713,18 @@ impl RustOutput {
                         parser_name,
                     )?;
                     output.write_all("}\n".indent(level + 1).as_bytes())?;
+                }
+                if !advance_error_set.is_empty() {
+                    output.write_all(
+                        format!(
+                            "    {} => {{\
+                           \n        {parser_name}.advance_with_error(diags, err![{parser_name}.span(),]);\
+                           \n    }}\n",
+                           advance_error_set.pattern(0)
+                        )
+                        .indent(level)
+                        .as_bytes(),
+                    )?;
                 }
                 output.write_all(
                     format!(

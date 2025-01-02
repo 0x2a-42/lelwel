@@ -2,7 +2,10 @@
 
 #[allow(unused_macros)]
 macro_rules! syntax_error_message {
-    [$span:expr, $($tk:literal),*] => {
+    [$span:expr,] => {
+        "invalid syntax".to_string()
+    };
+    [$span:expr, $($tk:literal),+] => {
         {
             let expected = [$($tk),*];
             let mut msg = "invalid syntax, expected".to_string();
