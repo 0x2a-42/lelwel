@@ -15,7 +15,7 @@ skip Comment DocComment Whitespace;
 file: decl*;
 decl^:
   token_list
-| rule_decl
+| ?1 rule_decl
 | start_decl
 | right_decl
 | skip_decl

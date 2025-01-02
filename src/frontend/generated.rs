@@ -419,7 +419,7 @@ impl<'a> Parser<'a> {
             Token::Token => {
                 self.r#token_list(diags);
             }
-            Token::Id => {
+            Token::Id if self.predicate_decl_1() => {
                 self.r#rule_decl(diags);
             }
             Token::Start => {
@@ -430,6 +430,9 @@ impl<'a> Parser<'a> {
             }
             Token::Skip => {
                 self.r#skip_decl(diags);
+            }
+            Token::Id => {
+                self.advance_with_error(diags, err![self.span(),]);
             }
             _ => {
                 self.error(
@@ -878,4 +881,5 @@ trait PredicatesAndActions {
     /// Called when a new syntax tree node is created
     #[allow(clippy::ptr_arg)]
     fn build(&mut self, _rule: Rule, _node: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+    fn predicate_decl_1(&self) -> bool;
 }

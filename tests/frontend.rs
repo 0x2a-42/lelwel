@@ -287,6 +287,17 @@ fn syntax_error() {
 
 #[test]
 #[rustfmt::skip]
+fn top_level_ident() {
+    let diags = gen_diags("tests/frontend/top_level_ident.llw");
+    let mut lines = diags.lines();
+
+    assert_eq!(lines.next().unwrap(), "tests/frontend/top_level_ident.llw:3:1: error: invalid syntax");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/top_level_ident.llw:5:1: warning[W005]: empty rule");
+    assert_eq!(lines.next(), None);
+}
+
+#[test]
+#[rustfmt::skip]
 fn undefined() {
     let diags = gen_diags("tests/frontend/undefined.llw");
     let mut lines = diags.lines();

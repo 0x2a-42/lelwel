@@ -188,4 +188,9 @@ pub fn tokenize(
 
 include!("./generated.rs");
 
-impl PredicatesAndActions for Parser<'_> {}
+impl PredicatesAndActions for Parser<'_> {
+    fn predicate_decl_1(&self) -> bool {
+        let peek = self.peek(1);
+        peek == Token::Colon || (peek == Token::Hat && self.peek(2) == Token::Colon)
+    }
+}
