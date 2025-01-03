@@ -351,7 +351,7 @@ pub fn completion(cst: &Cst, pos: usize, sema: &SemanticData) -> Option<Completi
                     add_top_level_items(cst, file, sema, &mut items);
                 }
             }
-            Node::Rule(Rule::File, _) => {
+            Node::Rule(Rule::File | Rule::Error, _) => {
                 add_top_level_items(cst, file, sema, &mut items);
             }
             _ => {}
