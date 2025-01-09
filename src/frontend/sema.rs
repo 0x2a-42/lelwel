@@ -268,7 +268,7 @@ impl<'a> GeneralCheck<'a> {
             let mut open = HashSet::new();
             let mut created = HashMap::new();
             let mut used = HashSet::new();
-            let left_rec = sema.recursive.get(&rule).map_or(false, |rec| {
+            let left_rec = sema.recursive.get(&rule).is_some_and(|rec| {
                 rec.branches()
                     .iter()
                     .any(|branch| matches!(branch, Recursion::Left(..) | Recursion::LeftRight(..)))
@@ -538,7 +538,7 @@ impl<'a> GeneralCheck<'a> {
                         && (sema
                             .elision
                             .get(&alt_op.syntax())
-                            .map_or(false, |elision| *elision != RuleNodeElision::None)
+                            .is_some_and(|elision| *elision != RuleNodeElision::None)
                             || rule.is_elided(cst))
                     {
                         diags.push(Diagnostic::elide_left_rec(&alt_op.span(cst)));
@@ -974,7 +974,7 @@ impl<'a> LL1Validator {
             }
             Regex::Paren(paren) => paren
                 .inner(cst)
-                .map_or(false, |inner| Self::has_predicate(cst, inner)),
+                .is_some_and(|inner| Self::has_predicate(cst, inner)),
             _ => false,
         }
     }
@@ -1151,7 +1151,7 @@ impl<'a> LL1Validator {
                 if sema
                     .first_sets
                     .get(&name.syntax())
-                    .map_or(false, |first| first.is_empty())
+                    .is_some_and(|first| first.is_empty())
                 {
                     diags.push(Diagnostic::consume_tokens(&regex.span(cst)));
                 }

@@ -11,10 +11,7 @@ fn contains(span: &Span, pos: usize) -> bool {
 pub fn lookup_node(cst: &Cst, node: NodeRef, pos: usize) -> Option<NodeRef> {
     cst.children(node)
         .filter(|node| matches!(cst.get(*node), Node::Rule(..)))
-        .find(|node| {
-            cst.get_span(*node)
-                .map_or(false, |span| contains(&span, pos))
-        })
+        .find(|node| cst.get_span(*node).is_some_and(|span| contains(&span, pos)))
         .and_then(|node| lookup_node(cst, node, pos).or(Some(node)))
 }
 pub fn find_node<P: Fn(Rule) -> bool>(
@@ -31,10 +28,7 @@ pub fn find_node<P: Fn(Rule) -> bool>(
                 false
             }
         })
-        .find(|node| {
-            cst.get_span(*node)
-                .map_or(false, |span| contains(&span, pos))
-        })
+        .find(|node| cst.get_span(*node).is_some_and(|span| contains(&span, pos)))
         .and_then(|node| find_node(cst, node, pos, pred).or(Some(node)))
 }
 

@@ -563,7 +563,7 @@ impl RustOutput {
             .as_bytes(),
         )?;
         if let Some(regex) = rule.regex(cst) {
-            if recursive.map_or(false, |recursive| {
+            if recursive.is_some_and(|recursive| {
                 recursive
                     .branches()
                     .iter()
