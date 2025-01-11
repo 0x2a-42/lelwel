@@ -81,7 +81,7 @@ pub enum Token {
     Colon,
     #[regex("\"", parse_string)]
     String,
-    #[regex(r"-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?")]
+    #[regex(r"-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?")]
     Number,
     #[regex(r"[[:alpha:]][[:alnum:]]*", |_| false)]
     Error,
