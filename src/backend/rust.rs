@@ -6,6 +6,13 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use std::io::Write;
 use std::path::Path;
 
+fn escape(sym: &str) -> String {
+    sym.replace(r"\\", r"\")
+        .replace(r"\'", "'")
+        .escape_default()
+        .to_string()
+}
+
 trait Indent {
     fn indent(&self, level: usize) -> String;
 }
@@ -48,7 +55,7 @@ impl Generator for std::collections::BTreeSet<TokenName<'_>> {
         if !self.is_empty() {
             let symbols: Vec<_> = self
                 .iter()
-                .map(|s| format!("\"{}\"", token_symbols[s.0]))
+                .map(|s| format!("\"{}\"", escape(token_symbols[s.0])))
                 .collect();
             symbols.join(&format!(",\n{}", "    ".repeat(level)))
         } else {
@@ -645,9 +652,12 @@ impl RustOutput {
                         .symbol(cst)
                         .map_or(name, |(sym, _)| &sym[1..sym.len() - 1]);
                     output.write_all(
-                        format!("expect!({name}, \"{sym}\", {parser_name}, diags);\n",)
-                            .indent(level)
-                            .as_bytes(),
+                        format!(
+                            "expect!({name}, \"{}\", {parser_name}, diags);\n",
+                            escape(sym)
+                        )
+                        .indent(level)
+                        .as_bytes(),
                     )?;
                 }
             }
@@ -656,7 +666,7 @@ impl RustOutput {
                 if let Some(token) = TokenDecl::cast(cst, decl) {
                     let name = token.name(cst).unwrap().0;
                     let sym = token.symbol(cst).unwrap().0;
-                    let sym = &sym[1..sym.len() - 1];
+                    let sym = escape(&sym[1..sym.len() - 1]);
                     output.write_all(
                         format!("expect!({name}, \"{sym}\", {parser_name}, diags);\n",)
                             .indent(level)
