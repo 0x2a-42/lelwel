@@ -280,7 +280,7 @@ fn syntax_error() {
 
     assert_eq!(lines.next().unwrap(), "tests/frontend/syntax_error.llw:2:1: error: invalid syntax, expected one of: '=', <identifier>, ';'");
     assert_eq!(lines.next().unwrap(), "tests/frontend/syntax_error.llw:8:1: error: invalid syntax, expected: ')'");
-    assert_eq!(lines.next().unwrap(), "tests/frontend/syntax_error.llw:13:2: error: invalid syntax, expected one of: <semantic action>, '^', <identifier>, '[', '(', <node creation>, <node marker>, <node rename>, '|', <semantic predicate>, ']', ')', ';', <string literal>");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/syntax_error.llw:13:2: error: invalid syntax, expected one of: <semantic action>, <semantic assertion>, '^', <identifier>, '[', '(', <node creation>, <node marker>, <node rename>, '|', <semantic predicate>, ']', ')', ';', '/', <string literal>, '~'");
     assert_eq!(lines.next().unwrap(), "tests/frontend/syntax_error.llw:13:1: error[E003]: use of undefined rule `b`");
     assert_eq!(lines.next(), None);
 }

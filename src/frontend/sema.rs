@@ -13,6 +13,7 @@ impl SemanticPass {
         let mut sema = SemanticData::default();
         GeneralCheck::new().run(cst, diags, &mut sema);
         if !diags.iter().any(|d| d.severity == Severity::Error) {
+            OrderedChoiceValidator::run(cst, diags, &mut sema);
             LL1Validator::run(cst, diags, &mut sema);
             UsageValidator::run(cst, diags, &mut sema);
             OperatorValidator::run(cst, diags, &mut sema);
@@ -134,6 +135,7 @@ pub struct SemanticData<'a> {
     pub start: Option<RuleDecl>,
     pub predicates: BTreeMap<NodeRef, (&'a str, &'a str)>,
     pub actions: BTreeMap<NodeRef, (&'a str, &'a str)>,
+    pub assertions: BTreeMap<NodeRef, (&'a str, &'a str)>,
     pub rule_bindings: BTreeSet<&'a str>,
     pub first_sets: HashMap<NodeRef, BTreeSet<TokenName<'a>>>,
     pub follow_sets: HashMap<NodeRef, BTreeSet<TokenName<'a>>>,
@@ -145,6 +147,7 @@ pub struct SemanticData<'a> {
     pub has_rule_creation: HashSet<RuleDecl>,
     pub undefined_rules: BTreeSet<&'a str>,
     pub undefined_tokens: BTreeSet<&'a str>,
+    pub used_in_ordered_choice: HashSet<NodeRef>,
 }
 
 #[derive(Default)]
@@ -362,6 +365,14 @@ impl<'a> GeneralCheck<'a> {
         in_loop: bool,
     ) -> RuleNodeElision {
         let elision = match regex {
+            Regex::OrderedChoice(regex) => {
+                regex
+                    .operands(cst)
+                    .fold(RuleNodeElision::None, |acc, regex| {
+                        let elision = self.check_regex(cst, rule, regex, diags, sema, false, false);
+                        acc.alt(elision)
+                    })
+            }
             Regex::Alternation(regex) => {
                 regex
                     .operands(cst)
@@ -456,6 +467,15 @@ impl<'a> GeneralCheck<'a> {
                 }
                 RuleNodeElision::None
             }
+            Regex::Assertion(regex) => {
+                if let Some((value, _)) = regex.value(cst) {
+                    if let Some(rule_name) = rule.name(cst).map(|(name, _)| name) {
+                        sema.assertions
+                            .insert(regex.syntax(), (rule_name, &value[1..]));
+                    }
+                }
+                RuleNodeElision::None
+            }
             Regex::NodeRename(regex) => {
                 if let Some((name, name_span)) = regex.value(cst) {
                     let name = &name[1..];
@@ -487,6 +507,7 @@ impl<'a> GeneralCheck<'a> {
                 }
                 RuleNodeElision::None
             }
+            Regex::Commit(_) => RuleNodeElision::None,
         };
         sema.elision.insert(regex.syntax(), elision);
         elision
@@ -572,6 +593,17 @@ impl<'a> GeneralCheck<'a> {
         left_rec: bool,
     ) {
         match regex {
+            Regex::OrderedChoice(regex) => regex.operands(cst).for_each(|op| {
+                Self::check_node_creation(
+                    cst,
+                    op,
+                    diags,
+                    &mut open.clone(),
+                    created,
+                    used,
+                    left_rec,
+                )
+            }),
             Regex::Alternation(regex) => regex.operands(cst).for_each(|op| {
                 Self::check_node_creation(
                     cst,
@@ -665,7 +697,181 @@ impl<'a> GeneralCheck<'a> {
                     diags.push(Diagnostic::create_rule_node_left_rec(&span));
                 }
             }
-            _ => {}
+            Regex::Name(_)
+            | Regex::Symbol(_)
+            | Regex::Predicate(_)
+            | Regex::Action(_)
+            | Regex::Assertion(_)
+            | Regex::NodeRename(_)
+            | Regex::NodeElision(_)
+            | Regex::Commit(_) => {}
+        };
+    }
+}
+
+struct OrderedChoiceValidator;
+
+impl<'a> OrderedChoiceValidator {
+    fn run(cst: &'a Cst, diags: &mut Vec<Diagnostic>, sema: &mut SemanticData<'a>) {
+        if let Some(file) = File::cast(cst, NodeRef::ROOT) {
+            Self::calc_containment(cst, sema, file);
+            for rule in file.rule_decls(cst) {
+                if let Some(regex) = rule.regex(cst) {
+                    Self::check_containment(cst, sema, regex, diags);
+                }
+            }
+        }
+    }
+
+    fn calc_containment(cst: &'a Cst, sema: &mut SemanticData<'a>, file: File) {
+        loop {
+            let size = sema.used_in_ordered_choice.len();
+            for rule in file.rule_decls(cst) {
+                if let Some(regex) = rule.regex(cst) {
+                    Self::calc_containment_regex(
+                        cst,
+                        sema,
+                        regex,
+                        sema.used_in_ordered_choice.contains(&rule.syntax()),
+                    );
+                }
+            }
+            if sema.used_in_ordered_choice.len() == size {
+                break;
+            }
+        }
+    }
+
+    fn calc_containment_regex(
+        cst: &'a Cst,
+        sema: &mut SemanticData<'a>,
+        regex: Regex,
+        active_choice: bool,
+    ) {
+        if active_choice {
+            sema.used_in_ordered_choice.insert(regex.syntax());
+        }
+        match regex {
+            Regex::Name(name) => {
+                if active_choice {
+                    let decl = sema.decl_bindings.get(&name.syntax());
+                    if let Some(rule) = decl.and_then(|decl| RuleDecl::cast(cst, *decl)) {
+                        sema.used_in_ordered_choice.insert(rule.syntax());
+                    }
+                }
+            }
+            Regex::Concat(concat) => {
+                let mut active_choice = active_choice;
+                for op in concat.operands(cst) {
+                    Self::calc_containment_regex(cst, sema, op, active_choice);
+                    if matches!(op, Regex::Commit(_)) {
+                        active_choice = false;
+                    }
+                }
+            }
+            Regex::OrderedChoice(choice) => {
+                let ops = choice.operands(cst).collect::<Vec<_>>();
+                for op in &ops[..ops.len() - 1] {
+                    Self::calc_containment_regex(cst, sema, *op, true);
+                }
+                let op = *ops.last().unwrap();
+                Self::calc_containment_regex(cst, sema, op, active_choice);
+            }
+            Regex::Alternation(alt) => {
+                for op in alt.operands(cst) {
+                    Self::calc_containment_regex(cst, sema, op, active_choice);
+                }
+            }
+            Regex::Star(star) => {
+                if let Some(op) = star.operand(cst) {
+                    Self::calc_containment_regex(cst, sema, op, active_choice);
+                }
+            }
+            Regex::Optional(opt) => {
+                if let Some(op) = opt.operand(cst) {
+                    Self::calc_containment_regex(cst, sema, op, active_choice);
+                }
+            }
+            Regex::Plus(plus) => {
+                if let Some(op) = plus.operand(cst) {
+                    Self::calc_containment_regex(cst, sema, op, active_choice);
+                }
+            }
+            Regex::Paren(paren) => {
+                if let Some(op) = paren.inner(cst) {
+                    Self::calc_containment_regex(cst, sema, op, active_choice);
+                }
+            }
+            Regex::Symbol(_)
+            | Regex::Predicate(_)
+            | Regex::Action(_)
+            | Regex::Assertion(_)
+            | Regex::NodeRename(_)
+            | Regex::NodeElision(_)
+            | Regex::NodeMarker(_)
+            | Regex::NodeCreation(_)
+            | Regex::Commit(_) => {}
+        };
+    }
+    fn check_containment(
+        cst: &'a Cst,
+        sema: &mut SemanticData<'a>,
+        regex: Regex,
+        diags: &mut Vec<Diagnostic>,
+    ) {
+        match regex {
+            Regex::Concat(concat) => {
+                for op in concat.operands(cst) {
+                    Self::check_containment(cst, sema, op, diags);
+                }
+            }
+            Regex::OrderedChoice(choice) => {
+                if sema.used_in_ordered_choice.contains(&choice.syntax()) {
+                    diags.push(Diagnostic::nested_ordered_choice(&choice.span(cst)));
+                }
+                for op in choice.operands(cst) {
+                    Self::check_containment(cst, sema, op, diags);
+                }
+            }
+            Regex::Alternation(alt) => {
+                for op in alt.operands(cst) {
+                    Self::check_containment(cst, sema, op, diags);
+                }
+            }
+            Regex::Star(star) => {
+                if let Some(op) = star.operand(cst) {
+                    Self::check_containment(cst, sema, op, diags);
+                }
+            }
+            Regex::Optional(opt) => {
+                if let Some(op) = opt.operand(cst) {
+                    Self::check_containment(cst, sema, op, diags);
+                }
+            }
+            Regex::Plus(plus) => {
+                if let Some(op) = plus.operand(cst) {
+                    Self::check_containment(cst, sema, op, diags);
+                }
+            }
+            Regex::Paren(paren) => {
+                if let Some(op) = paren.inner(cst) {
+                    Self::check_containment(cst, sema, op, diags);
+                }
+            }
+            Regex::Commit(commit) => {
+                if !sema.used_in_ordered_choice.contains(&commit.syntax()) {
+                    diags.push(Diagnostic::useless_commit(&commit.span(cst)));
+                }
+            }
+            Regex::Name(_)
+            | Regex::Symbol(_)
+            | Regex::Predicate(_)
+            | Regex::Action(_)
+            | Regex::Assertion(_)
+            | Regex::NodeRename(_)
+            | Regex::NodeElision(_)
+            | Regex::NodeMarker(_)
+            | Regex::NodeCreation(_) => {}
         };
     }
 }
@@ -765,6 +971,16 @@ impl<'a> LL1Validator {
                         .insert(TokenName("ɛ"));
                 }
             }
+            Regex::OrderedChoice(choice) => {
+                for op in choice.operands(cst) {
+                    Self::calc_first_regex(cst, sema, op, change);
+                    let op_first = sema.first_sets[&op.syntax()].clone();
+                    sema.first_sets
+                        .get_mut(&regex.syntax())
+                        .unwrap()
+                        .extend(op_first.into_iter());
+                }
+            }
             Regex::Alternation(alt) => {
                 for op in alt.operands(cst) {
                     Self::calc_first_regex(cst, sema, op, change);
@@ -813,7 +1029,14 @@ impl<'a> LL1Validator {
                         .extend(op_first);
                 }
             }
-            _ => {
+            Regex::Predicate(_)
+            | Regex::Action(_)
+            | Regex::Assertion(_)
+            | Regex::NodeRename(_)
+            | Regex::NodeElision(_)
+            | Regex::NodeMarker(_)
+            | Regex::NodeCreation(_)
+            | Regex::Commit(_) => {
                 entry.insert(TokenName("ɛ"));
             }
         };
@@ -892,6 +1115,16 @@ impl<'a> LL1Validator {
                     Self::calc_follow_regex(cst, sema, op, rule_regex, change);
                 }
             }
+            Regex::OrderedChoice(choice) => {
+                let follow = sema.follow_sets.entry(regex.syntax()).or_default().clone();
+                for op in choice.operands(cst) {
+                    sema.follow_sets
+                        .entry(op.syntax())
+                        .or_default()
+                        .extend(follow.iter());
+                    Self::calc_follow_regex(cst, sema, op, rule_regex, change);
+                }
+            }
             Regex::Alternation(alt) => {
                 let follow = sema.follow_sets.entry(regex.syntax()).or_default().clone();
                 for op in alt.operands(cst) {
@@ -943,7 +1176,15 @@ impl<'a> LL1Validator {
                     Self::calc_follow_regex(cst, sema, inner, rule_regex, change);
                 }
             }
-            _ => {}
+            Regex::Symbol(_)
+            | Regex::Predicate(_)
+            | Regex::Action(_)
+            | Regex::Assertion(_)
+            | Regex::NodeRename(_)
+            | Regex::NodeElision(_)
+            | Regex::NodeMarker(_)
+            | Regex::NodeCreation(_)
+            | Regex::Commit(_) => {}
         };
     }
 
@@ -990,6 +1231,7 @@ impl<'a> LL1Validator {
             .unwrap()
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn check_intersection(
         cst: &Cst,
         sema: &SemanticData<'a>,
@@ -998,6 +1240,7 @@ impl<'a> LL1Validator {
         branches: impl Iterator<Item = Regex>,
         i: usize,
         left_rec: bool,
+        ordered_choice: bool,
     ) {
         let prediction = &sema.predict_sets[&op.syntax()];
         let mut related = vec![];
@@ -1017,7 +1260,11 @@ impl<'a> LL1Validator {
                 related.push((cst.get_span(op.syntax()).unwrap().clone(), set));
             }
         }
-        if !related.is_empty() {
+        if ordered_choice {
+            if related.is_empty() {
+                diags.push(Diagnostic::replaceable_ordered_choice(&op.span(cst)));
+            }
+        } else if !related.is_empty() {
             if left_rec {
                 diags.push(Diagnostic::ll1_conflict_left_rec(&op.span(cst), related));
             } else {
@@ -1082,6 +1329,7 @@ impl<'a> LL1Validator {
                             .copied(),
                         i,
                         true,
+                        false,
                     );
                 }
                 let non_left_recursive_branches = || {
@@ -1101,6 +1349,7 @@ impl<'a> LL1Validator {
                         op,
                         non_left_recursive_branches(),
                         i,
+                        false,
                         false,
                     );
                 }
@@ -1156,6 +1405,24 @@ impl<'a> LL1Validator {
                     diags.push(Diagnostic::consume_tokens(&regex.span(cst)));
                 }
             }
+            Regex::OrderedChoice(choice) => {
+                let ops = choice.operands(cst).collect::<Vec<_>>();
+                for (i, op) in ops.iter().enumerate() {
+                    if i != ops.len() - 1 {
+                        Self::check_intersection(
+                            cst,
+                            sema,
+                            diags,
+                            *op,
+                            ops.iter().copied(),
+                            i,
+                            false,
+                            true,
+                        );
+                    }
+                    Self::check_regex(cst, sema, diags, *op, rule, None);
+                }
+            }
             Regex::Concat(concat) => {
                 for op in concat.operands(cst) {
                     Self::check_regex(cst, sema, diags, op, rule, None);
@@ -1166,7 +1433,15 @@ impl<'a> LL1Validator {
                     Self::check_regex(cst, sema, diags, inner, rule, None);
                 }
             }
-            _ => {}
+            Regex::Symbol(_)
+            | Regex::Predicate(_)
+            | Regex::Action(_)
+            | Regex::Assertion(_)
+            | Regex::NodeRename(_)
+            | Regex::NodeElision(_)
+            | Regex::NodeMarker(_)
+            | Regex::NodeCreation(_)
+            | Regex::Commit(_) => {}
         };
     }
 }
@@ -1208,6 +1483,9 @@ impl UsageValidator {
     }
     fn set_regex(cst: &Cst, sema: &mut SemanticData, regex: Regex) {
         match regex {
+            Regex::OrderedChoice(choice) => choice
+                .operands(cst)
+                .for_each(|op| Self::set_regex(cst, sema, op)),
             Regex::Alternation(alt) => alt
                 .operands(cst)
                 .for_each(|op| Self::set_regex(cst, sema, op)),
@@ -1246,10 +1524,12 @@ impl UsageValidator {
             }
             Regex::Predicate(_)
             | Regex::Action(_)
+            | Regex::Assertion(_)
             | Regex::NodeRename(_)
             | Regex::NodeElision(_)
             | Regex::NodeMarker(_)
-            | Regex::NodeCreation(_) => {}
+            | Regex::NodeCreation(_)
+            | Regex::Commit(_) => {}
         }
     }
 }
@@ -1370,6 +1650,12 @@ impl RecoverySetGenerator {
                     self.set_regex_pred(cst, sema, op);
                 }
             }
+            Regex::OrderedChoice(choice) => {
+                for op in choice.operands(cst) {
+                    self.add_pred(op, regex);
+                    self.set_regex_pred(cst, sema, op);
+                }
+            }
             Regex::Alternation(alt) => {
                 for op in alt.operands(cst) {
                     self.add_pred(op, regex);
@@ -1403,10 +1689,12 @@ impl RecoverySetGenerator {
             Regex::Symbol(_)
             | Regex::Predicate(_)
             | Regex::Action(_)
+            | Regex::Assertion(_)
             | Regex::NodeRename(_)
             | Regex::NodeElision(_)
             | Regex::NodeMarker(_)
-            | Regex::NodeCreation(_) => {}
+            | Regex::NodeCreation(_)
+            | Regex::Commit(_) => {}
         }
     }
 }
