@@ -278,7 +278,7 @@ fn add_reference_items(
 fn inside_decl(cst: &Cst, node: NodeRef, pos: usize) -> bool {
     cst.children(node)
         .find_map(|n| cst.get_token(n, Token::Semi))
-        .map_or(true, |(_, range)| pos < range.end)
+        .is_none_or(|(_, range)| pos < range.end)
 }
 
 pub fn completion(cst: &Cst, pos: usize, sema: &SemanticData) -> Option<CompletionResponse> {
