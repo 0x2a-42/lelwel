@@ -1,0 +1,35 @@
+token A B;
+start check;
+
+check:
+  nested_1
+  nested_2
+  not_nested
+  move_to_alternation
+  useless_commit
+  assertion
+;
+nested_1:
+  A (A / A B) / A B
+;
+nested_2:
+  inner_nested / inner_not_nested
+;
+inner_nested:
+  A B / A
+;
+inner_not_nested:
+  A B / A
+;
+not_nested:
+  A ~ (A / A B) / A B
+;
+move_to_alternation:
+  A / A / B
+;
+useless_commit:
+  A ~ B
+;
+assertion:
+  !1 A !2 B !3
+;
