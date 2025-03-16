@@ -170,7 +170,7 @@ impl RustOutput {
             assertions.insert((rule, num));
             output.write_all(
                 format!(
-                    "    fn assertion_{rule}_{num}(&self){}\n",
+                    "    fn assertion_{rule}_{num}(&self) -> Option<Diagnostic>{}\n",
                     if is_trait {
                         ";"
                     } else {
@@ -673,11 +673,13 @@ impl RustOutput {
         let in_choice = sema.used_in_ordered_choice.contains(&regex.syntax());
         let expect_macro = if in_choice { "try_expect!" } else { "expect!" };
         let ordered_choice_return = if in_choice {
-            "\nif self.in_ordered_choice {\
-             \n    return None;\
-             \n}"
+            format!(
+                "\nif {parser_name}.in_ordered_choice {{\
+                 \n    return None;\
+                 \n}}"
+            )
         } else {
-            ""
+            "".to_string()
         };
         match regex {
             Regex::Name(name) => {
@@ -722,10 +724,14 @@ impl RustOutput {
                 }
             }
             Regex::OrderedChoice(choice) => {
-                output.write_all("self.in_ordered_choice = true;\n".indent(level).as_bytes())?;
+                output.write_all(
+                    format!("{parser_name}.in_ordered_choice = true;\n")
+                        .indent(level)
+                        .as_bytes(),
+                )?;
                 output.write_all("'ordered_choice: {\n".indent(level).as_bytes())?;
                 output.write_all(
-                    "let state = self.get_state();\n"
+                    format!("let state = {parser_name}.get_state();\n")
                         .indent(level + 1)
                         .as_bytes(),
                 )?;
@@ -764,7 +770,11 @@ impl RustOutput {
                             .indent(level + 1)
                             .as_bytes(),
                     )?;
-                    output.write_all("self.set_state(&state);\n".indent(level + 1).as_bytes())?;
+                    output.write_all(
+                        format!("{parser_name}.set_state(&state);\n")
+                            .indent(level + 1)
+                            .as_bytes(),
+                    )?;
                     if rule_elision == RuleNodeElision::Conditional {
                         output
                             .write_all("elide = elision_state;\n".indent(level + 1).as_bytes())?;
@@ -777,14 +787,17 @@ impl RustOutput {
                         )?;
                     }
                 }
-                output.write_all("}\n".indent(level).as_bytes())?;
-                output.write_all("self.in_ordered_choice = false;\n".indent(level).as_bytes())?;
+                output.write_all(
+                    format!("{parser_name}.in_ordered_choice = false;\n")
+                        .indent(level + 1)
+                        .as_bytes(),
+                )?;
                 Self::output_regex(
                     cst,
                     sema,
                     *ops.last().unwrap(),
                     output,
-                    level,
+                    level + 1,
                     token_symbols,
                     false,
                     rule_name,
@@ -792,6 +805,7 @@ impl RustOutput {
                     parser_name,
                     has_rule_rename,
                 )?;
+                output.write_all("}\n".indent(level).as_bytes())?;
             }
             Regex::Concat(concat) => {
                 for op in concat.operands(cst) {
@@ -1137,7 +1151,11 @@ impl RustOutput {
                 )?;
             }
             Regex::Commit(_) => {
-                output.write_all("self.in_ordered_choice = false;\n".indent(level).as_bytes())?;
+                output.write_all(
+                    format!("{parser_name}.in_ordered_choice = false;\n")
+                        .indent(level)
+                        .as_bytes(),
+                )?;
             }
             Regex::Predicate(_) => {}
         }
