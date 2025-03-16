@@ -15,7 +15,7 @@
 
 ## Introduction
 
-[Lelwel](https://en.wikipedia.org/wiki/Lelwel_hartebeest) (**L**anguage for **E**xtended **L**L(1) parsing **W**ith **E**rror resilience and **L**ossless syntax trees) generates recursive descent parsers for Rust using [LL(1) grammars](https://en.wikipedia.org/wiki/LL_grammar) with extensions for direct left recursion, operator precedence, semantic predicates (which also enable arbitrary lookahead), and semantic actions (which allow to deal with semantic context sensitivity, e.g. type / variable name ambiguity in C).
+[Lelwel](https://en.wikipedia.org/wiki/Lelwel_hartebeest) (**L**anguage for **E**xtended **L**L(1) parsing **W**ith **E**rror resilience and **L**ossless syntax trees) generates recursive descent parsers for Rust using [LL(1) grammars](https://en.wikipedia.org/wiki/LL_grammar) with extensions for direct left recursion, operator precedence, semantic predicates (which also enable arbitrary lookahead), semantic actions (which allow to deal with semantic context sensitivity, e.g. type / variable name ambiguity in C), and a restricted ordered choice (which allows for backtracking).
 
 The parser creates a homogeneous, lossless, concrete syntax tree (CST) that can be used to construct an abstract syntax tree (AST).
 Special node rename, elision, marker, and creation operators allow fine-grained control over how the CST is built for certain parses.
@@ -323,15 +323,57 @@ Regular expressions are built from the following syntactic constructs.
 - **Symbol**: `'token symbol'`
 - **Concatenation**: `A B` which is `A` followed by `B`
 - **Alternation**: `A | B` which is either `A` or `B`
+- **Ordered Choice**: `A / B` which is `A` or else `B`
 - **Optional**: `[A]` which is either `A` or nothing
 - **Star Repetition**: `A*` which is a repetition of 0 or more `A`
 - **Plus Repetition**: `A+` which is a repetition of 1 or more `A`
 - **Semantic Predicate**: `?1` which is the semantic predicate number 1
 - **Semantic Action**: `#1` which is the semantic action number 1
+- **Semantic Assertion**: `!1` which is the semantic assertion number 1
 - **Node Rename**: `@new_node_name` renames the rule syntax tree node
 - **Node Elision**: `^` prevents creation of the rule syntax tree node
 - **Node Marker**: `<1` marker with index 1 for a new node
 - **Node Creation**: `1>new_node_name` insert node at position of marker with index 1
+- **Commit**: `~` commits to a parse in an ordered choice
+
+#### Ordered Choice
+The ordered choice operator `/` has a precedence between alternation and concatenation. Unlike in the PEG formalism, the operator is restricted, such that only one ordered choice can be active at a time.
+
+> [!WARNING]
+> This restriction avoids the worst case exponential time complexity of recursive descent PEG implementations without the use of memoization.
+> Due to the unlimited lookahead it is still possible to construct parsers with $O(n^2)$ worst case performance.
+
+> [!WARNING]
+> It is possible that an earlier branch prevents a later branch from ever being reached.
+> Only use ordered choice as an instrument to explicitly resolve an ambiguity.
+
+The commit operator `~` commits a parse to a choice, so in case of a failure there will be no backtracking.
+
+> [!NOTE]
+> This is useful as an optimization and to improve error reporting.
+> Furthermore it can be used to avoid the ordered choice restriction in some cases, as in a concatination no ordered choice is active after the commit operator.
+
+> **Example**
+> ```antlr
+> token Id Num Eq='=' Semi=';' LPar='(' RPar=')';
+> start stmt;
+> 
+> stmt^:
+>   decl_stmt
+> / expr_stmt
+> ;
+> decl_stmt: type Id ~ ['=' expr] ';';
+> expr_stmt: expr ';';
+> expr:
+>   Id
+> | Num
+> | '(' (
+>     type ')' !1 ~ expr
+>   / expr ')'
+>   )
+> ;
+> type: Id;
+> ```
 
 #### Direct Left Recursion
 Rules with direct left recursion are parsed using a Pratt parser.
@@ -367,39 +409,45 @@ Mixing left and right associative operators in the same branch is not allowed.
 > ;
 > ```
 
-#### Semantic Actions and Predicates
+#### Semantic Actions, Predicates, and Assertions
 Semantic actions can be defined at any point in a regex.
 Semantic predicates can be defined at the beginning of an alternation branch, an optional or a repetition.
 The index of actions and predicates can be used multiple times in a rule.
 
 When the semantic action or predicate is visited in a parse it will execute the rust code of the corresponding associated function in the `PredicatesAndActions` trait implementation of the `Parser` type.
 
+Semantic assertions can be placed at any position in a regex. An assertion fails if it does not return `None`. In the context of an ordered choice this can be used to steer the parser depending on semantic or syntactic information. Otherwise its diagnostic will just be emitted and the parser continues.
+
 > [!TIP]
 > If the `PredicatesAndActions` trait is implemented in the `parser.rs` file next to the grammar file (where it is generated by default), you can use the language server to jump from the grammar to the rust code.
 
 > **Example**
 > ```antlr
-> token A B C;
+> token A B C D;
 > 
 > foo:
 >   ?1 A #1 (?2 B C)* B #2
-> | A C #2
+> | A !1 C #2
+> / A D
 > ;
 > ```
 > ```rust
 > impl PredicatesAndActions for Parser<'_> {
->   fn predicate_foo_1(&self) -> bool {
->     self.peek(1) == Token::B
->   }
->   fn predicate_foo_2(&self) -> bool {
->     self.context.some_condition
->   }
->   fn action_foo_1(&mut self, diags: &mut Vec<Diagnostic>) {
->     println!("executed action 1");
->   }
->   fn action_foo_2(&mut self, diags: &mut Vec<Diagnostic>) {
->     println!("executed action 2");
->   }
+>     fn predicate_foo_1(&self) -> bool {
+>         self.peek(1) == Token::B
+>     }
+>     fn predicate_foo_2(&self) -> bool {
+>         self.context.some_condition
+>     }
+>     fn action_foo_1(&mut self, diags: &mut Vec<Diagnostic>) {
+>         println!("executed action 1");
+>     }
+>     fn action_foo_2(&mut self, diags: &mut Vec<Diagnostic>) {
+>         println!("executed action 2");
+>     }
+>     fn assertion_foo_1(&self) -> Option<Diagnostic> {
+>         None
+>     }
 > }
 > ```
 

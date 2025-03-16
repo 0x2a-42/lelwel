@@ -47,9 +47,12 @@ pub enum Rule {
     RuleDecl,
     Regex,
     Alternation,
+    OrderedChoice,
     Concat,
     Postfix,
     Action,
+    Assertion,
+    Commit,
     Name,
     NodeCreation,
     NodeElision,
@@ -259,16 +262,35 @@ macro_rules! expect {
         }
     };
 }
+#[allow(unused_macros)]
+macro_rules! try_expect {
+    ($tok:ident, $sym:literal, $self:expr, $diags:expr) => {
+        if let Token::$tok = $self.current {
+            $self.advance(false);
+        } else {
+            if $self.in_ordered_choice {
+                return None;
+            }
+            $self.error($diags, err![$self.span(), $sym]);
+        }
+    };
+}
 
+struct ParserState {
+    pos: usize,
+    current: Token,
+    node_count: usize,
+    token_count: usize,
+}
 pub struct Parser<'a> {
     cst: Cst<'a>,
     pos: usize,
     current: Token,
-    error_cooldown: bool,
     last_error_span: Span,
     max_offset: usize,
     #[allow(dead_code)]
     context: Context<'a>,
+    error_cooldown: bool,
 }
 #[allow(clippy::while_let_loop, dead_code)]
 impl<'a> Parser<'a> {
@@ -335,7 +357,6 @@ impl<'a> Parser<'a> {
         self.advance(true);
         self.close(m, Rule::Error, diags);
     }
-    #[allow(dead_code)]
     fn peek(&self, lookahead: usize) -> Token {
         self.cst
             .tokens
@@ -356,6 +377,20 @@ impl<'a> Parser<'a> {
         self.build(rule, NodeRef(m.0), diags);
         m
     }
+    fn get_state(&self) -> ParserState {
+        ParserState {
+            pos: self.pos,
+            current: self.current,
+            node_count: self.cst.nodes.len(),
+            token_count: self.cst.token_count,
+        }
+    }
+    fn set_state(&mut self, state: &ParserState) {
+        self.pos = state.pos;
+        self.current = state.current;
+        self.cst.nodes.truncate(state.node_count);
+        self.cst.token_count = state.token_count;
+    }
     pub fn parse(
         source: &'a str,
         tokens: Vec<Token>,
@@ -367,10 +402,10 @@ impl<'a> Parser<'a> {
             current: Token::EOF,
             cst: Cst::new(source, tokens, ranges),
             pos: 0,
-            error_cooldown: false,
             last_error_span: Span::default(),
             max_offset,
             context: Context::default(),
+            error_cooldown: false,
         };
         parser.file(diags);
         parser.cst
@@ -597,6 +632,7 @@ impl<'a> Parser<'a> {
         expect!(Colon, ":", self, diags);
         match self.current {
             Token::Action
+            | Token::Assertion
             | Token::Hat
             | Token::Id
             | Token::LBrak
@@ -605,7 +641,8 @@ impl<'a> Parser<'a> {
             | Token::NodeMarker
             | Token::NodeRename
             | Token::Predicate
-            | Token::Str => {
+            | Token::Str
+            | Token::Tilde => {
                 self.r#regex(diags);
             }
             Token::Semi => {}
@@ -615,6 +652,7 @@ impl<'a> Parser<'a> {
                     err![
                         self.span(),
                         "<semantic action>",
+                        "<semantic assertion>",
                         "^",
                         "<identifier>",
                         "[",
@@ -624,7 +662,8 @@ impl<'a> Parser<'a> {
                         "<node rename>",
                         "<semantic predicate>",
                         ";",
-                        "<string literal>"
+                        "<string literal>",
+                        "~"
                     ],
                 );
             }
@@ -637,16 +676,16 @@ impl<'a> Parser<'a> {
     }
     fn r#alternation(&mut self, diags: &mut Vec<Diagnostic>) {
         let start = self.cst.mark();
-        self.r#concat(diags);
+        self.r#ordered_choice(diags);
         match self.current {
             Token::Or => {
                 expect!(Or, "|", self, diags);
-                self.r#concat(diags);
+                self.r#ordered_choice(diags);
                 loop {
                     match self.current {
                         Token::Or => {
                             expect!(Or, "|", self, diags);
-                            self.r#concat(diags);
+                            self.r#ordered_choice(diags);
                         }
                         Token::RBrak
                         | Token::RPar
@@ -671,11 +710,52 @@ impl<'a> Parser<'a> {
             }
         }
     }
+    fn r#ordered_choice(&mut self, diags: &mut Vec<Diagnostic>) {
+        let start = self.cst.mark();
+        self.r#concat(diags);
+        match self.current {
+            Token::Slash => {
+                expect!(Slash, "/", self, diags);
+                self.r#concat(diags);
+                loop {
+                    match self.current {
+                        Token::Slash => {
+                            expect!(Slash, "/", self, diags);
+                            self.r#concat(diags);
+                        }
+                        Token::Or
+                        | Token::RBrak
+                        | Token::RPar
+                        | Token::Semi
+                        | Token::EOF
+                        | Token::Id
+                        | Token::Right
+                        | Token::Skip
+                        | Token::Start
+                        | Token::Token => break,
+                        _ => {
+                            self.advance_with_error(
+                                diags,
+                                err![self.span(), "|", "]", ")", ";", "/"],
+                            );
+                        }
+                    }
+                }
+                let open_node = self.cst.open_before(start);
+                self.close(open_node, Rule::OrderedChoice, diags);
+            }
+            Token::Or | Token::RBrak | Token::RPar | Token::Semi => {}
+            _ => {
+                self.error(diags, err![self.span(), "|", "]", ")", ";", "/"]);
+            }
+        }
+    }
     fn r#concat(&mut self, diags: &mut Vec<Diagnostic>) {
         let start = self.cst.mark();
         self.r#postfix(diags);
         match self.current {
             Token::Action
+            | Token::Assertion
             | Token::Hat
             | Token::Id
             | Token::LBrak
@@ -684,11 +764,13 @@ impl<'a> Parser<'a> {
             | Token::NodeMarker
             | Token::NodeRename
             | Token::Predicate
-            | Token::Str => {
+            | Token::Str
+            | Token::Tilde => {
                 self.r#postfix(diags);
                 loop {
                     match self.current {
                         Token::Action
+                        | Token::Assertion
                         | Token::Hat
                         | Token::Id
                         | Token::LBrak
@@ -697,13 +779,15 @@ impl<'a> Parser<'a> {
                         | Token::NodeMarker
                         | Token::NodeRename
                         | Token::Predicate
-                        | Token::Str => {
+                        | Token::Str
+                        | Token::Tilde => {
                             self.r#postfix(diags);
                         }
                         Token::Or
                         | Token::RBrak
                         | Token::RPar
                         | Token::Semi
+                        | Token::Slash
                         | Token::EOF
                         | Token::Right
                         | Token::Skip
@@ -715,6 +799,7 @@ impl<'a> Parser<'a> {
                                 err![
                                     self.span(),
                                     "<semantic action>",
+                                    "<semantic assertion>",
                                     "^",
                                     "<identifier>",
                                     "[",
@@ -727,7 +812,9 @@ impl<'a> Parser<'a> {
                                     "]",
                                     ")",
                                     ";",
-                                    "<string literal>"
+                                    "/",
+                                    "<string literal>",
+                                    "~"
                                 ],
                             );
                         }
@@ -736,13 +823,14 @@ impl<'a> Parser<'a> {
                 let open_node = self.cst.open_before(start);
                 self.close(open_node, Rule::Concat, diags);
             }
-            Token::Or | Token::RBrak | Token::RPar | Token::Semi => {}
+            Token::Or | Token::RBrak | Token::RPar | Token::Semi | Token::Slash => {}
             _ => {
                 self.error(
                     diags,
                     err![
                         self.span(),
                         "<semantic action>",
+                        "<semantic assertion>",
                         "^",
                         "<identifier>",
                         "[",
@@ -755,7 +843,9 @@ impl<'a> Parser<'a> {
                         "]",
                         ")",
                         ";",
-                        "<string literal>"
+                        "/",
+                        "<string literal>",
+                        "~"
                     ],
                 );
             }
@@ -806,6 +896,12 @@ impl<'a> Parser<'a> {
                     node_kind = Rule::Action;
                     parser.close(m, node_kind, diags);
                 }
+                Token::Assertion => {
+                    let m = parser.cst.open();
+                    expect!(Assertion, "<semantic assertion>", parser, diags);
+                    node_kind = Rule::Assertion;
+                    parser.close(m, node_kind, diags);
+                }
                 Token::NodeRename => {
                     let m = parser.cst.open();
                     expect!(NodeRename, "<node rename>", parser, diags);
@@ -830,12 +926,19 @@ impl<'a> Parser<'a> {
                     node_kind = Rule::NodeElision;
                     parser.close(m, node_kind, diags);
                 }
+                Token::Tilde => {
+                    let m = parser.cst.open();
+                    expect!(Tilde, "~", parser, diags);
+                    node_kind = Rule::Commit;
+                    parser.close(m, node_kind, diags);
+                }
                 _ => {
                     parser.error(
                         diags,
                         err![
                             parser.span(),
                             "<semantic action>",
+                            "<semantic assertion>",
                             "^",
                             "<identifier>",
                             "[",
@@ -844,7 +947,8 @@ impl<'a> Parser<'a> {
                             "<node marker>",
                             "<node rename>",
                             "<semantic predicate>",
-                            "<string literal>"
+                            "<string literal>",
+                            "~"
                         ],
                     );
                 }

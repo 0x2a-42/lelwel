@@ -29,12 +29,15 @@ pub const INVALID_CLOSE_NODE: &str = "E024";
 pub const CREATE_RULE_NODE_LEFT_REC: &str = "E025";
 pub const EXPECTED_RULE: &str = "E026";
 pub const MISSING_NODE_NAME: &str = "E027";
+pub const NESTED_ORDERED_CHOICE: &str = "E028";
 
 pub const UNUSED_RULE: &str = "W001";
 pub const UNUSED_TOKEN: &str = "W002";
 pub const UNUSED_OPEN_NODE: &str = "W003";
 pub const REDUNDANT_ELISION: &str = "W004";
 pub const EMPTY_RULE: &str = "W005";
+pub const USELESS_COMMIT: &str = "W006";
+pub const REPLACEABLE_ORDERED_CHOICE: &str = "W007";
 
 pub trait LanguageErrors {
     fn invalid_binding_pos(span: &Span) -> Self;
@@ -69,6 +72,9 @@ pub trait LanguageErrors {
     fn expected_rule(span: &Span) -> Self;
     fn missing_node_name(span: &Span) -> Self;
     fn empty_rule(span: &Span) -> Self;
+    fn nested_ordered_choice(span: &Span) -> Self;
+    fn useless_commit(span: &Span) -> Self;
+    fn replaceable_ordered_choice(span: &Span) -> Self;
 }
 
 impl LanguageErrors for Diagnostic {
@@ -366,6 +372,27 @@ impl LanguageErrors for Diagnostic {
         Diagnostic::warning()
             .with_code(EMPTY_RULE)
             .with_message("empty rule")
+            .with_labels(vec![Label::primary((), span.clone())])
+    }
+
+    fn nested_ordered_choice(span: &Span) -> Self {
+        Diagnostic::error()
+            .with_code(NESTED_ORDERED_CHOICE)
+            .with_message("nested ordered choice")
+            .with_labels(vec![Label::primary((), span.clone())])
+    }
+
+    fn useless_commit(span: &Span) -> Self {
+        Diagnostic::warning()
+            .with_code(USELESS_COMMIT)
+            .with_message("commit is never used in ordered choice")
+            .with_labels(vec![Label::primary((), span.clone())])
+    }
+
+    fn replaceable_ordered_choice(span: &Span) -> Self {
+        Diagnostic::warning()
+            .with_code(REPLACEABLE_ORDERED_CHOICE)
+            .with_message("ordered choice branch could be moved to alternation")
             .with_labels(vec![Label::primary((), span.clone())])
     }
 }

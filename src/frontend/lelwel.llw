@@ -2,11 +2,11 @@
 token Token='token' Start='start' Right='right' Skip='skip';
 /// Punctuator
 token Colon=':' Semi=';' Equal='=' LPar='(' RPar=')' LBrak='[' RBrak=']'
-      Or='|' Star='*' Plus='+' Hat='^';
+      Or='|' Star='*' Plus='+' Hat='^' Slash='/' Tilde='~';
 /// Identifier for rules and tokens
 token Id='<identifier>' Str='<string literal>';
-token Predicate='<semantic predicate>' Action='<semantic action>' NodeRename='<node rename>';
-token NodeMarker='<node marker>' NodeCreation='<node creation>';
+token Predicate='<semantic predicate>' Action='<semantic action>' Assertion='<semantic assertion>';
+token NodeRename='<node rename>' NodeMarker='<node marker>' NodeCreation='<node creation>';
 token Comment DocComment Whitespace;
 
 start file;
@@ -28,7 +28,8 @@ token_decl: Id ['=' Str];
 rule_decl: Id ['^'] ':' [regex] ';';
 
 regex^: alternation;
-alternation^: concat [('|' concat)+ >];
+alternation^: ordered_choice [('|' ordered_choice)+ >];
+ordered_choice^: concat [('/' concat)+ >];
 concat^: postfix [postfix+ >];
 postfix:
   postfix '*' @star
@@ -39,8 +40,10 @@ postfix:
 | Str @symbol
 | Predicate @predicate
 | Action @action
+| Assertion @assertion
 | NodeRename @node_rename
 | NodeMarker @node_marker
 | NodeCreation @node_creation
 | '^' @node_elision
+| '~' @commit
 ;

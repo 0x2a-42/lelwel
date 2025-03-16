@@ -233,16 +233,35 @@ macro_rules! expect {{
         }}
     }};
 }}
+#[allow(unused_macros)]
+macro_rules! try_expect {{
+    ($tok:ident, $sym:literal, $self:expr, $diags:expr) => {{
+        if let Token::$tok = $self.current {{
+            $self.advance(false);
+        }} else {{
+            if $self.in_ordered_choice {{
+                return None;
+            }}
+            $self.error($diags, err![$self.span(), $sym]);
+        }}
+    }};
+}}
 
+struct ParserState {{
+    pos: usize,
+    current: Token,
+    node_count: usize,
+    token_count: usize,
+}}
 pub struct Parser<'a> {{
     cst: Cst<'a>,
     pos: usize,
     current: Token,
-    error_cooldown: bool,
     last_error_span: Span,
     max_offset: usize,
     #[allow(dead_code)]
     context: Context<'a>,
+    error_cooldown: bool,{3}
 }}
 #[allow(clippy::while_let_loop, dead_code)]
 impl<'a> Parser<'a> {{
@@ -306,7 +325,6 @@ impl<'a> Parser<'a> {{
         self.advance(true);
         self.close(m, Rule::Error, diags);
     }}
-    #[allow(dead_code)]
     fn peek(&self, lookahead: usize) -> Token {{
         self.cst
             .tokens
@@ -326,6 +344,20 @@ impl<'a> Parser<'a> {{
         self.build(rule, NodeRef(m.0), diags);
         m
     }}
+    fn get_state(&self) -> ParserState {{
+        ParserState {{
+            pos: self.pos,
+            current: self.current,
+            node_count: self.cst.nodes.len(),
+            token_count: self.cst.token_count,
+        }}
+    }}
+    fn set_state(&mut self, state: &ParserState) {{
+        self.pos = state.pos;
+        self.current = state.current;
+        self.cst.nodes.truncate(state.node_count);
+        self.cst.token_count = state.token_count;
+    }}
     pub fn parse(
         source: &'a str,
         tokens: Vec<Token>,
@@ -337,10 +369,10 @@ impl<'a> Parser<'a> {{
             current: Token::EOF,
             cst: Cst::new(source, tokens, ranges),
             pos: 0,
-            error_cooldown: false,
             last_error_span: Span::default(),
             max_offset,
             context: Context::default(),
+            error_cooldown: false,{4}
         }};
         parser.{2}(diags);
         parser.cst

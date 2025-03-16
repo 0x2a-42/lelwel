@@ -210,6 +210,19 @@ fn oberon0() {
 
 #[test]
 #[rustfmt::skip]
+fn ordered_choice() {
+    let diags = gen_diags("tests/frontend/ordered_choice.llw");
+    let mut lines = diags.lines();
+
+    assert_eq!(lines.next().unwrap(), "tests/frontend/ordered_choice.llw:13:6: error[E028]: nested ordered choice");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/ordered_choice.llw:19:3: error[E028]: nested ordered choice");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/ordered_choice.llw:31:5: warning[W006]: commit is never used in ordered choice");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/ordered_choice.llw:28:7: warning[W007]: ordered choice branch could be moved to alternation");
+    assert_eq!(lines.next(), None);
+}
+
+#[test]
+#[rustfmt::skip]
 fn predef_token() {
     let diags = gen_diags("tests/frontend/predef_token.llw");
     let mut lines = diags.lines();
@@ -280,7 +293,7 @@ fn syntax_error() {
 
     assert_eq!(lines.next().unwrap(), "tests/frontend/syntax_error.llw:2:1: error: invalid syntax, expected one of: '=', <identifier>, ';'");
     assert_eq!(lines.next().unwrap(), "tests/frontend/syntax_error.llw:8:1: error: invalid syntax, expected: ')'");
-    assert_eq!(lines.next().unwrap(), "tests/frontend/syntax_error.llw:13:2: error: invalid syntax, expected one of: <semantic action>, '^', <identifier>, '[', '(', <node creation>, <node marker>, <node rename>, '|', <semantic predicate>, ']', ')', ';', <string literal>");
+    assert_eq!(lines.next().unwrap(), "tests/frontend/syntax_error.llw:13:2: error: invalid syntax, expected one of: <semantic action>, <semantic assertion>, '^', <identifier>, '[', '(', <node creation>, <node marker>, <node rename>, '|', <semantic predicate>, ']', ')', ';', '/', <string literal>, '~'");
     assert_eq!(lines.next().unwrap(), "tests/frontend/syntax_error.llw:13:1: error[E003]: use of undefined rule `b`");
     assert_eq!(lines.next(), None);
 }

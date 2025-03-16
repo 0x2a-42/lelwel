@@ -172,6 +172,19 @@ impl DebugPrinter {
             .get(&regex.syntax())
             .map_or("{}".to_string(), |set| format!("{:?}", set));
         match regex {
+            Regex::OrderedChoice(choice) => {
+                println!(
+                    "OrderedChoice {} {} {} {}",
+                    set!(first),
+                    set!(follow),
+                    pos!(choice.span(cst)),
+                    syntax!(choice.syntax().0),
+                );
+                let mut it = choice.operands(cst).peekable();
+                while let Some(op) = it.next() {
+                    self.branch(it.peek().is_none(), |s| s.print_regex(cst, sema, op));
+                }
+            }
             Regex::Alternation(alt) => {
                 println!(
                     "Alternation {} {} {} {}",
@@ -282,15 +295,26 @@ impl DebugPrinter {
                     syntax!(pred.syntax().0),
                 );
             }
-            Regex::Action(alt) => {
-                let value = alt.value(cst).map_or("", |(val, _)| val);
+            Regex::Action(action) => {
+                let value = action.value(cst).map_or("", |(val, _)| val);
                 println!(
                     "Action {} {} {} {} {}",
                     member!(value),
                     set!(first),
                     set!(follow),
-                    pos!(alt.span(cst)),
-                    syntax!(alt.syntax().0),
+                    pos!(action.span(cst)),
+                    syntax!(action.syntax().0),
+                );
+            }
+            Regex::Assertion(assertion) => {
+                let value = assertion.value(cst).map_or("", |(val, _)| val);
+                println!(
+                    "Assertion {} {} {} {} {}",
+                    member!(value),
+                    set!(first),
+                    set!(follow),
+                    pos!(assertion.span(cst)),
+                    syntax!(assertion.syntax().0),
                 );
             }
             Regex::NodeRename(rename) => {
@@ -334,6 +358,15 @@ impl DebugPrinter {
                     set!(follow),
                     pos!(creation.span(cst)),
                     syntax!(creation.syntax().0),
+                );
+            }
+            Regex::Commit(commit) => {
+                println!(
+                    "Commit {} {} {} {}",
+                    set!(first),
+                    set!(follow),
+                    pos!(commit.span(cst)),
+                    syntax!(commit.syntax().0),
                 );
             }
         }

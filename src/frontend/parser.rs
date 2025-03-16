@@ -114,6 +114,10 @@ pub enum Token {
     Plus,
     #[token("^")]
     Hat,
+    #[token("~")]
+    Tilde,
+    #[token("/")]
+    Slash,
     #[regex("[a-zA-Z][a-zA-Z_0-9]*")]
     Id,
     #[regex("'", parse_string)]
@@ -122,6 +126,8 @@ pub enum Token {
     Predicate,
     #[regex(r"#[0-9]+")]
     Action,
+    #[regex(r"![0-9]+")]
+    Assertion,
     #[regex(r"@([a-zA-Z][a-zA-Z_0-9]*)?")]
     NodeRename,
     #[regex("<[0-9]+")]

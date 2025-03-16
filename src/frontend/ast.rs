@@ -62,6 +62,7 @@ ast_node!(SkipDecl);
 ast_node!(
     Regex,
     (
+        OrderedChoice,
         Alternation,
         Concat,
         Paren,
@@ -72,12 +73,15 @@ ast_node!(
         Symbol,
         Predicate,
         Action,
+        Assertion,
         NodeRename,
         NodeElision,
         NodeMarker,
-        NodeCreation
+        NodeCreation,
+        Commit
     )
 );
+ast_node!(OrderedChoice);
 ast_node!(Alternation);
 ast_node!(Concat);
 ast_node!(Paren);
@@ -88,10 +92,12 @@ ast_node!(Name);
 ast_node!(Symbol);
 ast_node!(Predicate);
 ast_node!(Action);
+ast_node!(Assertion);
 ast_node!(NodeRename);
 ast_node!(NodeElision);
 ast_node!(NodeMarker);
 ast_node!(NodeCreation);
+ast_node!(Commit);
 
 impl Cst<'_> {
     fn child_node<T: AstNode>(&self, syntax: NodeRef) -> Option<T> {
@@ -200,6 +206,14 @@ impl SkipDecl {
             .for_each(f);
     }
 }
+impl OrderedChoice {
+    pub fn operands<'a>(
+        &self,
+        cst: &'a Cst,
+    ) -> std::iter::FilterMap<CstChildren<'a>, impl FnMut(NodeRef) -> Option<Regex> + 'a> {
+        cst.child_node_iter(self.syntax)
+    }
+}
 impl Alternation {
     pub fn operands<'a>(
         &self,
@@ -254,6 +268,11 @@ impl Predicate {
 impl Action {
     pub fn value<'a>(&self, cst: &'a Cst) -> Option<(&'a str, Span)> {
         cst.child_token(self.syntax, Token::Action)
+    }
+}
+impl Assertion {
+    pub fn value<'a>(&self, cst: &'a Cst) -> Option<(&'a str, Span)> {
+        cst.child_token(self.syntax, Token::Assertion)
     }
 }
 impl NodeRename {

@@ -21,11 +21,10 @@ impl Indent for &str {
     fn indent(&self, level: usize) -> String {
         let mut result = String::new();
         for l in self.lines() {
-            if l.is_empty() {
-                continue;
+            if !l.is_empty() {
+                result.push_str(&"    ".repeat(level));
+                result.push_str(l);
             }
-            result.push_str(&"    ".repeat(level));
-            result.push_str(l);
             result.push('\n');
         }
         if !self.ends_with('\n') {
@@ -163,6 +162,24 @@ impl RustOutput {
                 .as_bytes(),
             )?;
         }
+        let mut assertions = HashSet::new();
+        for (rule, num) in sema.assertions.values() {
+            if assertions.contains(&(rule, num)) {
+                continue;
+            }
+            assertions.insert((rule, num));
+            output.write_all(
+                format!(
+                    "    fn assertion_{rule}_{num}(&self) -> Option<Diagnostic>{}\n",
+                    if is_trait {
+                        ";"
+                    } else {
+                        " {\n        todo!()\n    }"
+                    }
+                )
+                .as_bytes(),
+            )?;
+        }
         output.write_all(b"}\n")
     }
 
@@ -254,6 +271,7 @@ impl RustOutput {
             name,
             elision,
             "self",
+            has_rule_rename,
         )?;
         if is_start {
             output.write_all(
@@ -297,6 +315,7 @@ impl RustOutput {
         name: &str,
         regex: Regex,
         recursive: &RecursiveBranches,
+        in_choice: bool,
     ) -> std::io::Result<()> {
         // binding power is not required if there is only one recursive branch or
         // if there are only left recursive branches
@@ -305,29 +324,33 @@ impl RustOutput {
                 .branches()
                 .iter()
                 .any(|branch| matches!(branch, Recursion::Right(..) | Recursion::LeftRight(..)));
-        if requires_bp {
-            output.write_all(
-                b"        fn rec(\
-                \n            parser: &mut Parser,\
-                \n            diags: &mut Vec<Diagnostic>,\
-                \n            min_bp: usize,\
-                \n            mut lhs: MarkClosed,\
-                \n        ) {\n",
-            )?;
-        } else {
-            output.write_all(
-                b"        fn rec(\
-                \n            parser: &mut Parser,\
-                \n            diags: &mut Vec<Diagnostic>,\
-                \n            mut lhs: MarkClosed,\
-                \n        ) {\n",
-            )?;
-        }
+        output.write_all(
+            format!(
+                "        fn rec(\
+               \n            parser: &mut Parser,\
+               \n            diags: &mut Vec<Diagnostic>,{}\
+               \n            mut lhs: MarkClosed,\
+               \n        ) {}{{\n",
+                if requires_bp {
+                    "\n            min_bp: usize,"
+                } else {
+                    ""
+                },
+                if in_choice { "-> Option<()> " } else { "" }
+            )
+            .as_bytes(),
+        )?;
         let call_rec = |parser, binding_power, marker| {
             if requires_bp {
-                format!("rec({parser}, diags, {binding_power}, {marker});\n")
+                format!(
+                    "rec({parser}, diags, {binding_power}, {marker}){};\n",
+                    if in_choice { "?" } else { "" }
+                )
             } else {
-                format!("rec({parser}, diags, {marker});\n")
+                format!(
+                    "rec({parser}, diags, {marker}){};\n",
+                    if in_choice { "?" } else { "" }
+                )
             }
         };
 
@@ -389,6 +412,7 @@ impl RustOutput {
                             name,
                             elision,
                             "parser",
+                            has_rule_rename,
                         )?;
                     }
                 }
@@ -404,6 +428,7 @@ impl RustOutput {
                     name,
                     elision,
                     "parser",
+                    has_rule_rename,
                 )?;
             }
             if elision != RuleNodeElision::Unconditional {
@@ -507,6 +532,7 @@ impl RustOutput {
                         name,
                         RuleNodeElision::None,
                         "parser",
+                        has_rule_rename,
                     )?;
                 }
             }
@@ -524,9 +550,10 @@ impl RustOutput {
         )?;
         output.write_all(
             format!(
-                "    }}\
+                "    }}{}\
                \n}}\
                \nlet lhs = self.cst.mark();\n{}",
+                if in_choice { "\n    Some(())" } else { "" },
                 call_rec("self", 0, "lhs")
             )
             .indent(2)
@@ -557,15 +584,17 @@ impl RustOutput {
                 .and_then(|regex| sema.elision.get(&regex.syntax()))
                 .unwrap_or(&RuleNodeElision::None)
         };
+        let in_choice = sema.used_in_ordered_choice.contains(&rule.syntax());
 
         output.write_all(
             format!(
-                "    {}fn r#{name}(&mut self, diags: &mut Vec<Diagnostic>) {{\n",
+                "    {}fn r#{name}(&mut self, diags: &mut Vec<Diagnostic>) {}{{\n",
                 if has_rule_rename {
                     "#[allow(unused_assignments)]\n    "
                 } else {
                     ""
-                }
+                },
+                if in_choice { "-> Option<()> " } else { "" }
             )
             .as_bytes(),
         )?;
@@ -585,6 +614,7 @@ impl RustOutput {
                     name,
                     regex,
                     recursive.unwrap(),
+                    in_choice,
                 )?;
             } else {
                 Self::output_normal_rule(
@@ -600,6 +630,9 @@ impl RustOutput {
                     *elision,
                 )?;
             }
+        }
+        if in_choice {
+            output.write_all(b"        Some(())\n")?;
         }
         output.write_all(b"    }\n")?;
         Ok(())
@@ -635,16 +668,32 @@ impl RustOutput {
         rule_name: &str,
         rule_elision: RuleNodeElision,
         parser_name: &str,
+        has_rule_rename: bool,
     ) -> std::io::Result<()> {
+        let in_choice = sema.used_in_ordered_choice.contains(&regex.syntax());
+        let expect_macro = if in_choice { "try_expect!" } else { "expect!" };
+        let ordered_choice_return = if in_choice {
+            format!(
+                "\nif {parser_name}.in_ordered_choice {{\
+                 \n    return None;\
+                 \n}}"
+            )
+        } else {
+            "".to_string()
+        };
         match regex {
             Regex::Name(name) => {
                 let decl = sema.decl_bindings[&name.syntax()];
                 if let Some(rule) = RuleDecl::cast(cst, decl) {
                     let name = rule.name(cst).unwrap().0;
+                    let rule_in_choice = sema.used_in_ordered_choice.contains(&rule.syntax());
                     output.write_all(
-                        format!("{parser_name}.r#{name}(diags);\n")
-                            .indent(level)
-                            .as_bytes(),
+                        format!(
+                            "{parser_name}.r#{name}(diags){};\n",
+                            if rule_in_choice { "?" } else { "" }
+                        )
+                        .indent(level)
+                        .as_bytes(),
                     )?;
                 } else if let Some(token) = TokenDecl::cast(cst, decl) {
                     let name = token.name(cst).unwrap().0;
@@ -653,7 +702,7 @@ impl RustOutput {
                         .map_or(name, |(sym, _)| &sym[1..sym.len() - 1]);
                     output.write_all(
                         format!(
-                            "expect!({name}, \"{}\", {parser_name}, diags);\n",
+                            "{expect_macro}({name}, \"{}\", {parser_name}, diags);\n",
                             escape(sym)
                         )
                         .indent(level)
@@ -668,11 +717,95 @@ impl RustOutput {
                     let sym = token.symbol(cst).unwrap().0;
                     let sym = escape(&sym[1..sym.len() - 1]);
                     output.write_all(
-                        format!("expect!({name}, \"{sym}\", {parser_name}, diags);\n",)
+                        format!("{expect_macro}({name}, \"{sym}\", {parser_name}, diags);\n",)
                             .indent(level)
                             .as_bytes(),
                     )?;
                 }
+            }
+            Regex::OrderedChoice(choice) => {
+                output.write_all(
+                    format!("{parser_name}.in_ordered_choice = true;\n")
+                        .indent(level)
+                        .as_bytes(),
+                )?;
+                output.write_all("'ordered_choice: {\n".indent(level).as_bytes())?;
+                output.write_all(
+                    format!("let state = {parser_name}.get_state();\n")
+                        .indent(level + 1)
+                        .as_bytes(),
+                )?;
+                if rule_elision == RuleNodeElision::Conditional {
+                    output
+                        .write_all("let elision_state = elide;\n".indent(level + 1).as_bytes())?;
+                }
+                if has_rule_rename {
+                    output.write_all(
+                        "let node_kind_state = node_kind;\n"
+                            .indent(level + 1)
+                            .as_bytes(),
+                    )?;
+                }
+                let ops = choice.operands(cst).collect::<Vec<_>>();
+                for op in &ops[..ops.len() - 1] {
+                    output.write_all("if (|| {\n".indent(level + 1).as_bytes())?;
+                    Self::output_regex(
+                        cst,
+                        sema,
+                        *op,
+                        output,
+                        level + 2,
+                        token_symbols,
+                        false,
+                        rule_name,
+                        rule_elision,
+                        parser_name,
+                        has_rule_rename,
+                    )?;
+                    output.write_all(
+                        "    Some(())\
+                       \n})().is_some() {\
+                       \n    break 'ordered_choice;\
+                       \n}\n"
+                            .indent(level + 1)
+                            .as_bytes(),
+                    )?;
+                    output.write_all(
+                        format!("{parser_name}.set_state(&state);\n")
+                            .indent(level + 1)
+                            .as_bytes(),
+                    )?;
+                    if rule_elision == RuleNodeElision::Conditional {
+                        output
+                            .write_all("elide = elision_state;\n".indent(level + 1).as_bytes())?;
+                    }
+                    if has_rule_rename {
+                        output.write_all(
+                            "node_kind = node_kind_state;\n"
+                                .indent(level + 1)
+                                .as_bytes(),
+                        )?;
+                    }
+                }
+                output.write_all(
+                    format!("{parser_name}.in_ordered_choice = false;\n")
+                        .indent(level + 1)
+                        .as_bytes(),
+                )?;
+                Self::output_regex(
+                    cst,
+                    sema,
+                    *ops.last().unwrap(),
+                    output,
+                    level + 1,
+                    token_symbols,
+                    false,
+                    rule_name,
+                    rule_elision,
+                    parser_name,
+                    has_rule_rename,
+                )?;
+                output.write_all("}\n".indent(level).as_bytes())?;
             }
             Regex::Concat(concat) => {
                 for op in concat.operands(cst) {
@@ -687,6 +820,7 @@ impl RustOutput {
                         rule_name,
                         rule_elision,
                         parser_name,
+                        has_rule_rename,
                     )?;
                 }
             }
@@ -721,16 +855,18 @@ impl RustOutput {
                         rule_name,
                         rule_elision,
                         parser_name,
+                        has_rule_rename,
                     )?;
                     output.write_all("}\n".indent(level + 1).as_bytes())?;
                 }
                 if !advance_error_set.is_empty() {
                     output.write_all(
                         format!(
-                            "    {} => {{\
+                            "    {} => {{{}\
                            \n        {parser_name}.advance_with_error(diags, err![{parser_name}.span(),]);\
                            \n    }}\n",
-                           advance_error_set.pattern(0)
+                           advance_error_set.pattern(0),
+                           ordered_choice_return.indent(2),
                         )
                         .indent(level)
                         .as_bytes(),
@@ -738,10 +874,11 @@ impl RustOutput {
                 }
                 output.write_all(
                     format!(
-                        "    _ => {{\
+                        "    _ => {{{}\
                        \n        {parser_name}.error(diags, err![{parser_name}.span(), {}]);\
                        \n    }}\
                        \n}}\n",
+                        ordered_choice_return.indent(2),
                         sema.predict_sets[&regex.syntax()].error(5, token_symbols),
                     )
                     .indent(level)
@@ -783,13 +920,14 @@ impl RustOutput {
                     rule_name,
                     rule_elision,
                     parser_name,
+                    has_rule_rename,
                 )?;
                 let recovery = &sema.recovery_sets[&regex.syntax()];
                 output.write_all(
                     format!(
                         "        }}\
                        \n        {}{}{} => break,\
-                       \n        _ => {{\
+                       \n        _ => {{{}\
                        \n            {parser_name}.advance_with_error(diags, err![{parser_name}.span(), {}]);\
                        \n        }}\
                        \n    }}\
@@ -801,6 +939,7 @@ impl RustOutput {
                             "\n        | "
                         },
                         recovery.pattern(2),
+                        ordered_choice_return.indent(3),
                         sema.predict_sets[&regex.syntax()].error(5, token_symbols),
                     )
                     .indent(level)
@@ -820,6 +959,7 @@ impl RustOutput {
                     rule_name,
                     rule_elision,
                     parser_name,
+                    has_rule_rename,
                 )?;
                 output.write_all(
                     format!(
@@ -854,13 +994,14 @@ impl RustOutput {
                     rule_name,
                     rule_elision,
                     parser_name,
+                    has_rule_rename,
                 )?;
                 let recovery = &sema.recovery_sets[&regex.syntax()];
                 output.write_all(
                     format!(
                         "        }}\
                        \n        {}{}{} => break,\
-                       \n        _ => {{\
+                       \n        _ => {{{}\
                        \n            {parser_name}.advance_with_error(diags, err![{parser_name}.span(), {}]);\
                        \n        }}\
                        \n    }}\
@@ -872,6 +1013,7 @@ impl RustOutput {
                             "\n        | "
                         },
                         recovery.pattern(2),
+                        ordered_choice_return.indent(3),
                         sema.follow_sets[&op.syntax()].error(5, token_symbols),
                     )
                     .indent(level)
@@ -912,16 +1054,18 @@ impl RustOutput {
                     rule_name,
                     rule_elision,
                     parser_name,
+                    has_rule_rename,
                 )?;
                 output.write_all(
                     format!(
                         "    }}\
                        \n    {} => {{}}\
-                       \n    _ => {{\
+                       \n    _ => {{{}\
                        \n        {parser_name}.error(diags, err![{parser_name}.span(), {}]);\
                        \n    }}\
                        \n}}\n",
                         sema.follow_sets[&regex.syntax()].pattern(1),
+                        ordered_choice_return.indent(2),
                         sema.predict_sets[&regex.syntax()].error(5, token_symbols),
                     )
                     .indent(level)
@@ -940,6 +1084,7 @@ impl RustOutput {
                     rule_name,
                     rule_elision,
                     parser_name,
+                    has_rule_rename,
                 )?;
             }
             Regex::Action(action) => {
@@ -947,6 +1092,19 @@ impl RustOutput {
                     format!(
                         "{parser_name}.action_{rule_name}_{}(diags);\n",
                         &action.value(cst).unwrap().0[1..]
+                    )
+                    .indent(level)
+                    .as_bytes(),
+                )?;
+            }
+            Regex::Assertion(assertion) => {
+                output.write_all(
+                    format!(
+                        "if let Some(diag) = {parser_name}.assertion_{rule_name}_{}() {{{}\
+                       \n    diags.push(diag);\
+                       \n}}\n",
+                        &assertion.value(cst).unwrap().0[1..],
+                        ordered_choice_return.indent(1),
                     )
                     .indent(level)
                     .as_bytes(),
@@ -992,7 +1150,14 @@ impl RustOutput {
                     .as_bytes(),
                 )?;
             }
-            _ => {}
+            Regex::Commit(_) => {
+                output.write_all(
+                    format!("{parser_name}.in_ordered_choice = false;\n")
+                        .indent(level)
+                        .as_bytes(),
+                )?;
+            }
+            Regex::Predicate(_) => {}
         }
         Ok(())
     }
@@ -1056,7 +1221,17 @@ impl RustOutput {
                 include_str!("../skeleton/generated.rs"),
                 rules,
                 skip,
-                sema.start.unwrap().name(cst).unwrap().0
+                sema.start.unwrap().name(cst).unwrap().0,
+                if !sema.used_in_ordered_choice.is_empty() {
+                    "\n    in_ordered_choice: bool,"
+                } else {
+                    ""
+                },
+                if !sema.used_in_ordered_choice.is_empty() {
+                    "\n            in_ordered_choice: false,"
+                } else {
+                    ""
+                },
             )
             .as_bytes(),
         )?;
