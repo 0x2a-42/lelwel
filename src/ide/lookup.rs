@@ -42,6 +42,9 @@ pub fn lookup_definition(
 ) -> Option<Location> {
     lookup_node(cst, NodeRef::ROOT, pos).and_then(|node| {
         if let Some((rule_name, number)) = sema.predicates.get(&node) {
+            if *number == "t" {
+                return None;
+            }
             lookup_parser_impl_definition("predicate", rule_name, number, parser_path)
         } else if let Some((rule_name, number)) = sema.actions.get(&node) {
             lookup_parser_impl_definition("action", rule_name, number, parser_path)

@@ -122,7 +122,7 @@ pub enum Token {
     Id,
     #[regex("'", parse_string)]
     Str,
-    #[regex(r"\?[0-9]+")]
+    #[regex(r"\?([0-9]+|t)")]
     Predicate,
     #[regex(r"#[0-9]+")]
     Action,

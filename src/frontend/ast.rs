@@ -264,6 +264,10 @@ impl Predicate {
     pub fn value<'a>(&self, cst: &'a Cst) -> Option<(&'a str, Span)> {
         cst.child_token(self.syntax, Token::Predicate)
     }
+    pub fn is_true(&self, cst: &Cst) -> bool {
+        self.value(cst)
+            .is_some_and(|(val, _)| matches!(&val[1..], "t"))
+    }
 }
 impl Action {
     pub fn value<'a>(&self, cst: &'a Cst) -> Option<(&'a str, Span)> {

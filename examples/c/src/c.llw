@@ -242,7 +242,7 @@ direct_declarator:
 ;
 /// 6.7.6
 pointer:
-  '*' (?1 (type_qualifier | gnu_attribute))* [pointer]
+  '*' (?t (type_qualifier | gnu_attribute))* [pointer]
 ;
 /// 6.7.6
 parameter_type_list:
@@ -335,9 +335,9 @@ statement^:
 labeled_statement:
   (
     Identifier ':'
-  | (?1 'case' constant_expr ':' /* parse consecutive case statements on same level */)+
+  | (?t 'case' constant_expr ':' /* parse consecutive case statements on same level */)+
   | 'default' ':'
-  ) [?2 statement /* label at end of compound statement is GNU extension */]
+  ) [?t statement /* label at end of compound statement is GNU extension */]
 ;
 /// 6.8.2
 compound_statement:
@@ -353,7 +353,7 @@ expression_statement:
 ;
 /// 6.8.4
 if_statement:
-  'if' '(' #1 expr ')' statement #2 [?1 'else' statement]
+  'if' '(' #1 expr ')' statement #2 [?t 'else' statement] // resolve dangling-else ambiguity
 ;
 /// 6.8.4
 switch_statement:
@@ -426,7 +426,7 @@ declaration_list:
 
 // GNU attribute extension
 gnu_attributes^:
-  [?1 (?1 gnu_attribute)+ >]
+  [?t (?t gnu_attribute)+ >]
 ;
 gnu_attribute:
   '__attribute__' '(' '(' attribute_list ')' ')'
