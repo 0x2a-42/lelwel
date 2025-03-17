@@ -780,22 +780,12 @@ impl PredicatesAndActions for Parser<'_> {
         // use extra lookahead
         self.current != Token::Identifier || self.peek(1) == Token::Colon
     }
-    fn predicate_labeled_statement_1(&self) -> bool {
-        true
-    }
-    fn predicate_labeled_statement_2(&self) -> bool {
-        true
-    }
     fn predicate_block_item_1(&self) -> bool {
         match self.current {
             Token::Identifier => self.is_type_name(self.pos),
             Token::Asm | Token::Extension => false,
             _ => true,
         }
-    }
-    fn predicate_if_statement_1(&self) -> bool {
-        // resolve dangling-else ambiguity
-        true
     }
     fn predicate_for_statement_1(&self) -> bool {
         self.current != Token::Identifier || self.is_type_name(self.pos)
@@ -821,12 +811,6 @@ impl PredicatesAndActions for Parser<'_> {
     }
     fn predicate_typeof_specifier_1(&self) -> bool {
         self.current != Token::Identifier || self.is_type_name(self.pos)
-    }
-    fn predicate_pointer_1(&self) -> bool {
-        true
-    }
-    fn predicate_gnu_attributes_1(&self) -> bool {
-        true
     }
 
     fn action_compound_statement_1(&mut self, _diags: &mut Vec<Diagnostic>) {

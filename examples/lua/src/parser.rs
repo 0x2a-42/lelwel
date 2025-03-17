@@ -353,9 +353,6 @@ impl PredicatesAndActions for Parser<'_> {
     fn predicate_pars_1(&self) -> bool {
         self.peek(1) != Token::Ellipsis
     }
-    fn predicate_prefixexp_1(&self) -> bool {
-        true
-    }
     fn predicate_fieldlist_1(&self) -> bool {
         self.peek(1) != Token::RBrace
     }

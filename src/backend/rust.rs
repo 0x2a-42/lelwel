@@ -642,10 +642,14 @@ impl RustOutput {
         match regex {
             Regex::Concat(concat) => match concat.operands(cst).next().unwrap() {
                 Regex::Predicate(pred) => {
-                    format!(
-                        " if {parser_name}.predicate_{rule_name}_{}()",
-                        &pred.value(cst).unwrap().0[1..]
-                    )
+                    if pred.is_true(cst) {
+                        " if true".to_string()
+                    } else {
+                        format!(
+                            " if {parser_name}.predicate_{rule_name}_{}()",
+                            &pred.value(cst).unwrap().0[1..]
+                        )
+                    }
                 }
                 _ => "".to_string(),
             },

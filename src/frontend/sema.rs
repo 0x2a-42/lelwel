@@ -451,9 +451,11 @@ impl<'a> GeneralCheck<'a> {
                     if !in_alt && !in_loop {
                         diags.push(Diagnostic::invalid_predicate_pos(&value_span));
                     }
-                    if let Some(rule_name) = rule.name(cst).map(|(name, _)| name) {
-                        sema.predicates
-                            .insert(regex.syntax(), (rule_name, &value[1..]));
+                    if !regex.is_true(cst) {
+                        if let Some(rule_name) = rule.name(cst).map(|(name, _)| name) {
+                            sema.predicates
+                                .insert(regex.syntax(), (rule_name, &value[1..]));
+                        }
                     }
                 }
                 RuleNodeElision::None
