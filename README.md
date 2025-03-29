@@ -4,6 +4,7 @@
 [![Crates.io](https://img.shields.io/crates/d/lelwel)](https://crates.io/crates/lelwel)
 [![Rust](https://img.shields.io/github/actions/workflow/status/0x2a-42/lelwel/rust.yml)](https://github.com/0x2a-42/lelwel/actions)
 [![Playground](https://img.shields.io/badge/playground-8A2BE2)](https://0x2a-42.github.io/playground.html)
+[![libs.tech recommends](https://libs.tech/project/381504905/badge.svg)](https://libs.tech/project/381504905/lelwel)
 
 ## Table of Contents
 * [Introduction](#introduction)
