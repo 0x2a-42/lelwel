@@ -2,7 +2,8 @@ use tower_lsp::lsp_types::*;
 
 use super::lookup::*;
 use crate::frontend::ast::{AstNode, File, Name, Named};
-use crate::{Cst, Node, NodeRef, Rule, SemanticData, Token};
+use crate::frontend::lexer::Token;
+use crate::{Cst, Node, NodeRef, Rule, SemanticData};
 
 /// Suggests a token name for a given token symbol.
 fn symbol_name_suggestion(symbol: &str) -> String {
@@ -277,7 +278,7 @@ fn add_reference_items(
 
 fn inside_decl(cst: &Cst, node: NodeRef, pos: usize) -> bool {
     cst.children(node)
-        .find_map(|n| cst.get_token(n, Token::Semi))
+        .find_map(|n| cst.match_token(n, Token::Semi))
         .is_none_or(|(_, range)| pos < range.end)
 }
 
@@ -318,7 +319,7 @@ pub fn completion(cst: &Cst, pos: usize, sema: &SemanticData) -> Option<Completi
                 if inside_decl(cst, node, pos) {
                     if let Some((_, range)) = cst
                         .children(node)
-                        .find_map(|n| cst.get_token(n, Token::Colon))
+                        .find_map(|n| cst.match_token(n, Token::Colon))
                     {
                         if pos > range.start {
                             add_reference_items(cst, file, sema, &mut items, true, true, None);

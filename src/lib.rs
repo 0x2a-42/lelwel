@@ -6,7 +6,6 @@ use codespan_reporting::diagnostic::Severity;
 use codespan_reporting::files::SimpleFile;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use codespan_reporting::term::{self, DisplayStyle};
-use logos::Logos;
 
 use backend::rust::RustOutput;
 use frontend::parser::*;
@@ -55,8 +54,7 @@ pub fn compile(
 
     let source = std::fs::read_to_string(input)?;
     let mut diags = vec![];
-    let (tokens, ranges) = tokenize(Token::lexer(&source), &mut diags);
-    let cst = Parser::parse(&source, tokens, ranges, &mut diags);
+    let cst = Parser::parse(&source, &mut diags);
     let sema = SemanticPass::run(&cst, &mut diags);
 
     if verbose > 1 {
@@ -97,8 +95,7 @@ pub fn generate_syntax_tree(source: &str) -> Vec<String> {
     use codespan_reporting::term::Config;
 
     let mut diags = vec![];
-    let (tokens, ranges) = tokenize(Token::lexer(source), &mut diags);
-    let cst = Parser::parse(source, tokens, ranges, &mut diags);
+    let cst = Parser::parse(source, &mut diags);
     let _sema = SemanticPass::run(&cst, &mut diags);
     let mut writer = NoColor::new(BufWriter::new(Vec::new()));
     let config = Config::default();

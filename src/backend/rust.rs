@@ -74,19 +74,26 @@ impl RustOutput {
 
         let parser_path = input.parent().unwrap().join("parser.rs");
         if !parser_path.exists() {
-            Self::output_parser(cst, file, sema, &parser_path)?;
+            Self::output_parser(sema, &parser_path)?;
+        }
+
+        let lexer_path = input.parent().unwrap().join("lexer.rs");
+        if !lexer_path.exists() {
+            Self::output_lexer(cst, file, &lexer_path)?;
         }
 
         Ok(())
     }
 
-    fn output_parser(
-        cst: &Cst,
-        file: File,
-        sema: &SemanticData,
-        path: &Path,
-    ) -> std::io::Result<()> {
+    fn output_parser(sema: &SemanticData, path: &Path) -> std::io::Result<()> {
         let mut parser_file = std::fs::File::create(path)?;
+        let skeleton = include_str!("../skeleton/parser.rs");
+        parser_file.write_all(skeleton.as_bytes())?;
+        Self::output_parser_callbacks(&mut parser_file, sema, false)
+    }
+
+    fn output_lexer(cst: &Cst, file: File, path: &Path) -> std::io::Result<()> {
+        let mut lexer_file = std::fs::File::create(path)?;
 
         let mut token_enumerators = "{\n    EOF,\n".to_string();
         for token in file.token_decls(cst) {
@@ -105,26 +112,35 @@ impl RustOutput {
             token_enumerators += ",\n";
         }
 
-        let template =
-            include_str!("../skeleton/parser.rs").replace("{\n    EOF,\n", &token_enumerators);
-
-        parser_file.write_all(template.as_bytes())?;
-
-        Self::output_predicates_and_actions(&mut parser_file, sema, false)
+        let skeleton =
+            include_str!("../skeleton/lexer.rs").replace("{\n    EOF,\n", &token_enumerators);
+        lexer_file.write_all(skeleton.as_bytes())
     }
 
-    fn output_predicates_and_actions(
+    fn output_parser_callbacks(
         output: &mut std::fs::File,
         sema: &SemanticData,
         is_trait: bool,
     ) -> std::io::Result<()> {
         output.write_all(if is_trait {
-            b"trait PredicatesAndActions {\
-            \n    /// Called when a new syntax tree node is created\
+            b"trait ParserCallbacks {\
+            \n    /// Called at the start of the parse to generate all tokens and corrsponding spans.\
+            \n    fn create_tokens(source: &str, diags: &mut Vec<Diagnostic>) -> (Vec<Token>, Vec<Span>);\
+            \n    /// Called when a new diagnostic is created.\
+            \n    fn create_diagnostic(&self, span: Span, message: String) -> Diagnostic;\
+            \n    /// Called when a new syntax tree node is created.\
             \n    #[allow(clippy::ptr_arg)]\
-            \n    fn build(&mut self, _rule: Rule, _node: NodeRef, _diags: &mut Vec<Diagnostic>) {}\n"
+            \n    fn create_node(&mut self, _rule: Rule, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}\n"
         } else {
-            b"impl<'a> PredicatesAndActions for Parser<'a> {\n"
+            b"impl<'a> ParserCallbacks for Parser<'a> {\
+            \n    fn create_tokens(source: &str, diags: &mut Vec<Diagnostic>) -> (Vec<Token>, Vec<Span>) {\
+            \n        tokenize(source, diags)\
+            \n    }\
+            \n    fn create_diagnostic(&self, span: Span, message: String) -> Diagnostic {\
+            \n        Diagnostic::error()\
+            \n            .with_message(message)\
+            \n            .with_labels(vec![Label::primary((), span)])\
+            \n    }\n"
         })?;
         let mut predicates = HashSet::new();
         for (rule, num) in sema.predicates.values() {
@@ -276,12 +292,12 @@ impl RustOutput {
         if is_start {
             output.write_all(
                 b"        if self.current != Token::EOF {\
-                \n            self.error(diags, err![self.span(), \"<end of file>\"]);\
+                \n            self.error(diags, err![self, \"<end of file>\"]);\
                 \n            let error_tree = self.cst.open();\
                 \n            loop {\
-                \n                match self.cst.tokens.get(self.pos) {\
+                \n                match self.tokens.get(self.pos) {\
                 \n                    None => break,\
-                \n                    _ => self.cst.advance(),\
+                \n                    Some(token) => self.cst.advance(*token),\
                 \n                }\
                 \n                self.pos += 1;\
                 \n            }\
@@ -440,7 +456,7 @@ impl RustOutput {
             output.write_all(
                 format!(
                     "    {} => {{\
-                   \n        parser.advance_with_error(diags, err![parser.span(),]);\
+                   \n        parser.advance_with_error(diags, err![parser,]);\
                    \n    }}\n",
                     advance_error_set.pattern(0)
                 )
@@ -451,7 +467,7 @@ impl RustOutput {
         output.write_all(
             format!(
                 "    _ => {{\
-               \n        parser.error(diags, err![parser.span(), {}]);\
+               \n        parser.error(diags, err![parser, {}]);\
                \n    }}\
                \n}}\n",
                 sema.predict_sets[&regex.syntax()].error(5, token_symbols)
@@ -588,7 +604,7 @@ impl RustOutput {
 
         output.write_all(
             format!(
-                "    {}fn r#{name}(&mut self, diags: &mut Vec<Diagnostic>) {}{{\n",
+                "    {}fn rule_{name}(&mut self, diags: &mut Vec<Diagnostic>) {}{{\n",
                 if has_rule_rename {
                     "#[allow(unused_assignments)]\n    "
                 } else {
@@ -693,7 +709,7 @@ impl RustOutput {
                     let rule_in_choice = sema.used_in_ordered_choice.contains(&rule.syntax());
                     output.write_all(
                         format!(
-                            "{parser_name}.r#{name}(diags){};\n",
+                            "{parser_name}.rule_{name}(diags){};\n",
                             if rule_in_choice { "?" } else { "" }
                         )
                         .indent(level)
@@ -867,10 +883,10 @@ impl RustOutput {
                     output.write_all(
                         format!(
                             "    {} => {{{}\
-                           \n        {parser_name}.advance_with_error(diags, err![{parser_name}.span(),]);\
+                           \n        {parser_name}.advance_with_error(diags, err![{parser_name},]);\
                            \n    }}\n",
-                           advance_error_set.pattern(0),
-                           ordered_choice_return.indent(2),
+                            advance_error_set.pattern(0),
+                            ordered_choice_return.indent(2),
                         )
                         .indent(level)
                         .as_bytes(),
@@ -879,7 +895,7 @@ impl RustOutput {
                 output.write_all(
                     format!(
                         "    _ => {{{}\
-                       \n        {parser_name}.error(diags, err![{parser_name}.span(), {}]);\
+                       \n        {parser_name}.error(diags, err![{parser_name}, {}]);\
                        \n    }}\
                        \n}}\n",
                         ordered_choice_return.indent(2),
@@ -932,7 +948,7 @@ impl RustOutput {
                         "        }}\
                        \n        {}{}{} => break,\
                        \n        _ => {{{}\
-                       \n            {parser_name}.advance_with_error(diags, err![{parser_name}.span(), {}]);\
+                       \n            {parser_name}.advance_with_error(diags, err![{parser_name}, {}]);\
                        \n        }}\
                        \n    }}\
                        \n}}\n",
@@ -1006,7 +1022,7 @@ impl RustOutput {
                         "        }}\
                        \n        {}{}{} => break,\
                        \n        _ => {{{}\
-                       \n            {parser_name}.advance_with_error(diags, err![{parser_name}.span(), {}]);\
+                       \n            {parser_name}.advance_with_error(diags, err![{parser_name}, {}]);\
                        \n        }}\
                        \n    }}\
                        \n}}\n",
@@ -1065,7 +1081,7 @@ impl RustOutput {
                         "    }}\
                        \n    {} => {{}}\
                        \n    _ => {{{}\
-                       \n        {parser_name}.error(diags, err![{parser_name}.span(), {}]);\
+                       \n        {parser_name}.error(diags, err![{parser_name}, {}]);\
                        \n    }}\
                        \n}}\n",
                         sema.follow_sets[&regex.syntax()].pattern(1),
@@ -1198,6 +1214,7 @@ impl RustOutput {
             token_symbols.insert(name, sym);
         }
         let mut rules = "".to_string();
+        let mut rules_fmt = "".to_string();
         let mut rule_names = HashSet::new();
         for rule in file.rule_decls(cst) {
             let rule_name = rule.name(cst).unwrap().0;
@@ -1205,6 +1222,11 @@ impl RustOutput {
             rules += "\n    ";
             rules += &Self::snake_to_pascal_case(rule_name);
             rules += ",";
+            rules_fmt += "\n    Rule::";
+            rules_fmt += &Self::snake_to_pascal_case(rule_name);
+            rules_fmt += " => write!(f, \"";
+            rules_fmt += rule_name;
+            rules_fmt += "\"),";
         }
         for rule_name in sema.rule_bindings.iter() {
             if rule_names.contains(rule_name) {
@@ -1213,6 +1235,11 @@ impl RustOutput {
             rules += "\n    ";
             rules += &Self::snake_to_pascal_case(rule_name);
             rules += ",";
+            rules_fmt += "\n    Rule::";
+            rules_fmt += &Self::snake_to_pascal_case(rule_name);
+            rules_fmt += " => write!(f, \"";
+            rules_fmt += rule_name;
+            rules_fmt += "\"),";
         }
         let mut skip = "".to_string();
         for token in sema.skipped.iter() {
@@ -1226,16 +1253,7 @@ impl RustOutput {
                 rules,
                 skip,
                 sema.start.unwrap().name(cst).unwrap().0,
-                if !sema.used_in_ordered_choice.is_empty() {
-                    "\n    in_ordered_choice: bool,"
-                } else {
-                    ""
-                },
-                if !sema.used_in_ordered_choice.is_empty() {
-                    "\n            in_ordered_choice: false,"
-                } else {
-                    ""
-                },
+                rules_fmt,
             )
             .as_bytes(),
         )?;
@@ -1244,6 +1262,6 @@ impl RustOutput {
         }
         output.write_all(b"}\n\n")?;
 
-        Self::output_predicates_and_actions(output, sema, true)
+        Self::output_parser_callbacks(output, sema, true)
     }
 }

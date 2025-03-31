@@ -4,16 +4,14 @@
 use codespan_reporting::files::SimpleFile;
 use codespan_reporting::term::termcolor::NoColor;
 use codespan_reporting::term::{self, DisplayStyle};
-use lelwel::frontend::parser::{tokenize, Parser, Token};
+use lelwel::frontend::parser::Parser;
 use lelwel::frontend::sema::SemanticPass;
-use logos::Logos;
 use std::io::BufWriter;
 
 fn gen_diags(input: &str) -> String {
     let source = std::fs::read_to_string(input).unwrap();
     let mut diags = vec![];
-    let (tokens, ranges) = tokenize(Token::lexer(&source), &mut diags);
-    let cst = Parser::parse(&source, tokens, ranges, &mut diags);
+    let cst = Parser::parse(&source, &mut diags);
     let _ = SemanticPass::run(&cst, &mut diags);
 
     let mut writer = NoColor::new(BufWriter::new(Vec::new()));

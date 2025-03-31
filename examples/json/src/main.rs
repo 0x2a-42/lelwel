@@ -1,10 +1,10 @@
+mod lexer;
 mod parser;
 
 use codespan_reporting::diagnostic::Severity;
 use codespan_reporting::files::SimpleFile;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use codespan_reporting::term::{self, Config};
-use logos::Logos;
 use parser::*;
 
 fn main() -> std::io::Result<()> {
@@ -17,8 +17,7 @@ fn main() -> std::io::Result<()> {
     let config = Config::default();
     let source = std::fs::read_to_string(&args[1])?;
     let mut diags = vec![];
-    let (tokens, ranges) = tokenize(Token::lexer(&source), &mut diags);
-    let cst = Parser::parse(&source, tokens, ranges, &mut diags);
+    let cst = Parser::parse(&source, &mut diags);
     println!("{cst}");
     let file = SimpleFile::new(&args[1], &source);
     for diag in diags.iter() {

@@ -1,5 +1,6 @@
 use crate::frontend::ast::{AstNode, Regex, RuleDecl};
-use crate::{Cst, NodeRef, Rule, SemanticData, Token};
+use crate::frontend::lexer::Token;
+use crate::{Cst, NodeRef, Rule, SemanticData};
 use logos::Span;
 
 use super::lookup::*;
@@ -45,7 +46,7 @@ pub fn hover(cst: &Cst, sema: &SemanticData, pos: usize) -> Option<(String, Span
                 let mut comment_nodes = vec![];
                 if let Some(comment_attached_node) = comment_attached_node {
                     for i in 1.. {
-                        if let Some(node) = cst.get_token(
+                        if let Some(node) = cst.match_token(
                             NodeRef(comment_attached_node.0.saturating_sub(i)),
                             Token::DocComment,
                         ) {
