@@ -40,34 +40,34 @@ macro_rules! err {
 #[derive(Copy, Clone, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum Rule {
-    Error,
-    File,
-    Decl,
-    StartDecl,
-    RightDecl,
-    SkipDecl,
-    TokenList,
-    TokenDecl,
-    RuleDecl,
-    Regex,
-    Alternation,
-    OrderedChoice,
-    Concat,
-    Postfix,
     Action,
+    Alternation,
     Assertion,
     Commit,
+    Concat,
+    Decl,
+    Error,
+    File,
     Name,
     NodeCreation,
     NodeElision,
     NodeMarker,
     NodeRename,
     Optional,
+    OrderedChoice,
     Paren,
     Plus,
+    Postfix,
     Predicate,
+    Regex,
+    RightDecl,
+    RuleDecl,
+    SkipDecl,
     Star,
+    StartDecl,
     Symbol,
+    TokenDecl,
+    TokenList,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
@@ -339,34 +339,34 @@ impl std::fmt::Display for Cst<'_> {
 impl std::fmt::Debug for Rule {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Rule::Error => write!(f, "error"),
-            Rule::File => write!(f, "file"),
-            Rule::Decl => write!(f, "decl"),
-            Rule::StartDecl => write!(f, "start_decl"),
-            Rule::RightDecl => write!(f, "right_decl"),
-            Rule::SkipDecl => write!(f, "skip_decl"),
-            Rule::TokenList => write!(f, "token_list"),
-            Rule::TokenDecl => write!(f, "token_decl"),
-            Rule::RuleDecl => write!(f, "rule_decl"),
-            Rule::Regex => write!(f, "regex"),
-            Rule::Alternation => write!(f, "alternation"),
-            Rule::OrderedChoice => write!(f, "ordered_choice"),
-            Rule::Concat => write!(f, "concat"),
-            Rule::Postfix => write!(f, "postfix"),
             Rule::Action => write!(f, "action"),
+            Rule::Alternation => write!(f, "alternation"),
             Rule::Assertion => write!(f, "assertion"),
             Rule::Commit => write!(f, "commit"),
+            Rule::Concat => write!(f, "concat"),
+            Rule::Decl => write!(f, "decl"),
+            Rule::Error => write!(f, "error"),
+            Rule::File => write!(f, "file"),
             Rule::Name => write!(f, "name"),
             Rule::NodeCreation => write!(f, "node_creation"),
             Rule::NodeElision => write!(f, "node_elision"),
             Rule::NodeMarker => write!(f, "node_marker"),
             Rule::NodeRename => write!(f, "node_rename"),
             Rule::Optional => write!(f, "optional"),
+            Rule::OrderedChoice => write!(f, "ordered_choice"),
             Rule::Paren => write!(f, "paren"),
             Rule::Plus => write!(f, "plus"),
+            Rule::Postfix => write!(f, "postfix"),
             Rule::Predicate => write!(f, "predicate"),
+            Rule::Regex => write!(f, "regex"),
+            Rule::RightDecl => write!(f, "right_decl"),
+            Rule::RuleDecl => write!(f, "rule_decl"),
+            Rule::SkipDecl => write!(f, "skip_decl"),
             Rule::Star => write!(f, "star"),
+            Rule::StartDecl => write!(f, "start_decl"),
             Rule::Symbol => write!(f, "symbol"),
+            Rule::TokenDecl => write!(f, "token_decl"),
+            Rule::TokenList => write!(f, "token_list"),
         }
     }
 }
@@ -478,7 +478,8 @@ impl<'a> Parser<'a> {
         self.error(diags, diag);
         self.error_cooldown = true;
         self.advance(true);
-        self.close(m, Rule::Error, diags);
+        self.cst.close(m, Rule::Error);
+        self.create_node_error(NodeRef(m.0), diags);
     }
     fn peek(&self, lookahead: usize) -> Token {
         self.tokens
@@ -503,11 +504,6 @@ impl<'a> Parser<'a> {
             .get(self.pos)
             .map_or(self.max_offset..self.max_offset, |span| span.clone())
     }
-    fn close(&mut self, mark: MarkOpened, rule: Rule, diags: &mut Vec<Diagnostic>) -> MarkClosed {
-        let m = self.cst.close(mark, rule);
-        self.create_node(rule, NodeRef(m.0), diags);
-        m
-    }
     fn get_state(&self) -> ParserState {
         ParserState {
             pos: self.pos,
@@ -515,11 +511,50 @@ impl<'a> Parser<'a> {
             truncation_mark: self.cst.mark_truncation(),
         }
     }
-    fn set_state(&mut self, state: &ParserState) {
+    fn set_state(&mut self, state: &ParserState, diags: &mut Vec<Diagnostic>) {
         self.pos = state.pos;
         self.current = state.current;
+        for i in state.truncation_mark.node_count..self.cst.nodes.len() {
+            if let Node::Rule(rule, _) = self.cst.nodes[i] {
+                self.delete_node(rule, NodeRef(i), diags);
+            }
+        }
         self.cst.truncate(state.truncation_mark.clone());
     }
+    fn create_node(&mut self, rule: Rule, node_ref: NodeRef, diags: &mut Vec<Diagnostic>) {
+        match rule {
+            Rule::Action => self.create_node_action(node_ref, diags),
+            Rule::Alternation => self.create_node_alternation(node_ref, diags),
+            Rule::Assertion => self.create_node_assertion(node_ref, diags),
+            Rule::Commit => self.create_node_commit(node_ref, diags),
+            Rule::Concat => self.create_node_concat(node_ref, diags),
+            Rule::Decl => self.create_node_decl(node_ref, diags),
+            Rule::Error => self.create_node_error(node_ref, diags),
+            Rule::File => self.create_node_file(node_ref, diags),
+            Rule::Name => self.create_node_name(node_ref, diags),
+            Rule::NodeCreation => self.create_node_node_creation(node_ref, diags),
+            Rule::NodeElision => self.create_node_node_elision(node_ref, diags),
+            Rule::NodeMarker => self.create_node_node_marker(node_ref, diags),
+            Rule::NodeRename => self.create_node_node_rename(node_ref, diags),
+            Rule::Optional => self.create_node_optional(node_ref, diags),
+            Rule::OrderedChoice => self.create_node_ordered_choice(node_ref, diags),
+            Rule::Paren => self.create_node_paren(node_ref, diags),
+            Rule::Plus => self.create_node_plus(node_ref, diags),
+            Rule::Postfix => self.create_node_postfix(node_ref, diags),
+            Rule::Predicate => self.create_node_predicate(node_ref, diags),
+            Rule::Regex => self.create_node_regex(node_ref, diags),
+            Rule::RightDecl => self.create_node_right_decl(node_ref, diags),
+            Rule::RuleDecl => self.create_node_rule_decl(node_ref, diags),
+            Rule::SkipDecl => self.create_node_skip_decl(node_ref, diags),
+            Rule::Star => self.create_node_star(node_ref, diags),
+            Rule::StartDecl => self.create_node_start_decl(node_ref, diags),
+            Rule::Symbol => self.create_node_symbol(node_ref, diags),
+            Rule::TokenDecl => self.create_node_token_decl(node_ref, diags),
+            Rule::TokenList => self.create_node_token_list(node_ref, diags),
+        }
+    }
+    #[allow(clippy::ptr_arg)]
+    fn delete_node(&mut self, _rule: Rule, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
     /// Returns the CST for a parse with the given `source` file and writes diagnostics to `diags`.
     ///
     /// The context can be explicitly defined for the parse.
@@ -585,9 +620,11 @@ impl<'a> Parser<'a> {
                 }
                 self.pos += 1;
             }
-            self.close(error_tree, Rule::Error, diags);
+            self.cst.close(error_tree, Rule::Error);
+            self.create_node_error(NodeRef(error_tree.0), diags);
         }
-        self.close(m, Rule::File, diags);
+        let closed = self.cst.close(m, Rule::File);
+        self.create_node_file(NodeRef(closed.0), diags);
     }
     fn rule_decl(&mut self, diags: &mut Vec<Diagnostic>) {
         match self.current {
@@ -622,7 +659,8 @@ impl<'a> Parser<'a> {
         expect!(Start, "start", self, diags);
         expect!(Id, "<identifier>", self, diags);
         expect!(Semi, ";", self, diags);
-        self.close(m, Rule::StartDecl, diags);
+        let closed = self.cst.close(m, Rule::StartDecl);
+        self.create_node_start_decl(NodeRef(closed.0), diags);
     }
     fn rule_right_decl(&mut self, diags: &mut Vec<Diagnostic>) {
         let m = self.cst.open();
@@ -666,7 +704,8 @@ impl<'a> Parser<'a> {
             }
         }
         expect!(Semi, ";", self, diags);
-        self.close(m, Rule::RightDecl, diags);
+        let closed = self.cst.close(m, Rule::RightDecl);
+        self.create_node_right_decl(NodeRef(closed.0), diags);
     }
     fn rule_skip_decl(&mut self, diags: &mut Vec<Diagnostic>) {
         let m = self.cst.open();
@@ -710,7 +749,8 @@ impl<'a> Parser<'a> {
             }
         }
         expect!(Semi, ";", self, diags);
-        self.close(m, Rule::SkipDecl, diags);
+        let closed = self.cst.close(m, Rule::SkipDecl);
+        self.create_node_skip_decl(NodeRef(closed.0), diags);
     }
     fn rule_token_list(&mut self, diags: &mut Vec<Diagnostic>) {
         let m = self.cst.open();
@@ -733,7 +773,8 @@ impl<'a> Parser<'a> {
             }
         }
         expect!(Semi, ";", self, diags);
-        self.close(m, Rule::TokenList, diags);
+        let closed = self.cst.close(m, Rule::TokenList);
+        self.create_node_token_list(NodeRef(closed.0), diags);
     }
     fn rule_token_decl(&mut self, diags: &mut Vec<Diagnostic>) {
         let m = self.cst.open();
@@ -748,7 +789,8 @@ impl<'a> Parser<'a> {
                 self.error(diags, err![self, "=", "<identifier>", ";"]);
             }
         }
-        self.close(m, Rule::TokenDecl, diags);
+        let closed = self.cst.close(m, Rule::TokenDecl);
+        self.create_node_token_decl(NodeRef(closed.0), diags);
     }
     fn rule_rule_decl(&mut self, diags: &mut Vec<Diagnostic>) {
         let m = self.cst.open();
@@ -802,7 +844,8 @@ impl<'a> Parser<'a> {
             }
         }
         expect!(Semi, ";", self, diags);
-        self.close(m, Rule::RuleDecl, diags);
+        let closed = self.cst.close(m, Rule::RuleDecl);
+        self.create_node_rule_decl(NodeRef(closed.0), diags);
     }
     fn rule_regex(&mut self, diags: &mut Vec<Diagnostic>) {
         self.rule_alternation(diags);
@@ -835,7 +878,8 @@ impl<'a> Parser<'a> {
                     }
                 }
                 let open_node = self.cst.open_before(start);
-                self.close(open_node, Rule::Alternation, diags);
+                self.cst.close(open_node, Rule::Alternation);
+                self.create_node_alternation(NodeRef(start.0), diags);
             }
             Token::RBrak | Token::RPar | Token::Semi => {}
             _ => {
@@ -872,7 +916,8 @@ impl<'a> Parser<'a> {
                     }
                 }
                 let open_node = self.cst.open_before(start);
-                self.close(open_node, Rule::OrderedChoice, diags);
+                self.cst.close(open_node, Rule::OrderedChoice);
+                self.create_node_ordered_choice(NodeRef(start.0), diags);
             }
             Token::Or | Token::RBrak | Token::RPar | Token::Semi => {}
             _ => {
@@ -951,7 +996,8 @@ impl<'a> Parser<'a> {
                     }
                 }
                 let open_node = self.cst.open_before(start);
-                self.close(open_node, Rule::Concat, diags);
+                self.cst.close(open_node, Rule::Concat);
+                self.create_node_concat(NodeRef(start.0), diags);
             }
             Token::Or | Token::RBrak | Token::RPar | Token::Semi | Token::Slash => {}
             _ => {
@@ -992,7 +1038,8 @@ impl<'a> Parser<'a> {
                     parser.rule_regex(diags);
                     expect!(RPar, ")", parser, diags);
                     node_kind = Rule::Paren;
-                    parser.close(m, node_kind, diags);
+                    let closed = parser.cst.close(m, node_kind);
+                    parser.create_node(node_kind, NodeRef(closed.0), diags);
                 }
                 Token::LBrak => {
                     let m = parser.cst.open();
@@ -1000,67 +1047,78 @@ impl<'a> Parser<'a> {
                     parser.rule_regex(diags);
                     expect!(RBrak, "]", parser, diags);
                     node_kind = Rule::Optional;
-                    parser.close(m, node_kind, diags);
+                    let closed = parser.cst.close(m, node_kind);
+                    parser.create_node(node_kind, NodeRef(closed.0), diags);
                 }
                 Token::Id => {
                     let m = parser.cst.open();
                     expect!(Id, "<identifier>", parser, diags);
                     node_kind = Rule::Name;
-                    parser.close(m, node_kind, diags);
+                    let closed = parser.cst.close(m, node_kind);
+                    parser.create_node(node_kind, NodeRef(closed.0), diags);
                 }
                 Token::Str => {
                     let m = parser.cst.open();
                     expect!(Str, "<string literal>", parser, diags);
                     node_kind = Rule::Symbol;
-                    parser.close(m, node_kind, diags);
+                    let closed = parser.cst.close(m, node_kind);
+                    parser.create_node(node_kind, NodeRef(closed.0), diags);
                 }
                 Token::Predicate => {
                     let m = parser.cst.open();
                     expect!(Predicate, "<semantic predicate>", parser, diags);
                     node_kind = Rule::Predicate;
-                    parser.close(m, node_kind, diags);
+                    let closed = parser.cst.close(m, node_kind);
+                    parser.create_node(node_kind, NodeRef(closed.0), diags);
                 }
                 Token::Action => {
                     let m = parser.cst.open();
                     expect!(Action, "<semantic action>", parser, diags);
                     node_kind = Rule::Action;
-                    parser.close(m, node_kind, diags);
+                    let closed = parser.cst.close(m, node_kind);
+                    parser.create_node(node_kind, NodeRef(closed.0), diags);
                 }
                 Token::Assertion => {
                     let m = parser.cst.open();
                     expect!(Assertion, "<semantic assertion>", parser, diags);
                     node_kind = Rule::Assertion;
-                    parser.close(m, node_kind, diags);
+                    let closed = parser.cst.close(m, node_kind);
+                    parser.create_node(node_kind, NodeRef(closed.0), diags);
                 }
                 Token::NodeRename => {
                     let m = parser.cst.open();
                     expect!(NodeRename, "<node rename>", parser, diags);
                     node_kind = Rule::NodeRename;
-                    parser.close(m, node_kind, diags);
+                    let closed = parser.cst.close(m, node_kind);
+                    parser.create_node(node_kind, NodeRef(closed.0), diags);
                 }
                 Token::NodeMarker => {
                     let m = parser.cst.open();
                     expect!(NodeMarker, "<node marker>", parser, diags);
                     node_kind = Rule::NodeMarker;
-                    parser.close(m, node_kind, diags);
+                    let closed = parser.cst.close(m, node_kind);
+                    parser.create_node(node_kind, NodeRef(closed.0), diags);
                 }
                 Token::NodeCreation => {
                     let m = parser.cst.open();
                     expect!(NodeCreation, "<node creation>", parser, diags);
                     node_kind = Rule::NodeCreation;
-                    parser.close(m, node_kind, diags);
+                    let closed = parser.cst.close(m, node_kind);
+                    parser.create_node(node_kind, NodeRef(closed.0), diags);
                 }
                 Token::Hat => {
                     let m = parser.cst.open();
                     expect!(Hat, "^", parser, diags);
                     node_kind = Rule::NodeElision;
-                    parser.close(m, node_kind, diags);
+                    let closed = parser.cst.close(m, node_kind);
+                    parser.create_node(node_kind, NodeRef(closed.0), diags);
                 }
                 Token::Tilde => {
                     let m = parser.cst.open();
                     expect!(Tilde, "~", parser, diags);
                     node_kind = Rule::Commit;
-                    parser.close(m, node_kind, diags);
+                    let closed = parser.cst.close(m, node_kind);
+                    parser.create_node(node_kind, NodeRef(closed.0), diags);
                 }
                 _ => {
                     parser.error(
@@ -1090,14 +1148,18 @@ impl<'a> Parser<'a> {
                         let m = parser.cst.open_before(lhs);
                         expect!(Star, "*", parser, diags);
                         node_kind = Rule::Star;
-                        lhs = parser.close(m, node_kind, diags);
+                        let closed = parser.cst.close(m, node_kind);
+                        parser.create_node(node_kind, NodeRef(closed.0), diags);
+                        lhs = closed;
                         continue;
                     }
                     Token::Plus => {
                         let m = parser.cst.open_before(lhs);
                         expect!(Plus, "+", parser, diags);
                         node_kind = Rule::Plus;
-                        lhs = parser.close(m, node_kind, diags);
+                        let closed = parser.cst.close(m, node_kind);
+                        parser.create_node(node_kind, NodeRef(closed.0), diags);
+                        lhs = closed;
                         continue;
                     }
                     _ => {
@@ -1111,13 +1173,70 @@ impl<'a> Parser<'a> {
     }
 }
 
+#[allow(clippy::ptr_arg)]
 trait ParserCallbacks {
     /// Called at the start of the parse to generate all tokens and corresponding spans.
     fn create_tokens(source: &str, diags: &mut Vec<Diagnostic>) -> (Vec<Token>, Vec<Span>);
-    /// Called when a new diagnostic is created.
+    /// Called when diagnostic is created.
     fn create_diagnostic(&self, span: Span, message: String) -> Diagnostic;
-    /// Called when a new syntax tree node is created.
-    #[allow(clippy::ptr_arg)]
-    fn create_node(&mut self, _rule: Rule, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+
+    /// Called when `action` node is created.
+    fn create_node_action(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+    /// Called when `alternation` node is created.
+    fn create_node_alternation(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+    /// Called when `assertion` node is created.
+    fn create_node_assertion(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+    /// Called when `commit` node is created.
+    fn create_node_commit(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+    /// Called when `concat` node is created.
+    fn create_node_concat(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+    /// Called when `decl` node is created.
+    fn create_node_decl(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+    /// Called when `error` node is created.
+    fn create_node_error(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+    /// Called when `file` node is created.
+    fn create_node_file(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+    /// Called when `name` node is created.
+    fn create_node_name(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+    /// Called when `node_creation` node is created.
+    fn create_node_node_creation(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+    /// Called when `node_elision` node is created.
+    fn create_node_node_elision(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+    /// Called when `node_marker` node is created.
+    fn create_node_node_marker(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+    /// Called when `node_rename` node is created.
+    fn create_node_node_rename(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+    /// Called when `optional` node is created.
+    fn create_node_optional(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+    /// Called when `ordered_choice` node is created.
+    fn create_node_ordered_choice(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+    /// Called when `paren` node is created.
+    fn create_node_paren(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+    /// Called when `plus` node is created.
+    fn create_node_plus(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+    /// Called when `postfix` node is created.
+    fn create_node_postfix(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+    /// Called when `predicate` node is created.
+    fn create_node_predicate(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+    /// Called when `regex` node is created.
+    fn create_node_regex(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+    /// Called when `right_decl` node is created.
+    fn create_node_right_decl(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+    /// Called when `rule_decl` node is created.
+    fn create_node_rule_decl(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+    /// Called when `skip_decl` node is created.
+    fn create_node_skip_decl(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+    /// Called when `star` node is created.
+    fn create_node_star(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+    /// Called when `start_decl` node is created.
+    fn create_node_start_decl(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+    /// Called when `symbol` node is created.
+    fn create_node_symbol(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+    /// Called when `token_decl` node is created.
+    fn create_node_token_decl(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+    /// Called when `token_list` node is created.
+    fn create_node_token_list(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+
+    /// Called when semantic predicate `?1` in rule `decl` is visited.
     fn predicate_decl_1(&self) -> bool;
 }

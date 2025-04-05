@@ -20,82 +20,68 @@ impl ParserCallbacks for Parser<'_> {
             .with_message(message)
             .with_labels(vec![Label::primary((), span)])
     }
-    fn create_node(&mut self, rule: Rule, node: NodeRef, diags: &mut Vec<Diagnostic>) {
-        match rule {
-            Rule::Expstat => {
-                self.cst.children(node).for_each(|c| {
-                    if let Some(exp) = Exp::cast(&self.cst, c) {
-                        match exp {
-                            Exp::Callexp(_) => {}
-                            _ => {
-                                diags.push(
-                                    Diagnostic::error()
-                                        .with_message("unexpected expression kind")
-                                        .with_labels(vec![
-                                            codespan_reporting::diagnostic::Label::primary(
-                                                (),
-                                                self.cst.get_span(c).unwrap(),
-                                            ),
-                                        ])
-                                        .with_notes(vec![
-                                            "note: expected call expression".to_string()
-                                        ]),
-                                );
-                            }
-                        }
+
+    fn create_node_expstat(&mut self, node: NodeRef, diags: &mut Vec<Diagnostic>) {
+        self.cst.children(node).for_each(|c| {
+            if let Some(exp) = Exp::cast(&self.cst, c) {
+                match exp {
+                    Exp::Callexp(_) => {}
+                    _ => {
+                        diags.push(
+                            Diagnostic::error()
+                                .with_message("unexpected expression kind")
+                                .with_labels(vec![codespan_reporting::diagnostic::Label::primary(
+                                    (),
+                                    self.cst.get_span(c).unwrap(),
+                                )])
+                                .with_notes(vec!["note: expected call expression".to_string()]),
+                        );
                     }
-                });
+                }
             }
-            Rule::Assignstat => {
-                self.cst.children(node).for_each(|c| {
-                    if let Some(exp) = Exp::cast(&self.cst, c) {
-                        match exp {
-                            Exp::Nameexp(_) | Exp::Indexexp(_) | Exp::Fieldexp(_) => {}
-                            _ => {
-                                diags.push(
-                                    Diagnostic::error()
-                                        .with_message("unexpected expression kind")
-                                        .with_labels(vec![
-                                            codespan_reporting::diagnostic::Label::primary(
-                                                (),
-                                                self.cst.get_span(c).unwrap(),
-                                            ),
-                                        ])
-                                        .with_notes(vec![
-                                            "note: expected name, index, or field expression"
-                                                .to_string(),
-                                        ]),
-                                );
-                            }
-                        }
-                    }
-                });
-            }
-            Rule::Attrib => {
-                self.cst
-                    .children(node)
-                    .find_map(|node| self.cst.match_token(node, Token::Name))
-                    .inspect(|(value, span)| {
-                        if *value != "const" && *value != "close" {
-                            diags.push(
-                                Diagnostic::error()
-                                    .with_message(format!("unexpected attribute name: '{}'", value))
-                                    .with_labels(vec![
-                                        codespan_reporting::diagnostic::Label::primary(
-                                            (),
-                                            span.clone(),
-                                        ),
-                                    ])
-                                    .with_notes(vec![
-                                        "note: expected 'const' or 'close'".to_string()
-                                    ]),
-                            );
-                        }
-                    });
-            }
-            _ => {}
-        }
+        });
     }
+    fn create_node_assignstat(&mut self, node: NodeRef, diags: &mut Vec<Diagnostic>) {
+        self.cst.children(node).for_each(|c| {
+            if let Some(exp) = Exp::cast(&self.cst, c) {
+                match exp {
+                    Exp::Nameexp(_) | Exp::Indexexp(_) | Exp::Fieldexp(_) => {}
+                    _ => {
+                        diags.push(
+                            Diagnostic::error()
+                                .with_message("unexpected expression kind")
+                                .with_labels(vec![codespan_reporting::diagnostic::Label::primary(
+                                    (),
+                                    self.cst.get_span(c).unwrap(),
+                                )])
+                                .with_notes(vec![
+                                    "note: expected name, index, or field expression".to_string(),
+                                ]),
+                        );
+                    }
+                }
+            }
+        });
+    }
+    fn create_node_attrib(&mut self, node: NodeRef, diags: &mut Vec<Diagnostic>) {
+        self.cst
+            .children(node)
+            .find_map(|node| self.cst.match_token(node, Token::Name))
+            .inspect(|(value, span)| {
+                if *value != "const" && *value != "close" {
+                    diags.push(
+                        Diagnostic::error()
+                            .with_message(format!("unexpected attribute name: '{}'", value))
+                            .with_labels(vec![codespan_reporting::diagnostic::Label::primary(
+                                (),
+                                span.clone(),
+                            )])
+                            .with_notes(vec!["note: expected 'const' or 'close'".to_string()]),
+                    );
+                }
+            });
+    }
+
     fn predicate_forstat_1(&self) -> bool {
         self.peek(1) == Token::Equal
     }

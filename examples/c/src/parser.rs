@@ -152,79 +152,74 @@ impl ParserCallbacks for Parser<'_> {
             .with_message(message)
             .with_labels(vec![Label::primary((), span)])
     }
-    fn create_node(&mut self, rule: Rule, node: NodeRef, diags: &mut Vec<Diagnostic>) {
-        match rule {
-            Rule::Declaration => {
-                let decl = Declaration::cast(&self.cst, node).unwrap();
-                if let Some(init_decl_list) = decl.init_declarator_list(&self.cst) {
-                    for init_decl in init_decl_list.init_declarators(&self.cst) {
-                        self.check_missing_type_specifier(
-                            decl.declaration_specifiers(&self.cst),
-                            init_decl.declarator(&self.cst),
-                            diags,
+
+    fn create_node_declaration(&mut self, node: NodeRef, diags: &mut Vec<Diagnostic>) {
+        let decl = Declaration::cast(&self.cst, node).unwrap();
+        if let Some(init_decl_list) = decl.init_declarator_list(&self.cst) {
+            for init_decl in init_decl_list.init_declarators(&self.cst) {
+                self.check_missing_type_specifier(
+                    decl.declaration_specifiers(&self.cst),
+                    init_decl.declarator(&self.cst),
+                    diags,
+                );
+            }
+        }
+    }
+    fn create_node_function_definition(&mut self, node: NodeRef, diags: &mut Vec<Diagnostic>) {
+        let def = FunctionDefinition::cast(&self.cst, node).unwrap();
+        self.check_missing_type_specifier(
+            def.declaration_specifiers(&self.cst),
+            def.declarator(&self.cst),
+            diags,
+        );
+    }
+    fn create_node_declarator(&mut self, node: NodeRef, diags: &mut Vec<Diagnostic>) {
+        let decl = Declarator::cast(&self.cst, node);
+        if let Some(decl) = decl {
+            let is_type = self.context.in_typedef.last().unwrap().is_some();
+            if let Some((name, name_span)) = decl.name(&self.cst) {
+                if let Some(was_type) = self
+                    .context
+                    .scopes
+                    .last_mut()
+                    .unwrap()
+                    .declared_names
+                    .insert(name, is_type)
+                {
+                    if was_type != is_type {
+                        diags.push(
+                            Diagnostic::error()
+                                .with_message("redeclaration as different kind of symbol")
+                                .with_labels(vec![Label::primary((), name_span)]),
                         );
                     }
                 }
             }
-            Rule::FunctionDefinition => {
-                let def = FunctionDefinition::cast(&self.cst, node).unwrap();
-                self.check_missing_type_specifier(
-                    def.declaration_specifiers(&self.cst),
-                    def.declarator(&self.cst),
-                    diags,
-                );
+            let direct_decl = decl.direct_declarator(&self.cst);
+            if !matches!(direct_decl, Some(DirectDeclarator::ParenDeclarator(_))) {
+                self.context.last_seen_declarator = Some(decl);
             }
-            Rule::Declarator => {
-                let decl = Declarator::cast(&self.cst, node);
-                if let Some(decl) = decl {
-                    let is_type = self.context.in_typedef.last().unwrap().is_some();
-                    if let Some((name, name_span)) = decl.name(&self.cst) {
-                        if let Some(was_type) = self
-                            .context
-                            .scopes
-                            .last_mut()
-                            .unwrap()
-                            .declared_names
-                            .insert(name, is_type)
-                        {
-                            if was_type != is_type {
-                                diags.push(
-                                    Diagnostic::error()
-                                        .with_message("redeclaration as different kind of symbol")
-                                        .with_labels(vec![Label::primary((), name_span)]),
-                                );
-                            }
-                        }
-                    }
-                    let direct_decl = decl.direct_declarator(&self.cst);
-                    if !matches!(direct_decl, Some(DirectDeclarator::ParenDeclarator(_))) {
-                        self.context.last_seen_declarator = Some(decl);
-                    }
+        }
+    }
+    fn create_node_enumerator(&mut self, node: NodeRef, diags: &mut Vec<Diagnostic>) {
+        if let Some((name, name_span)) = Enumerator::cast(&self.cst, node).unwrap().name(&self.cst)
+        {
+            if let Some(was_type) = self
+                .context
+                .scopes
+                .last_mut()
+                .unwrap()
+                .declared_names
+                .insert(name, false)
+            {
+                if was_type {
+                    diags.push(
+                        Diagnostic::error()
+                            .with_message("redeclaration as different kind of symbol")
+                            .with_labels(vec![Label::primary((), name_span)]),
+                    );
                 }
             }
-            Rule::Enumerator => {
-                if let Some((name, name_span)) =
-                    Enumerator::cast(&self.cst, node).unwrap().name(&self.cst)
-                {
-                    if let Some(was_type) = self
-                        .context
-                        .scopes
-                        .last_mut()
-                        .unwrap()
-                        .declared_names
-                        .insert(name, false)
-                    {
-                        if was_type {
-                            diags.push(
-                                Diagnostic::error()
-                                    .with_message("redeclaration as different kind of symbol")
-                                    .with_labels(vec![Label::primary((), name_span)]),
-                            );
-                        }
-                    }
-                }
-            }
-            _ => {}
         }
     }
 

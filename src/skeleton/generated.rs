@@ -37,8 +37,7 @@ macro_rules! err {{
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 #[allow(dead_code)]
-pub enum Rule {{
-    Error,{0}
+pub enum Rule {{{0}
 }}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
@@ -309,8 +308,7 @@ impl std::fmt::Display for Cst<'_> {{
 }}
 impl std::fmt::Debug for Rule {{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {{
-        match self {{
-            Rule::Error => write!(f, "error"),{3}
+        match self {{{3}
         }}
     }}
 }}
@@ -415,7 +413,8 @@ impl<'a> Parser<'a> {{
         self.error(diags, diag);
         self.error_cooldown = true;
         self.advance(true);
-        self.close(m, Rule::Error, diags);
+        self.cst.close(m, Rule::Error);
+        self.create_node_error(NodeRef(m.0), diags);
     }}
     fn peek(&self, lookahead: usize) -> Token {{
         self.tokens
@@ -439,11 +438,6 @@ impl<'a> Parser<'a> {{
             .get(self.pos)
             .map_or(self.max_offset..self.max_offset, |span| span.clone())
     }}
-    fn close(&mut self, mark: MarkOpened, rule: Rule, diags: &mut Vec<Diagnostic>) -> MarkClosed {{
-        let m = self.cst.close(mark, rule);
-        self.create_node(rule, NodeRef(m.0), diags);
-        m
-    }}
     fn get_state(&self) -> ParserState {{
         ParserState {{
             pos: self.pos,
@@ -451,10 +445,23 @@ impl<'a> Parser<'a> {{
             truncation_mark: self.cst.mark_truncation(),
         }}
     }}
-    fn set_state(&mut self, state: &ParserState) {{
+    fn set_state(&mut self, state: &ParserState, diags: &mut Vec<Diagnostic>) {{
         self.pos = state.pos;
         self.current = state.current;
+        for i in state.truncation_mark.node_count..self.cst.nodes.len() {{
+            if let Node::Rule(rule, _) = self.cst.nodes[i] {{
+                self.delete_node(rule, NodeRef(i), diags);
+            }}
+        }}
         self.cst.truncate(state.truncation_mark.clone());
+    }}
+    fn create_node(&mut self, rule: Rule, node_ref: NodeRef, diags: &mut Vec<Diagnostic>) {{
+        match rule {{{4}
+        }}
+    }}
+    #[allow(clippy::ptr_arg)]
+    fn delete_node(&mut self, _rule: Rule, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {{
+        {5}
     }}
     /// Returns the CST for a parse with the given `source` file and writes diagnostics to `diags`.
     ///
