@@ -52,7 +52,7 @@ EOF
   echo >> $output
   echo "$diag" | while read -r line ; do
     if [ ! -z "$line" ]; then
-      echo "    assert_eq!(lines.next().unwrap(), \"$line\");" >> $output
+      echo "    assert_eq!(lines.next(), Some(\"$line\"));" >> $output
     fi
   done
   echo '    assert_eq!(lines.next(), None);' >> $output
