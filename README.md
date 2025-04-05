@@ -411,7 +411,7 @@ Mixing left and right associative operators in the same branch is not allowed.
 > ```
 
 #### Semantic Actions, Predicates, and Assertions
-Semantic actions can be defined at any point in a regex.
+Semantic actions can be defined at any point in a regex. They must not occur within an ordered choice.
 
 Semantic predicates can be defined at the beginning of an alternation branch, an optional or a repetition. The syntax `?t` can be used to define a constant `true` predicate, which is useful for disambiguation, where one parse is always prioritized (e.g. [dangling else problem](https://en.wikipedia.org/wiki/Dangling_else)).
 
