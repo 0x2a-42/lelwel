@@ -209,7 +209,6 @@ arg_list: '(' [expr (?1 ',' expr)* [',']] ')';
    mod lexer;
    mod parser;
 
-   use codespan_reporting::diagnostic::Severity;
    use codespan_reporting::files::SimpleFile;
    use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
    use codespan_reporting::term::{self, Config};
