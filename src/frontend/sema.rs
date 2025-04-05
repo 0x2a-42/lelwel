@@ -865,10 +865,14 @@ impl<'a> OrderedChoiceValidator {
                     diags.push(Diagnostic::useless_commit(&commit.span(cst)));
                 }
             }
+            Regex::Action(action) => {
+                if sema.used_in_ordered_choice.contains(&action.syntax()) {
+                    diags.push(Diagnostic::action_in_ordered_choice(&action.span(cst)));
+                }
+            }
             Regex::Name(_)
             | Regex::Symbol(_)
             | Regex::Predicate(_)
-            | Regex::Action(_)
             | Regex::Assertion(_)
             | Regex::NodeRename(_)
             | Regex::NodeElision(_)

@@ -30,6 +30,7 @@ pub const CREATE_RULE_NODE_LEFT_REC: &str = "E025";
 pub const EXPECTED_RULE: &str = "E026";
 pub const MISSING_NODE_NAME: &str = "E027";
 pub const NESTED_ORDERED_CHOICE: &str = "E028";
+pub const ACTION_IN_ORDERED_CHOICE: &str = "E029";
 
 pub const UNUSED_RULE: &str = "W001";
 pub const UNUSED_TOKEN: &str = "W002";
@@ -75,6 +76,7 @@ pub trait LanguageErrors {
     fn nested_ordered_choice(span: &Span) -> Self;
     fn useless_commit(span: &Span) -> Self;
     fn replaceable_ordered_choice(span: &Span) -> Self;
+    fn action_in_ordered_choice(span: &Span) -> Self;
 }
 
 impl LanguageErrors for Diagnostic {
@@ -394,5 +396,15 @@ impl LanguageErrors for Diagnostic {
             .with_code(REPLACEABLE_ORDERED_CHOICE)
             .with_message("ordered choice branch could be moved to alternation")
             .with_labels(vec![Label::primary((), span.clone())])
+    }
+
+    fn action_in_ordered_choice(span: &Span) -> Self {
+        Diagnostic::error()
+            .with_code(ACTION_IN_ORDERED_CHOICE)
+            .with_message("semantic action could be used inside of ordered choice")
+            .with_labels(vec![Label::primary((), span.clone())])
+            .with_notes(vec![
+                "note: this is not allowed to prevent side effects where backtracking is possible".to_string(),
+            ])
     }
 }

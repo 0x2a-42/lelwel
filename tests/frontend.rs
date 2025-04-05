@@ -30,6 +30,16 @@ fn gen_diags(input: &str) -> String {
 
 #[test]
 #[rustfmt::skip]
+fn action_ordered_choice() {
+    let diags = gen_diags("tests/frontend/action_ordered_choice.llw");
+    let mut lines = diags.lines();
+
+    assert_eq!(lines.next().unwrap(), "tests/frontend/action_ordered_choice.llw:5:8: error[E029]: semantic action could be used inside of ordered choice");
+    assert_eq!(lines.next(), None);
+}
+
+#[test]
+#[rustfmt::skip]
 fn calc() {
     let diags = gen_diags("examples/calc/src/calc.llw");
     let mut lines = diags.lines();
