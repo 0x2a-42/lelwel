@@ -1,12 +1,12 @@
-use self::parser::{tokenize, Parser, Token};
+use self::parser::Parser;
 use codespan_reporting::files::SimpleFile;
 use codespan_reporting::term::{
     self,
     termcolor::{ColorChoice, StandardStream},
     Config,
 };
-use logos::Logos;
 
+mod lexer;
 mod parser;
 
 fn main() {
@@ -17,8 +17,7 @@ fn main() {
 
     let source = &args[1];
     let mut diags = vec![];
-    let (tokens, ranges) = tokenize(Token::lexer(source), &mut diags);
-    let cst = Parser::parse(source, tokens, ranges, &mut diags);
+    let cst = Parser::parse(source, &mut diags);
     println!("{cst}");
     let writer = StandardStream::stderr(ColorChoice::Auto);
     let config = Config::default();

@@ -1,11 +1,11 @@
 mod ast;
+mod lexer;
 mod parser;
 
 use codespan_reporting::diagnostic::Severity;
 use codespan_reporting::files::SimpleFile;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use codespan_reporting::term::{self, Config};
-use logos::Logos;
 use parser::*;
 use std::io::Read;
 
@@ -25,8 +25,7 @@ fn main() -> std::io::Result<()> {
     };
 
     let mut diags = vec![];
-    let (tokens, ranges) = tokenize(Token::lexer(&source), &mut diags);
-    let cst = Parser::parse(&source, tokens, ranges, &mut diags);
+    let cst = Parser::parse(&source, &mut diags);
     println!("{cst}");
     let writer = StandardStream::stderr(ColorChoice::Auto);
     let config = Config::default();

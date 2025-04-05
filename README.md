@@ -54,48 +54,48 @@ void f() {
 <summary>Lelwel syntax tree</summary>
 
 ```
-TranslationUnit [0..33]
-    FunctionDefinition [0..33]
-        DeclarationSpecifiers [0..4]
-            TypeSpecifier [0..4]
+translation_unit [0..33]
+    function_definition [0..33]
+        declaration_specifiers [0..4]
+            type_specifier [0..4]
                 Void "void" [0..4]
                 Whitespace " " [4..5]
-        Declarator [5..8]
-            FunctionDeclarator [5..8]
-                IdentDeclarator [5..6]
+        declarator [5..8]
+            function_declarator [5..8]
+                ident_declarator [5..6]
                     Identifier "f" [5..6]
                 LPar "(" [6..7]
                 RPar ")" [7..8]
                 Whitespace " " [8..9]
-        CompoundStatement [9..33]
+        compound_statement [9..33]
             LBrace "{" [9..10]
             Whitespace "\n  " [10..13]
-            ExpressionStatement [13..17]
-                CallExpr [13..17]
-                    IdentExpr [13..14]
+            expression_statement [13..17]
+                call_expr [13..17]
+                    ident_expr [13..14]
                         Identifier "g" [13..14]
                     LPar "(" [14..15]
-                    ArgumentExpressionList [15..17]
-                        IntExpr [15..16]
+                    argument_expression_list [15..17]
+                        int_expr [15..16]
                             IntConst "1" [15..16]
                         Comma "," [16..17]
                         Whitespace "\n  " [17..20]
-            Declaration [20..31]
-                DeclarationSpecifiers [20..23]
-                    TypeSpecifier [20..23]
+            declaration [20..31]
+                declaration_specifiers [20..23]
+                    type_specifier [20..23]
                         Int "int" [20..23]
                         Whitespace " " [23..24]
-                InitDeclaratorList [24..31]
-                    InitDeclarator [24..31]
-                        Declarator [24..25]
-                            IdentDeclarator [24..25]
+                init_declarator_list [24..31]
+                    init_declarator [24..31]
+                        declarator [24..25]
+                            ident_declarator [24..25]
                                 Identifier "x" [24..25]
                                 Whitespace " " [25..26]
                         Assign "=" [26..27]
                         Whitespace " " [27..28]
-                        Initializer [28..31]
-                            BinExpr [28..31]
-                                IntExpr [28..29]
+                        initializer [28..31]
+                            bin_expr [28..31]
+                                int_expr [28..29]
                                     IntConst "2" [28..29]
                                     Whitespace " " [29..30]
                                 Plus "+" [30..31]
@@ -201,17 +201,17 @@ arg_list: '(' [expr (?1 ',' expr)* [',']] ')';
       lelwel::build("src/your_grammar.llw");
    }
    ```
-1. Start a build. This will create a `parser.rs` file next to your grammar file.
-   The `parser.rs` file is supposed to be manually edited to implement the lexer and it includes the actual parser `generated.rs`, which is written to the Cargo `OUT_DIR`.
-   If you change the grammar after the `parser.rs` file has been generated, it may be required to manually update the `Token` enum or the `Parser` impl for semantic predicates and actions.
-1. Use the parser module with the following minimal `main.rs` file for printing the CST and diagnostics.
+1. Start a build. This will create a `lexer.rs` and a `parser.rs` file next to your grammar file.
+   The `lexer.rs` and `parser.rs` files are supposed to be manually edited to implement the lexer and the parser callbacks. The actual parser `generated.rs` is included in `parser.rs` and written to the Cargo `OUT_DIR`.
+   If you change the grammar after the `lexer.rs` and `parser.rs` files have been generated, it may be required to manually update the `Token` enum or the `ParserCallbacks` implementation.
+1. Use the `lexer` and `parser` modules with the following minimal `main.rs` file for printing the CST and diagnostics.
    ```rust
+   mod lexer;
    mod parser;
 
    use codespan_reporting::files::SimpleFile;
    use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
    use codespan_reporting::term::{self, Config};
-   use logos::Logos;
    use parser::*;
 
    fn main() -> std::io::Result<()> {
@@ -219,14 +219,15 @@ arg_list: '(' [expr (?1 ',' expr)* [',']] ')';
        if args.len() != 2 {
            std::process::exit(1);
        }
+
        let source = std::fs::read_to_string(&args[1])?;
        let mut diags = vec![];
-       let (tokens, ranges) = tokenize(Token::lexer(&source), &mut diags);
-       let cst = Parser::parse(&source, tokens, ranges, &mut diags);
+       let cst = Parser::parse(&source, &mut diags);
        println!("{cst}");
+
+       let file = SimpleFile::new(&args[1], &source);
        let writer = StandardStream::stderr(ColorChoice::Auto);
        let config = Config::default();
-       let file = SimpleFile::new(&args[1], &source);
        for diag in diags.iter() {
            term::emit(&mut writer.lock(), &config, &file, diag).unwrap();
        }
@@ -351,7 +352,7 @@ The commit operator `~` commits a parse to a choice, so in case of a failure the
 
 > [!NOTE]
 > This is useful as an optimization and to improve error reporting.
-> Furthermore it can be used to avoid the ordered choice restriction in some cases, as in a concatination no ordered choice is active after the commit operator.
+> Furthermore it can be used to avoid the ordered choice restriction in some cases, as in a concatenation no ordered choice is active after the commit operator.
 
 > **Example**
 > ```antlr
@@ -416,12 +417,12 @@ Semantic predicates can be defined at the beginning of an alternation branch, an
 
 Semantic assertions can be placed at any position in a regex. An assertion fails if it does not return `None`. In the context of an ordered choice this can be used to steer the parser depending on semantic or syntactic information. Otherwise its diagnostic will just be emitted and the parser continues.
 
-When the semantic action, predicate, or assertion is visited in a parse it will execute the rust code of the corresponding associated function in the `PredicatesAndActions` trait implementation of the `Parser` type.
+When the semantic action, predicate, or assertion is visited in a parse it will execute the rust code of the corresponding associated function in the `ParserCallbacks` trait implementation of the `Parser` type.
 
 The index of actions, predicates, and assertions can be used multiple times in a rule.
 
 > [!TIP]
-> If the `PredicatesAndActions` trait is implemented in the `parser.rs` file next to the grammar file (where it is generated by default), you can use the language server to jump from the grammar to the rust code.
+> If the `ParserCallbacks` trait is implemented in the `parser.rs` file next to the grammar file (where it is generated by default), you can use the language server to jump from the grammar to the rust code.
 
 > **Example**
 > ```antlr
@@ -434,7 +435,8 @@ The index of actions, predicates, and assertions can be used multiple times in a
 > ;
 > ```
 > ```rust
-> impl PredicatesAndActions for Parser<'_> {
+> impl ParserCallbacks for Parser<'_> {
+>     // ...
 >     fn predicate_foo_1(&self) -> bool {
 >         self.peek(1) == Token::B
 >     }

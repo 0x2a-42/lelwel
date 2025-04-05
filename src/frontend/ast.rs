@@ -1,4 +1,5 @@
-use crate::{Cst, CstChildren, Node, NodeRef, Rule, Span, Token};
+use crate::frontend::lexer::Token;
+use crate::{Cst, CstChildren, Node, NodeRef, Rule, Span};
 
 pub trait AstNode {
     fn cast(cst: &Cst, syntax: NodeRef) -> Option<Self>
@@ -110,7 +111,8 @@ impl Cst<'_> {
         self.children(syntax).filter_map(|c| T::cast(self, c))
     }
     fn child_token(&self, syntax: NodeRef, token: Token) -> Option<(&str, Span)> {
-        self.children(syntax).find_map(|c| self.get_token(c, token))
+        self.children(syntax)
+            .find_map(|c| self.match_token(c, token))
     }
 }
 
@@ -118,7 +120,7 @@ pub trait Named: AstNode {
     fn name<'a>(&self, cst: &'a Cst) -> Option<(&'a str, Span)>;
 }
 impl File {
-    #[allow(clippy::type_complexity)]
+    #[allow(clippy::type_complexity, clippy::filter_map_bool_then)]
     pub fn token_decls<'a>(
         &self,
         cst: &'a Cst,
@@ -129,7 +131,7 @@ impl File {
         impl FnMut(NodeRef) -> Option<TokenDecl> + 'a,
     > {
         cst.children(self.syntax)
-            .filter_map(|c| cst.get_rule(c, Rule::TokenList).map(|l| cst.children(l)))
+            .filter_map(|c| cst.match_rule(c, Rule::TokenList).then(|| cst.children(c)))
             .flatten()
             .filter_map(|c| TokenDecl::cast(cst, c))
     }
@@ -190,8 +192,8 @@ impl RightDecl {
     pub fn token_names<'a, F: FnMut((&'a str, Span))>(&self, cst: &'a Cst, f: F) {
         cst.children(self.syntax)
             .filter_map(|c| {
-                cst.get_token(c, Token::Id)
-                    .or_else(|| cst.get_token(c, Token::Str))
+                cst.match_token(c, Token::Id)
+                    .or_else(|| cst.match_token(c, Token::Str))
             })
             .for_each(f);
     }
@@ -200,8 +202,8 @@ impl SkipDecl {
     pub fn token_names<'a, F: FnMut((&'a str, Span))>(&self, cst: &'a Cst, f: F) {
         cst.children(self.syntax)
             .filter_map(|c| {
-                cst.get_token(c, Token::Id)
-                    .or_else(|| cst.get_token(c, Token::Str))
+                cst.match_token(c, Token::Id)
+                    .or_else(|| cst.match_token(c, Token::Str))
             })
             .for_each(f);
     }

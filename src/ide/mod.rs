@@ -1,9 +1,8 @@
 #![cfg(feature = "lsp")]
 
-use crate::{tokenize, Parser, SemanticPass, Token};
+use crate::{Parser, SemanticPass, Span};
 use codespan_reporting::diagnostic::{LabelStyle, Severity};
 use codespan_reporting::files::SimpleFile;
-use logos::{Logos, Span};
 use std::collections::HashMap;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
@@ -141,8 +140,7 @@ async fn analyze(
     let parser_path = path.parent().unwrap().join("parser.rs");
     let mut diags = vec![];
 
-    let (tokens, ranges) = tokenize(Token::lexer(&source), &mut diags);
-    let cst = Parser::parse(&source, tokens, ranges, &mut diags);
+    let cst = Parser::parse(&source, &mut diags);
     let sema = SemanticPass::run(&cst, &mut diags);
     let file = SimpleFile::new(path.to_str().unwrap(), source.as_str());
 

@@ -1,4 +1,5 @@
-use crate::{Cst, CstChildren, Node, NodeRef, Rule, Span, Token};
+use crate::lexer::Token;
+use crate::{Cst, CstChildren, Node, NodeRef, Rule, Span};
 
 #[allow(dead_code)]
 pub trait AstNode {
@@ -151,7 +152,7 @@ impl FunctionDeclarator {
     }
     pub fn is_complete(&self, cst: &Cst) -> bool {
         cst.children(self.syntax)
-            .find_map(|node| cst.get_token(node, Token::RPar))
+            .find_map(|node| cst.match_token(node, Token::RPar))
             .is_some()
     }
 }
@@ -170,12 +171,12 @@ impl ParenDeclarator {
 impl IdentDeclarator {
     pub fn name<'a>(&self, cst: &Cst<'a>) -> Option<(&'a str, Span)> {
         cst.children(self.syntax)
-            .find_map(|node| cst.get_token(node, Token::Identifier))
+            .find_map(|node| cst.match_token(node, Token::Identifier))
     }
 }
 impl Enumerator {
     pub fn name<'a>(&self, cst: &Cst<'a>) -> Option<(&'a str, Span)> {
         cst.children(self.syntax)
-            .find_map(|node| cst.get_token(node, Token::Identifier))
+            .find_map(|node| cst.match_token(node, Token::Identifier))
     }
 }
