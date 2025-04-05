@@ -139,7 +139,7 @@ pub type Span = core::ops::Range<usize>;
 
 /// A concrete syntax tree (CST) type.
 ///
-/// Nodes are layed out linearly in memory.
+/// Nodes are laid out linearly in memory.
 /// Spans for tokens are directly stored in the `spans` vector.
 /// Spans for rule nodes are calculated based on their contained token nodes.
 ///

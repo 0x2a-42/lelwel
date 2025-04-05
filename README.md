@@ -352,7 +352,7 @@ The commit operator `~` commits a parse to a choice, so in case of a failure the
 
 > [!NOTE]
 > This is useful as an optimization and to improve error reporting.
-> Furthermore it can be used to avoid the ordered choice restriction in some cases, as in a concatination no ordered choice is active after the commit operator.
+> Furthermore it can be used to avoid the ordered choice restriction in some cases, as in a concatenation no ordered choice is active after the commit operator.
 
 > **Example**
 > ```antlr

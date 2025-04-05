@@ -168,7 +168,7 @@ pub type Span = core::ops::Range<usize>;
 
 /// A concrete syntax tree (CST) type.
 ///
-/// Nodes are layed out linearly in memory.
+/// Nodes are laid out linearly in memory.
 /// Spans for tokens are directly stored in the `spans` vector.
 /// Spans for rule nodes are calculated based on their contained token nodes.
 ///
@@ -1112,7 +1112,7 @@ impl<'a> Parser<'a> {
 }
 
 trait ParserCallbacks {
-    /// Called at the start of the parse to generate all tokens and corrsponding spans.
+    /// Called at the start of the parse to generate all tokens and corresponding spans.
     fn create_tokens(source: &str, diags: &mut Vec<Diagnostic>) -> (Vec<Token>, Vec<Span>);
     /// Called when a new diagnostic is created.
     fn create_diagnostic(&self, span: Span, message: String) -> Diagnostic;

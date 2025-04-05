@@ -124,7 +124,7 @@ impl RustOutput {
     ) -> std::io::Result<()> {
         output.write_all(if is_trait {
             b"trait ParserCallbacks {\
-            \n    /// Called at the start of the parse to generate all tokens and corrsponding spans.\
+            \n    /// Called at the start of the parse to generate all tokens and corresponding spans.\
             \n    fn create_tokens(source: &str, diags: &mut Vec<Diagnostic>) -> (Vec<Token>, Vec<Span>);\
             \n    /// Called when a new diagnostic is created.\
             \n    fn create_diagnostic(&self, span: Span, message: String) -> Diagnostic;\
