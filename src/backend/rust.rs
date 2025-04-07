@@ -2,7 +2,7 @@ use crate::frontend::ast::*;
 use crate::frontend::parser::{Cst, NodeRef};
 use crate::frontend::sema::*;
 use crate::VERSION;
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::io::Write;
 use std::path::Path;
 
@@ -89,7 +89,7 @@ impl RustOutput {
         let mut parser_file = std::fs::File::create(path)?;
         let skeleton = include_str!("../skeleton/parser.rs");
         parser_file.write_all(skeleton.as_bytes())?;
-        Self::output_parser_callbacks(&mut parser_file, sema, false)
+        Self::output_parser_callbacks(&mut parser_file, sema, false, BTreeMap::default())
     }
 
     fn output_lexer(cst: &Cst, file: File, path: &Path) -> std::io::Result<()> {
@@ -121,16 +121,15 @@ impl RustOutput {
         output: &mut std::fs::File,
         sema: &SemanticData,
         is_trait: bool,
+        rule_names: BTreeMap<&str, bool>,
     ) -> std::io::Result<()> {
         output.write_all(if is_trait {
-            b"trait ParserCallbacks {\
+            b"#[allow(clippy::ptr_arg)]\
+            \ntrait ParserCallbacks {\
             \n    /// Called at the start of the parse to generate all tokens and corresponding spans.\
             \n    fn create_tokens(source: &str, diags: &mut Vec<Diagnostic>) -> (Vec<Token>, Vec<Span>);\
-            \n    /// Called when a new diagnostic is created.\
-            \n    fn create_diagnostic(&self, span: Span, message: String) -> Diagnostic;\
-            \n    /// Called when a new syntax tree node is created.\
-            \n    #[allow(clippy::ptr_arg)]\
-            \n    fn create_node(&mut self, _rule: Rule, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}\n"
+            \n    /// Called when diagnostic is created.\
+            \n    fn create_diagnostic(&self, span: Span, message: String) -> Diagnostic;\n\n"
         } else {
             b"impl<'a> ParserCallbacks for Parser<'a> {\
             \n    fn create_tokens(source: &str, diags: &mut Vec<Diagnostic>) -> (Vec<Token>, Vec<Span>) {\
@@ -142,12 +141,41 @@ impl RustOutput {
             \n            .with_labels(vec![Label::primary((), span)])\
             \n    }\n"
         })?;
+        if is_trait {
+            for (rule_name, _) in rule_names.iter() {
+                output.write_all(
+                    format!(
+                        "    /// Called when `{rule_name}` node is created.\
+                       \n    fn create_node_{rule_name}(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {{}}\n"
+                    ).as_bytes()
+                )?;
+            }
+            output.write_all(b"\n")?;
+            for (rule_name, in_choice) in rule_names {
+                if in_choice {
+                    output.write_all(
+                        format!(
+                            "    /// Called when `{rule_name}` node is deleted during backtracking.\
+                           \n    fn delete_node_{rule_name}(&mut self, _node_ref: NodeRef) {{}}\n"
+                        )
+                        .as_bytes(),
+                    )?;
+                }
+            }
+            output.write_all(b"\n")?;
+        }
         let mut predicates = HashSet::new();
         for (rule, num) in sema.predicates.values() {
             if predicates.contains(&(rule, num)) {
                 continue;
             }
             predicates.insert((rule, num));
+            if is_trait {
+                output.write_all(
+                    format!("    /// Called when semantic predicate `?{num}` in rule `{rule}` is visited.\n")
+                        .as_bytes(),
+                )?;
+            }
             output.write_all(
                 format!(
                     "    fn predicate_{rule}_{num}(&self) -> bool{}\n",
@@ -166,6 +194,12 @@ impl RustOutput {
                 continue;
             }
             actions.insert((rule, num));
+            if is_trait {
+                output.write_all(
+                    format!("    /// Called when semantic action `#{num}` in rule `{rule}` is visited.\n")
+                        .as_bytes(),
+                )?;
+            }
             output.write_all(
                 format!(
                     "    fn action_{rule}_{num}(&mut self, diags: &mut Vec<Diagnostic>){}\n",
@@ -184,6 +218,12 @@ impl RustOutput {
                 continue;
             }
             assertions.insert((rule, num));
+            if is_trait {
+                output.write_all(
+                    format!("    /// Called when semantic assertion `!{num}` in rule `{rule}` is visited.\n")
+                        .as_bytes(),
+                )?;
+            }
             output.write_all(
                 format!(
                     "    fn assertion_{rule}_{num}(&self) -> Option<Diagnostic>{}\n",
@@ -228,17 +268,23 @@ impl RustOutput {
         assign_lhs: bool,
         parser_name: &str,
     ) -> std::io::Result<()> {
-        let lhs = if assign_lhs { "lhs = " } else { "" };
+        let lhs = if assign_lhs { "lhs = closed;" } else { "" };
         if has_rule_rename {
             output.write_all(
-                format!("{lhs}{parser_name}.close(m, node_kind, diags);\n")
-                    .indent(level)
-                    .as_bytes(),
+                format!(
+                    "let closed = {parser_name}.cst.close(m, node_kind);\
+                   \n{parser_name}.create_node(node_kind, NodeRef(closed.0), diags);\
+                   \n{lhs}\n"
+                )
+                .indent(level)
+                .as_bytes(),
             )
         } else {
             output.write_all(
                 format!(
-                    "{lhs}{parser_name}.close(m, Rule::{}, diags);\n",
+                    "let closed = {parser_name}.cst.close(m, Rule::{});\
+                   \n{parser_name}.create_node_{name}(NodeRef(closed.0), diags);\
+                   \n{lhs}\n",
                     Self::snake_to_pascal_case(name),
                 )
                 .indent(level)
@@ -301,7 +347,8 @@ impl RustOutput {
                 \n                }\
                 \n                self.pos += 1;\
                 \n            }\
-                \n            self.close(error_tree, Rule::Error, diags);\
+                \n            self.cst.close(error_tree, Rule::Error);\
+                \n            self.create_node_error(NodeRef(error_tree.0), diags);\
                 \n        }\n",
             )?;
         }
@@ -751,7 +798,7 @@ impl RustOutput {
                 )?;
                 output.write_all("'ordered_choice: {\n".indent(level).as_bytes())?;
                 output.write_all(
-                    format!("let state = {parser_name}.get_state();\n")
+                    format!("let state = {parser_name}.get_state(diags);\n")
                         .indent(level + 1)
                         .as_bytes(),
                 )?;
@@ -791,7 +838,7 @@ impl RustOutput {
                             .as_bytes(),
                     )?;
                     output.write_all(
-                        format!("{parser_name}.set_state(&state);\n")
+                        format!("{parser_name}.set_state(&state, diags);\n")
                             .indent(level + 1)
                             .as_bytes(),
                     )?;
@@ -1163,7 +1210,8 @@ impl RustOutput {
                 output.write_all(
                     format!(
                         "let open_node = {parser_name}.cst.open_before({mark});\
-                        \n{parser_name}.close(open_node, Rule::{}, diags);\n",
+                       \n{parser_name}.cst.close(open_node, Rule::{});\
+                       \n{parser_name}.create_node_{node_name}(NodeRef({mark}.0), diags);\n",
                         Self::snake_to_pascal_case(node_name)
                     )
                     .indent(level)
@@ -1213,34 +1261,68 @@ impl RustOutput {
                 .map_or(name, |(sym, _)| &sym[1..sym.len() - 1]);
             token_symbols.insert(name, sym);
         }
+        let contains_ordered_choice = !sema.used_in_ordered_choice.is_empty();
+        let mut rule_names = BTreeMap::from_iter([("error", contains_ordered_choice)]);
+        for rule in file.rule_decls(cst) {
+            let in_choice = sema.used_in_ordered_choice.contains(&rule.syntax());
+            rule_names
+                .entry(rule.name(cst).unwrap().0)
+                .and_modify(|val| *val |= in_choice)
+                .or_insert(in_choice);
+        }
+        for (rule_name, node_refs) in sema.rule_bindings.iter() {
+            let in_choice = node_refs.iter().fold(false, |acc, node_ref| {
+                acc | sema.used_in_ordered_choice.contains(node_ref)
+            });
+            rule_names
+                .entry(rule_name)
+                .and_modify(|val| *val |= in_choice)
+                .or_insert(in_choice);
+        }
         let mut rules = "".to_string();
         let mut rules_fmt = "".to_string();
-        let mut rule_names = HashSet::new();
-        for rule in file.rule_decls(cst) {
-            let rule_name = rule.name(cst).unwrap().0;
-            rule_names.insert(rule_name);
+        let mut rules_create = "".to_string();
+        let mut rules_delete = if contains_ordered_choice {
+            "match _rule {".to_string()
+        } else {
+            "".to_string()
+        };
+        let mut delete_covered = true;
+        for (rule_name, in_choice) in rule_names.iter() {
+            let pascal_case_name = &Self::snake_to_pascal_case(rule_name);
+
             rules += "\n    ";
-            rules += &Self::snake_to_pascal_case(rule_name);
+            rules += pascal_case_name;
             rules += ",";
+
             rules_fmt += "\n    Rule::";
-            rules_fmt += &Self::snake_to_pascal_case(rule_name);
+            rules_fmt += pascal_case_name;
             rules_fmt += " => write!(f, \"";
             rules_fmt += rule_name;
             rules_fmt += "\"),";
-        }
-        for rule_name in sema.rule_bindings.iter() {
-            if rule_names.contains(rule_name) {
-                continue;
+
+            rules_create += "\n            Rule::";
+            rules_create += pascal_case_name;
+            rules_create += " => self.create_node_";
+            rules_create += rule_name;
+            rules_create += "(node_ref, diags),";
+
+            delete_covered &= *in_choice;
+            if *in_choice {
+                rules_delete += "\n            Rule::";
+                rules_delete += pascal_case_name;
+                rules_delete += " => self.delete_node_";
+                rules_delete += rule_name;
+                rules_delete += "(_node_ref),";
             }
-            rules += "\n    ";
-            rules += &Self::snake_to_pascal_case(rule_name);
-            rules += ",";
-            rules_fmt += "\n    Rule::";
-            rules_fmt += &Self::snake_to_pascal_case(rule_name);
-            rules_fmt += " => write!(f, \"";
-            rules_fmt += rule_name;
-            rules_fmt += "\"),";
         }
+        if contains_ordered_choice {
+            if !delete_covered {
+                rules_delete += "\n            _ => {}";
+            }
+            rules_delete += "\n         }"
+        }
+
         let mut skip = "".to_string();
         for token in sema.skipped.iter() {
             skip += " | Token::";
@@ -1254,6 +1336,8 @@ impl RustOutput {
                 skip,
                 sema.start.unwrap().name(cst).unwrap().0,
                 rules_fmt,
+                rules_create,
+                rules_delete,
             )
             .as_bytes(),
         )?;
@@ -1262,6 +1346,6 @@ impl RustOutput {
         }
         output.write_all(b"}\n\n")?;
 
-        Self::output_parser_callbacks(output, sema, true)
+        Self::output_parser_callbacks(output, sema, true, rule_names)
     }
 }

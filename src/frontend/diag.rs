@@ -404,7 +404,8 @@ impl LanguageErrors for Diagnostic {
             .with_message("semantic action could be used inside of ordered choice")
             .with_labels(vec![Label::primary((), span.clone())])
             .with_notes(vec![
-                "note: this is not allowed to prevent side effects where backtracking is possible".to_string(),
+                "note: this is not allowed to prevent side effects where backtracking is possible"
+                    .to_string(),
             ])
     }
 }

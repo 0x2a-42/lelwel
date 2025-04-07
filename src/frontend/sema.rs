@@ -136,7 +136,7 @@ pub struct SemanticData<'a> {
     pub predicates: BTreeMap<NodeRef, (&'a str, &'a str)>,
     pub actions: BTreeMap<NodeRef, (&'a str, &'a str)>,
     pub assertions: BTreeMap<NodeRef, (&'a str, &'a str)>,
-    pub rule_bindings: BTreeSet<&'a str>,
+    pub rule_bindings: BTreeMap<&'a str, Vec<NodeRef>>,
     pub first_sets: HashMap<NodeRef, BTreeSet<TokenName<'a>>>,
     pub follow_sets: HashMap<NodeRef, BTreeSet<TokenName<'a>>>,
     pub predict_sets: HashMap<NodeRef, BTreeSet<TokenName<'a>>>,
@@ -486,7 +486,10 @@ impl<'a> GeneralCheck<'a> {
                             diags.push(Diagnostic::uppercase_rule(&name_span, name));
                         }
                         sema.has_rule_rename.insert(rule);
-                        sema.rule_bindings.insert(name);
+                        sema.rule_bindings
+                            .entry(name)
+                            .and_modify(|val| val.push(regex.syntax()))
+                            .or_insert(vec![regex.syntax()]);
                     } else {
                         diags.push(Diagnostic::missing_node_name(&name_span));
                     }
@@ -501,7 +504,10 @@ impl<'a> GeneralCheck<'a> {
                         if name.starts_with(|c: char| c.is_uppercase()) {
                             diags.push(Diagnostic::uppercase_rule(&regex.span(cst), name));
                         }
-                        sema.rule_bindings.insert(name);
+                        sema.rule_bindings
+                            .entry(name)
+                            .and_modify(|val| val.push(regex.syntax()))
+                            .or_insert(vec![regex.syntax()]);
                     }
                 }
                 if regex.whole_rule(cst) {
