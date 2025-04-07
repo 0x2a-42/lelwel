@@ -340,6 +340,7 @@ struct ParserState {{
     pos: usize,
     current: Token,
     truncation_mark: MarkTruncation,
+    diag_count: usize,
 }}
 pub struct Parser<'a> {{
     cst: Cst<'a>,
@@ -438,19 +439,21 @@ impl<'a> Parser<'a> {{
             .get(self.pos)
             .map_or(self.max_offset..self.max_offset, |span| span.clone())
     }}
-    fn get_state(&self) -> ParserState {{
+    fn get_state(&self, diags: &[Diagnostic]) -> ParserState {{
         ParserState {{
             pos: self.pos,
             current: self.current,
             truncation_mark: self.cst.mark_truncation(),
+            diag_count: diags.len(),
         }}
     }}
     fn set_state(&mut self, state: &ParserState, diags: &mut Vec<Diagnostic>) {{
         self.pos = state.pos;
         self.current = state.current;
+        diags.truncate(state.diag_count);
         for i in state.truncation_mark.node_count..self.cst.nodes.len() {{
             if let Node::Rule(rule, _) = self.cst.nodes[i] {{
-                self.delete_node(rule, NodeRef(i), diags);
+                self.delete_node(rule, NodeRef(i));
             }}
         }}
         self.cst.truncate(state.truncation_mark.clone());
@@ -459,8 +462,7 @@ impl<'a> Parser<'a> {{
         match rule {{{4}
         }}
     }}
-    #[allow(clippy::ptr_arg)]
-    fn delete_node(&mut self, _rule: Rule, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {{
+    fn delete_node(&mut self, _rule: Rule, _node_ref: NodeRef) {{
         {5}
     }}
     /// Returns the CST for a parse with the given `source` file and writes diagnostics to `diags`.

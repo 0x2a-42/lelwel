@@ -156,8 +156,9 @@ impl RustOutput {
                     output.write_all(
                         format!(
                             "    /// Called when `{rule_name}` node is deleted during backtracking.\
-                           \n    fn delete_node_{rule_name}(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {{}}\n"
-                        ).as_bytes()
+                           \n    fn delete_node_{rule_name}(&mut self, _node_ref: NodeRef) {{}}\n"
+                        )
+                        .as_bytes(),
                     )?;
                 }
             }
@@ -797,7 +798,7 @@ impl RustOutput {
                 )?;
                 output.write_all("'ordered_choice: {\n".indent(level).as_bytes())?;
                 output.write_all(
-                    format!("let state = {parser_name}.get_state();\n")
+                    format!("let state = {parser_name}.get_state(diags);\n")
                         .indent(level + 1)
                         .as_bytes(),
                 )?;
@@ -1312,7 +1313,7 @@ impl RustOutput {
                 rules_delete += pascal_case_name;
                 rules_delete += " => self.delete_node_";
                 rules_delete += rule_name;
-                rules_delete += "(_node_ref, _diags),";
+                rules_delete += "(_node_ref),";
             }
         }
         if contains_ordered_choice {
