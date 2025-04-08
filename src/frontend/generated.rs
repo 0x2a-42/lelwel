@@ -196,6 +196,7 @@ pub struct Cst<'a> {
     spans: Vec<Span>,
     nodes: Vec<Node>,
     token_count: usize,
+    non_skip_len: usize,
 }
 #[allow(dead_code)]
 impl<'a> Cst<'a> {
@@ -206,23 +207,33 @@ impl<'a> Cst<'a> {
             spans,
             nodes,
             token_count: 0,
+            non_skip_len: 0,
         }
     }
     fn open(&mut self) -> MarkOpened {
         let mark = MarkOpened(self.nodes.len());
         self.nodes.push(Node::Rule(Rule::Error, 0.into()));
+        self.non_skip_len = self.nodes.len();
         mark
     }
     fn close(&mut self, mark: MarkOpened, rule: Rule) -> MarkClosed {
+        self.nodes[mark.0] = Node::Rule(rule, (self.non_skip_len - 1 - mark.0).into());
+        MarkClosed(mark.0)
+    }
+    fn close_root(&mut self, mark: MarkOpened, rule: Rule) -> MarkClosed {
         self.nodes[mark.0] = Node::Rule(rule, (self.nodes.len() - 1 - mark.0).into());
         MarkClosed(mark.0)
     }
-    fn advance(&mut self, token: Token) {
+    fn advance(&mut self, token: Token, skip: bool) {
         self.nodes.push(Node::Token(token, self.token_count.into()));
         self.token_count += 1;
+        if !skip {
+            self.non_skip_len = self.nodes.len();
+        }
     }
     fn open_before(&mut self, mark: MarkClosed) -> MarkOpened {
         self.nodes.insert(mark.0, Node::Rule(Rule::Error, 0.into()));
+        self.non_skip_len += 1;
         MarkOpened(mark.0)
     }
     fn mark(&self) -> MarkClosed {
@@ -256,16 +267,12 @@ impl<'a> Cst<'a> {
     }
     /// Returns the span for the node referenced by `node_ref`.
     ///
-    /// For rules the span is calculated based on the first and last non-skipped token.
-    /// If there are only skipped tokens the function returns `None`.
+    /// For rules the span is calculated based on the first and last token.
+    /// If there are no tokens the function returns `None`.
     pub fn get_span(&self, node_ref: NodeRef) -> Option<Span> {
-        fn find_non_skip<'a>(mut iter: impl Iterator<Item = &'a Node>) -> Option<usize> {
+        fn find_token<'a>(mut iter: impl Iterator<Item = &'a Node>) -> Option<usize> {
             iter.find_map(|node| match node {
-                Node::Token(
-                    Token::Error | Token::Comment | Token::DocComment | Token::Whitespace,
-                    _,
-                )
-                | Node::Rule(..) => None,
+                Node::Rule(..) => None,
                 Node::Token(_, idx) => Some(usize::from(*idx)),
             })
         }
@@ -273,8 +280,8 @@ impl<'a> Cst<'a> {
             Node::Token(_, idx) => Some(self.spans[usize::from(idx)].clone()),
             Node::Rule(_, end_offset) => {
                 let end = node_ref.0 + usize::from(end_offset);
-                let first = find_non_skip(self.nodes[node_ref.0 + 1..=end].iter());
-                let last = find_non_skip(self.nodes[node_ref.0 + 1..=end].iter().rev());
+                let first = find_token(self.nodes[node_ref.0 + 1..=end].iter());
+                let last = find_token(self.nodes[node_ref.0 + 1..=end].iter().rev());
                 if let (Some(first), Some(last)) = (first, last) {
                     Some(self.spans[first].start..self.spans[last].end)
                 } else {
@@ -426,14 +433,14 @@ impl<'a> Parser<'a> {
         if !error {
             self.error_cooldown = false;
         }
-        self.cst.advance(self.current);
+        self.cst.advance(self.current, false);
         loop {
             self.pos += 1;
             match self.tokens.get(self.pos) {
                 Some(
                     token @ (Token::Error | Token::Comment | Token::DocComment | Token::Whitespace),
                 ) => {
-                    self.cst.advance(*token);
+                    self.cst.advance(*token, true);
                     continue;
                 }
                 Some(token) => {
@@ -460,7 +467,7 @@ impl<'a> Parser<'a> {
                     token @ (Token::Error | Token::Comment | Token::DocComment | Token::Whitespace),
                 ) => {
                     self.pos += 1;
-                    self.cst.advance(*token);
+                    self.cst.advance(*token, true);
                     continue;
                 }
                 Some(token) => {
@@ -618,14 +625,14 @@ impl<'a> Parser<'a> {
             loop {
                 match self.tokens.get(self.pos) {
                     None => break,
-                    Some(token) => self.cst.advance(*token),
+                    Some(token) => self.cst.advance(*token, Self::is_skipped(*token)),
                 }
                 self.pos += 1;
             }
             self.cst.close(error_tree, Rule::Error);
             self.create_node_error(NodeRef(error_tree.0), diags);
         }
-        let closed = self.cst.close(m, Rule::File);
+        let closed = self.cst.close_root(m, Rule::File);
         self.create_node_file(NodeRef(closed.0), diags);
     }
     fn rule_decl(&mut self, diags: &mut Vec<Diagnostic>) {

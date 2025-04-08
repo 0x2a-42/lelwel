@@ -267,12 +267,14 @@ impl RustOutput {
         level: usize,
         assign_lhs: bool,
         parser_name: &str,
+        is_start: bool,
     ) -> std::io::Result<()> {
+        let close = if is_start { "close_root" } else { "close" };
         let lhs = if assign_lhs { "lhs = closed;" } else { "" };
         if has_rule_rename {
             output.write_all(
                 format!(
-                    "let closed = {parser_name}.cst.close(m, node_kind);\
+                    "let closed = {parser_name}.cst.{close}(m, node_kind);\
                    \n{parser_name}.create_node(node_kind, NodeRef(closed.0), diags);\
                    \n{lhs}\n"
                 )
@@ -282,7 +284,7 @@ impl RustOutput {
         } else {
             output.write_all(
                 format!(
-                    "let closed = {parser_name}.cst.close(m, Rule::{});\
+                    "let closed = {parser_name}.cst.{close}(m, Rule::{});\
                    \n{parser_name}.create_node_{name}(NodeRef(closed.0), diags);\
                    \n{lhs}\n",
                     Self::snake_to_pascal_case(name),
@@ -343,7 +345,7 @@ impl RustOutput {
                 \n            loop {\
                 \n                match self.tokens.get(self.pos) {\
                 \n                    None => break,\
-                \n                    Some(token) => self.cst.advance(*token),\
+                \n                    Some(token) => self.cst.advance(*token, Self::is_skipped(*token)),\
                 \n                }\
                 \n                self.pos += 1;\
                 \n            }\
@@ -354,14 +356,14 @@ impl RustOutput {
         }
         match elision {
             RuleNodeElision::None => {
-                Self::output_cst_close(output, has_rule_rename, name, 2, false, "self")
+                Self::output_cst_close(output, has_rule_rename, name, 2, false, "self", is_start)
             }
             RuleNodeElision::Conditional => {
                 output.write_all(
                     b"        if !elide {\
                                  \n            let m = self.cst.open_before(start);\n",
                 )?;
-                Self::output_cst_close(output, has_rule_rename, name, 3, false, "self")?;
+                Self::output_cst_close(output, has_rule_rename, name, 3, false, "self", is_start)?;
                 output.write_all(b"        }\n")
             }
             RuleNodeElision::Unconditional => Ok(()),
@@ -495,7 +497,7 @@ impl RustOutput {
                 )?;
             }
             if elision != RuleNodeElision::Unconditional {
-                Self::output_cst_close(output, has_rule_rename, name, 5, false, "parser")?;
+                Self::output_cst_close(output, has_rule_rename, name, 5, false, "parser", false)?;
             }
             output.write_all("}\n".indent(4).as_bytes())?;
         }
@@ -599,7 +601,7 @@ impl RustOutput {
                     )?;
                 }
             }
-            Self::output_cst_close(output, has_rule_rename, name, 6, true, "parser")?;
+            Self::output_cst_close(output, has_rule_rename, name, 6, true, "parser", false)?;
             output.write_all(b"                        continue;\n")?;
             output.write_all(b"                    }\n")?;
         }
