@@ -11,7 +11,7 @@ pub const UPPERCASE_RULE: &str = "E006";
 pub const LOWERCASE_TOKEN: &str = "E007";
 pub const MISSING_START_RULE: &str = "E008";
 pub const REFERENCE_START_RULE: &str = "E009";
-pub const PREDEFINED_TOKEN_NAME: &str = "E010";
+pub const PREDEFINED_NAME: &str = "E010";
 pub const LL1_CONFLICT_ALT: &str = "E011";
 pub const LL1_CONFLICT_LEFT_REC: &str = "E012";
 pub const LL1_CONFLICT_REP: &str = "E013";
@@ -184,7 +184,7 @@ impl LanguageErrors for Diagnostic {
             notes.push("note: there is no need for an explicit EOF token".to_string())
         }
         Diagnostic::error()
-            .with_code(PREDEFINED_TOKEN_NAME)
+            .with_code(PREDEFINED_NAME)
             .with_message(format!("use of predefined {kind} name"))
             .with_labels(vec![Label::primary((), span.clone())])
             .with_notes(notes)
