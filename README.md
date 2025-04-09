@@ -191,7 +191,7 @@ arg_list: '(' [expr (?1 ',' expr)* [',']] ')';
    ```toml
    [dependencies]
    logos = "0.15"
-   codespan-reporting = "0.11"
+   codespan-reporting = "0.12"
 
    [build-dependencies]
    lelwel = "0.7"

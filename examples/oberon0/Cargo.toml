@@ -10,7 +10,7 @@ crate-type = ["lib", "cdylib"]
 
 [dependencies]
 logos = "0.15"
-codespan-reporting = "0.11"
+codespan-reporting = "0.12"
 wasm-bindgen = "0.2"
 
 [build-dependencies]
