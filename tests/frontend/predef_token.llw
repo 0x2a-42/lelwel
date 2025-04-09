@@ -1,4 +1,4 @@
-token A Error EOF;
+token Error EOF;
 
 start s;
 
