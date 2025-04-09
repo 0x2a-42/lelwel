@@ -233,9 +233,8 @@ impl<'a> GeneralCheck<'a> {
     }
     fn check_token_decl(&mut self, cst: &'a Cst, decl: TokenDecl, diags: &mut Vec<Diagnostic>) {
         if let Some((name, name_span)) = decl.name(cst) {
-            if name == "EOF" {
-                diags.push(Diagnostic::predefined_token_name(&name_span));
-                return;
+            if matches!(name, "EOF" | "Error") {
+                diags.push(Diagnostic::predefined_name(&name_span, name));
             }
             self.bind_symbol(cst, name, "token", decl.syntax(), diags);
             if name.starts_with(|c: char| c.is_lowercase()) {
@@ -248,6 +247,9 @@ impl<'a> GeneralCheck<'a> {
     }
     fn bind_rule_decl(&mut self, cst: &'a Cst, decl: RuleDecl, diags: &mut Vec<Diagnostic>) {
         if let Some((name, name_span)) = decl.name(cst) {
+            if matches!(name, "error") {
+                diags.push(Diagnostic::predefined_name(&name_span, name));
+            }
             self.bind_symbol(cst, name, "rule", decl.syntax(), diags);
             if name.starts_with(|c: char| c.is_uppercase()) {
                 diags.push(Diagnostic::uppercase_rule(&name_span, name));
