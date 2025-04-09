@@ -50,7 +50,7 @@ pub trait LanguageErrors {
     fn lowercase_token(span: &Span, name: &str) -> Self;
     fn missing_start_rule() -> Self;
     fn reference_start_rule(span: &Span) -> Self;
-    fn predefined_token_name(span: &Span) -> Self;
+    fn predefined_name(span: &Span, name: &str) -> Self;
     fn unused_rule(span: &Span) -> Self;
     fn unused_token(span: &Span) -> Self;
     fn ll1_conflict_alt(span: &Span, conflicting: Vec<(Span, String)>) -> Self;
@@ -173,15 +173,21 @@ impl LanguageErrors for Diagnostic {
             .with_labels(vec![Label::primary((), span.clone())])
     }
 
-    fn predefined_token_name(span: &Span) -> Self {
+    fn predefined_name(span: &Span, name: &str) -> Self {
+        let kind = if name.starts_with(|c: char| c.is_uppercase()) {
+            "token"
+        } else {
+            "rule"
+        };
+        let mut notes = vec![format!("note: the {kind} name `{name}` is reserved")];
+        if name == "EOF" {
+            notes.push("note: there is no need for an explicit EOF token".to_string())
+        }
         Diagnostic::error()
             .with_code(PREDEFINED_TOKEN_NAME)
-            .with_message("use of predefined token name")
+            .with_message(format!("use of predefined {kind} name"))
             .with_labels(vec![Label::primary((), span.clone())])
-            .with_notes(vec![
-                "note: the token name `EOF` is reserved".to_string(),
-                "note: there is no need for an explicit EOF token".to_string(),
-            ])
+            .with_notes(notes)
     }
 
     fn ll1_conflict_alt(span: &Span, conflicting: Vec<(Span, String)>) -> Self {

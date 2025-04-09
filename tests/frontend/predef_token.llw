@@ -1,7 +1,6 @@
-token EOF Invalid;
+token A Error EOF;
 
 start s;
 
-s:
-  Invalid EOF
-;
+s: error EOF;
+error: Error;

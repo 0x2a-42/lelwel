@@ -235,8 +235,9 @@ fn predef_token() {
     let diags = gen_diags("tests/frontend/predef_token.llw");
     let mut lines = diags.lines();
 
-    assert_eq!(lines.next(), Some("tests/frontend/predef_token.llw:1:7: error[E010]: use of predefined token name"));
-    assert_eq!(lines.next(), Some("tests/frontend/predef_token.llw:6:11: error[E004]: use of undefined token `EOF`"));
+    assert_eq!(lines.next(), Some("tests/frontend/predef_token.llw:6:1: error[E010]: use of predefined rule name"));
+    assert_eq!(lines.next(), Some("tests/frontend/predef_token.llw:1:9: error[E010]: use of predefined token name"));
+    assert_eq!(lines.next(), Some("tests/frontend/predef_token.llw:1:15: error[E010]: use of predefined token name"));
     assert_eq!(lines.next(), None);
 }
 
