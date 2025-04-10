@@ -73,15 +73,11 @@ impl RustOutput {
         Self::output_generated(cst, sema, file, &mut generated_file)?;
 
         let parser_path = input.parent().unwrap().join("parser.rs");
-        if !parser_path.exists() {
-            Self::output_parser(sema, &parser_path)?;
-        }
-
         let lexer_path = input.parent().unwrap().join("lexer.rs");
-        if !lexer_path.exists() {
+        if !parser_path.exists() && !lexer_path.exists() {
+            Self::output_parser(sema, &parser_path)?;
             Self::output_lexer(cst, file, &lexer_path)?;
         }
-
         Ok(())
     }
 
