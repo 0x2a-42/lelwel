@@ -1,6 +1,7 @@
 use codespan_reporting::files::{Files, SimpleFile};
 use tower_lsp::lsp_types::{Location, Url};
 
+use crate::frontend::lexer::Token;
 use crate::frontend::parser::Span;
 use crate::{Cst, Node, NodeRef, Rule, SemanticData};
 
@@ -8,11 +9,21 @@ fn contains(span: &Span, pos: usize) -> bool {
     span.start <= pos && pos < span.end
 }
 
-pub fn lookup_node(cst: &Cst, node: NodeRef, pos: usize) -> Option<NodeRef> {
+pub fn lookup_rule_node(cst: &Cst, node: NodeRef, pos: usize) -> Option<NodeRef> {
     cst.children(node)
         .filter(|node| matches!(cst.get(*node), Node::Rule(..)))
         .find(|node| cst.get_span(*node).is_some_and(|span| contains(&span, pos)))
-        .and_then(|node| lookup_node(cst, node, pos).or(Some(node)))
+        .and_then(|node| lookup_rule_node(cst, node, pos).or(Some(node)))
+}
+pub fn inside_comment(cst: &Cst, node: NodeRef, pos: usize) -> bool {
+    cst.children(node)
+        .filter(|node| {
+            matches!(
+                cst.get(*node),
+                Node::Token(Token::Comment | Token::DocComment, _)
+            )
+        })
+        .any(|node| cst.get_span(node).is_some_and(|span| contains(&span, pos)))
 }
 pub fn find_node<P: Fn(Rule) -> bool>(
     cst: &Cst,
@@ -40,7 +51,7 @@ pub fn lookup_definition(
     file: &SimpleFile<&str, &str>,
     parser_path: &std::path::Path,
 ) -> Option<Location> {
-    lookup_node(cst, NodeRef::ROOT, pos).and_then(|node| {
+    lookup_rule_node(cst, NodeRef::ROOT, pos).and_then(|node| {
         if let Some((rule_name, number)) = sema.predicates.get(&node) {
             lookup_parser_impl_definition("predicate", rule_name, number, parser_path)
         } else if let Some((rule_name, number)) = sema.actions.get(&node) {
@@ -63,7 +74,7 @@ pub fn lookup_references(
     pos: usize,
     with_def: bool,
 ) -> Vec<NodeRef> {
-    if let Some(def) = lookup_node(cst, NodeRef::ROOT, pos) {
+    if let Some(def) = lookup_rule_node(cst, NodeRef::ROOT, pos) {
         let mut refs = sema
             .decl_bindings
             .iter()

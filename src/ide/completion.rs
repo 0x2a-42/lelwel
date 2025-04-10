@@ -286,7 +286,10 @@ pub fn completion(cst: &Cst, pos: usize, sema: &SemanticData) -> Option<Completi
     let mut items = vec![];
 
     let file = File::cast(cst, NodeRef::ROOT)?;
-    if let Some(node) = lookup_node(cst, NodeRef::ROOT, pos.saturating_sub(1)) {
+    if let Some(node) = lookup_rule_node(cst, NodeRef::ROOT, pos.saturating_sub(1)) {
+        if inside_comment(cst, node, pos) {
+            return None;
+        }
         match cst.get(node) {
             Node::Rule(
                 Rule::Alternation
@@ -358,6 +361,9 @@ pub fn completion(cst: &Cst, pos: usize, sema: &SemanticData) -> Option<Completi
             _ => {}
         }
     } else {
+        if inside_comment(cst, NodeRef::ROOT, pos) {
+            return None;
+        }
         add_top_level_items(cst, file, sema, &mut items);
     }
     Some(CompletionResponse::Array(items))

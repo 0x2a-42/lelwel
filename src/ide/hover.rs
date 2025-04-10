@@ -6,7 +6,7 @@ use logos::Span;
 use super::lookup::*;
 
 pub fn hover(cst: &Cst, sema: &SemanticData, pos: usize) -> Option<(String, Span)> {
-    let node = lookup_node(cst, NodeRef::ROOT, pos)?;
+    let node = lookup_rule_node(cst, NodeRef::ROOT, pos)?;
     let span = cst.get_span(node)?;
 
     if let Some(regex) = Regex::cast(cst, node) {

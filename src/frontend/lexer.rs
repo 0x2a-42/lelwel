@@ -163,6 +163,10 @@ pub fn tokenize(source: &str, diags: &mut Vec<Diagnostic>) -> (Vec<Token>, Vec<S
                 }
                 tokens.push(token);
             }
+            Err(LexerError::UnterminatedComment) => {
+                diags.push(LexerError::UnterminatedComment.into_diagnostic(span.clone()));
+                tokens.push(Token::Comment);
+            }
             Err(err) => {
                 diags.push(err.into_diagnostic(span.clone()));
                 tokens.push(Token::Error);
