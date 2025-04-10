@@ -1,4 +1,4 @@
-use crate::lexer::{Token, tokenize};
+use super::lexer::{Token, tokenize};
 use codespan_reporting::diagnostic::Label;
 
 // TODO: change definition and all uses if codespan_reporting is not used
