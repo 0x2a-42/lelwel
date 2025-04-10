@@ -106,6 +106,7 @@ struct MarkClosed(usize);
 struct MarkTruncation {{
     node_count: usize,
     token_count: usize,
+    non_skip_len: usize,
 }}
 
 /// An iterator for child nodes of a CST node.
@@ -187,7 +188,13 @@ impl<'a> Cst<'a> {{
         mark
     }}
     fn close(&mut self, mark: MarkOpened, rule: Rule) -> MarkClosed {{
-        self.nodes[mark.0] = Node::Rule(rule, (self.non_skip_len - 1 - mark.0).into());
+        let len = self.non_skip_len - 1;
+        self.nodes[mark.0] = Node::Rule(rule, if mark.0 > len {{
+            self.non_skip_len += mark.0 - len;
+            0
+        }} else {{
+            len - mark.0
+        }}.into());
         MarkClosed(mark.0)
     }}
     fn close_root(&mut self, mark: MarkOpened, rule: Rule) -> MarkClosed {{
@@ -213,11 +220,13 @@ impl<'a> Cst<'a> {{
         MarkTruncation {{
             node_count: self.nodes.len(),
             token_count: self.token_count,
+            non_skip_len: self.non_skip_len,
         }}
     }}
     fn truncate(&mut self, mark: MarkTruncation) {{
         self.nodes.truncate(mark.node_count);
         self.token_count = mark.token_count;
+        self.non_skip_len = mark.non_skip_len;
     }}
     /// Returns an iterator over the children of the node referenced by `node_ref`.
     pub fn children(&self, node_ref: NodeRef) -> CstChildren {{
