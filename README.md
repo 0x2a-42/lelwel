@@ -194,7 +194,7 @@ arg_list: '(' [expr (?1 ',' expr)* [',']] ')';
    codespan-reporting = "0.12"
 
    [build-dependencies]
-   lelwel = "0.7"
+   lelwel = "0.8"
    ```
    ```rust
    fn main() {
