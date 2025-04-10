@@ -5,4 +5,4 @@ Scopes and typedef names are tracked during parsing, which is required to resolv
 
 To parse most programs, you first have to create the preprocessed output by running `gcc -E -P` and remove all remaining `#pragma` directives.
 
-The parser is capable of parsing all examples (`bzip2.c`, `gzip.c`, `oggenc.c`, `gcc.c`) from https://people.csail.mit.edu/smcc/projects/single-file-programs after preprocessing.
+The parser is capable of parsing all examples (`bzip2.c`, `gzip.c`, `oggenc.c`, `gcc.c`) from https://people.csail.mit.edu/smcc/projects/single-file-programs after preprocessing. On an Intel Core i7-8550U CPU the preprocessed `gcc.c` file with 473154 lines is parsed in 273 ms when the CST is not being printed. This translates to about 1.7 million lines of code per second.
