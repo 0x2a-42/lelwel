@@ -179,7 +179,7 @@ struct_declaration:
 ;
 /// 6.7.2.1
 specifier_qualifier_list:
-  (?1 (?2 type_specifier | type_qualifier | alignment_specifier | gnu_attribute))+
+  (?1 (?2 type_specifier #1 | type_qualifier | alignment_specifier | gnu_attribute))+ #2
 ;
 /// 6.7.2.1
 struct_declarator_list:
@@ -334,7 +334,7 @@ statement^:
 /// 6.8.1
 labeled_statement:
   (
-    Identifier ':'
+    Identifier ':' [?t gnu_attribute]
   | (?t 'case' constant_expr ':' /* parse consecutive case statements on same level */)+
   | 'default' ':'
   ) [?t statement /* label at end of compound statement is GNU extension */]

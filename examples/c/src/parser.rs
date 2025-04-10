@@ -93,7 +93,7 @@ impl Parser<'_> {
         false
     }
 
-    fn is_parenthesized_type(&self) -> bool {
+    fn is_followed_by_type(&self) -> bool {
         let lookahead = self.peek(1);
         if matches!(
             lookahead,
@@ -135,7 +135,7 @@ impl Parser<'_> {
                     }
                 })
                 .nth(1)
-                .map_or(false, |i| self.is_type_name(self.pos + i))
+                .is_some_and(|i| self.is_type_name(self.pos + i))
         } else {
             false
         }
@@ -224,10 +224,10 @@ impl ParserCallbacks for Parser<'_> {
     }
 
     fn predicate_postfix_expr_1(&self) -> bool {
-        self.is_parenthesized_type()
+        self.is_followed_by_type()
     }
     fn predicate_unary_expr_1(&self) -> bool {
-        if self.is_parenthesized_type() {
+        if self.is_followed_by_type() {
             // check that this is not a compound literal
             let mut it = self.tokens[self.pos..]
                 .iter()
@@ -250,7 +250,7 @@ impl ParserCallbacks for Parser<'_> {
         }
     }
     fn predicate_cast_expr_1(&self) -> bool {
-        if self.is_parenthesized_type() {
+        if self.is_followed_by_type() {
             // check this is not a compound literal
             let mut it = self.tokens[self.pos..].iter().skip(1);
             let mut paren_depth = 1;
@@ -279,7 +279,8 @@ impl ParserCallbacks for Parser<'_> {
         }
     }
     fn predicate_specifier_qualifier_list_1(&self) -> bool {
-        self.current != Token::Identifier || self.is_type_name(self.pos)
+        self.current != Token::Identifier
+            || (!self.context.has_type_specifier && self.is_type_name(self.pos))
     }
     fn predicate_specifier_qualifier_list_2(&self) -> bool {
         if self.current == Token::Atomic {
@@ -361,8 +362,25 @@ impl ParserCallbacks for Parser<'_> {
     }
     fn predicate_block_item_1(&self) -> bool {
         match self.current {
-            Token::Identifier => self.is_type_name(self.pos),
-            Token::Asm | Token::Extension => false,
+            Token::Identifier => self.is_type_name(self.pos) && self.peek(1) != Token::Colon,
+            Token::Extension => {
+                self.is_followed_by_type()
+                    || matches!(
+                        self.peek(1),
+                        Token::Auto
+                            | Token::AutoType
+                            | Token::Extern
+                            | Token::Identifier
+                            | Token::Inline
+                            | Token::Noreturn
+                            | Token::Register
+                            | Token::Static
+                            | Token::StaticAssert
+                            | Token::ThreadLocal
+                            | Token::Typedef
+                    )
+            }
+            Token::Asm => false,
             _ => true,
         }
     }
@@ -444,6 +462,13 @@ impl ParserCallbacks for Parser<'_> {
         self.context.has_type_specifier = true;
     }
     fn action_declaration_specifiers_2(&mut self, _diags: &mut Vec<Diagnostic>) {
+        self.context.has_type_specifier = false;
+    }
+
+    fn action_specifier_qualifier_list_1(&mut self, _diags: &mut Vec<Diagnostic>) {
+        self.context.has_type_specifier = true;
+    }
+    fn action_specifier_qualifier_list_2(&mut self, _diags: &mut Vec<Diagnostic>) {
         self.context.has_type_specifier = false;
     }
 
