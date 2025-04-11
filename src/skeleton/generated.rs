@@ -240,7 +240,7 @@ impl<'a> Cst<'a> {{
             offset: node_ref.0 + 1,
         }}
     }}
-    /// Returns the the node referenced by `node_ref`.
+    /// Returns the node referenced by `node_ref`.
     pub fn get(&self, node_ref: NodeRef) -> Node {{
         self.nodes[node_ref.0]
     }}
