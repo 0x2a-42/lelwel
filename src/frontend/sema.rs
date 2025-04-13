@@ -1326,25 +1326,27 @@ impl<'a> LL1Validator {
                                 related,
                             ));
                         }
-                    }
 
-                    Self::check_intersection(
-                        cst,
-                        sema,
-                        diags,
-                        op,
-                        recursive
-                            .branches
-                            .iter()
-                            .filter_map(|rec| match rec {
-                                Recursion::Left(op, ..) | Recursion::LeftRight(op, ..) => Some(op),
-                                _ => None,
-                            })
-                            .copied(),
-                        i,
-                        true,
-                        false,
-                    );
+                        Self::check_intersection(
+                            cst,
+                            sema,
+                            diags,
+                            op,
+                            recursive
+                                .branches
+                                .iter()
+                                .filter_map(|rec| match rec {
+                                    Recursion::Left(op, ..) | Recursion::LeftRight(op, ..) => {
+                                        Some(op)
+                                    }
+                                    _ => None,
+                                })
+                                .copied(),
+                            i,
+                            true,
+                            false,
+                        );
+                    }
                 }
                 let non_left_recursive_branches = || {
                     alt.operands(cst).filter(|op| {

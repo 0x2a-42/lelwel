@@ -122,6 +122,17 @@ fn left_rec_node_create() {
 
 #[test]
 #[rustfmt::skip]
+fn left_rec_predicate() {
+    let diags = gen_diags("tests/frontend/left_rec_predicate.llw");
+    let mut lines = diags.lines();
+
+    assert_eq!(lines.next(), Some("tests/frontend/left_rec_predicate.llw:9:19: error[E012]: LL(1) conflict in left recursive rule"));
+    assert_eq!(lines.next(), Some("tests/frontend/left_rec_predicate.llw:19:19: error[E012]: LL(1) conflict in left recursive rule"));
+    assert_eq!(lines.next(), None);
+}
+
+#[test]
+#[rustfmt::skip]
 fn left_recursive() {
     let diags = gen_diags("tests/frontend/left_recursive.llw");
     let mut lines = diags.lines();

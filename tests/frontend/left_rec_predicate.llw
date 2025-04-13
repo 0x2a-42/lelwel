@@ -1,0 +1,27 @@
+token A B C;
+
+start test;
+
+test: (follow_conflict / follow_conflict_resolved / branch_conflict / branch_conflict_resolved) C;
+
+follow_conflict:
+  follow_conflict A
+| follow_conflict C
+| B
+;
+follow_conflict_resolved:
+  follow_conflict_resolved A
+| ?1 follow_conflict_resolved C
+| B
+;
+
+branch_conflict:
+  branch_conflict A
+| branch_conflict A
+| B
+;
+branch_conflict_resolved:
+  ?1 branch_conflict_resolved A
+| branch_conflict_resolved A
+| B
+;
