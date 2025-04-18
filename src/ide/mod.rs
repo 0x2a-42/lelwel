@@ -177,7 +177,7 @@ async fn analyze(
                     .map(|node| {
                         Location::new(
                             uri.clone(),
-                            compat::span_to_range(&file, &cst.get_span(node).unwrap()),
+                            compat::span_to_range(&file, &cst.span(node).unwrap()),
                         )
                     })
                     .collect();

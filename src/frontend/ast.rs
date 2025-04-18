@@ -9,7 +9,7 @@ pub trait AstNode {
     fn syntax(&self) -> NodeRef;
 
     fn span(&self, cst: &Cst) -> Span {
-        cst.get_span(self.syntax()).unwrap()
+        cst.span(self.syntax()).unwrap()
     }
 }
 

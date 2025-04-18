@@ -7,7 +7,7 @@ use super::lookup::*;
 
 pub fn hover(cst: &Cst, sema: &SemanticData, pos: usize) -> Option<(String, Span)> {
     let node = lookup_rule_node(cst, NodeRef::ROOT, pos)?;
-    let span = cst.get_span(node)?;
+    let span = cst.span(node)?;
 
     if let Some(regex) = Regex::cast(cst, node) {
         let first = &sema
@@ -37,7 +37,7 @@ pub fn hover(cst: &Cst, sema: &SemanticData, pos: usize) -> Option<(String, Span
                 let comment_attached_node = sema
                     .decl_bindings
                     .get(&node)
-                    .and_then(|decl| cst.get_span(*decl))
+                    .and_then(|decl| cst.span(*decl))
                     .and_then(|span| {
                         find_node(cst, NodeRef::ROOT, span.start, |r| {
                             r == Rule::TokenList || r == Rule::RuleDecl

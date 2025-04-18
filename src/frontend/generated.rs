@@ -282,7 +282,7 @@ impl<'a> Cst<'a> {
     ///
     /// For rules the span is calculated based on the first and last token.
     /// If there are no tokens the function returns `None`.
-    pub fn get_span(&self, node_ref: NodeRef) -> Option<Span> {
+    pub fn span(&self, node_ref: NodeRef) -> Option<Span> {
         fn find_token<'a>(mut iter: impl Iterator<Item = &'a Node>) -> Option<usize> {
             iter.find_map(|node| match node {
                 Node::Rule(..) => None,
@@ -330,7 +330,7 @@ impl std::fmt::Display for Cst<'_> {
         ) -> std::fmt::Result {
             match cst.get(node_ref) {
                 Node::Rule(rule, _) => {
-                    if let Some(span) = cst.get_span(node_ref) {
+                    if let Some(span) = cst.span(node_ref) {
                         writeln!(f, "{}{rule:?} [{span:?}]", DEPTH.repeat(indent),)?;
                     } else {
                         writeln!(f, "{}{rule:?}", DEPTH.repeat(indent),)?;
