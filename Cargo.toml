@@ -43,4 +43,5 @@ members = [
     "examples/l",
     "examples/lua",
     "examples/oberon0",
+    "examples/toml",
 ]
