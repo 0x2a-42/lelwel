@@ -168,16 +168,8 @@ impl<'a> GeneralCheck<'a> {
         diags: &mut Vec<Diagnostic>,
     ) {
         if let Some(old) = self.symbol_table.insert(name, syntax) {
-            let span = if let Some(span) = cst.get_span(syntax) {
-                span
-            } else {
-                return;
-            };
-            let old_span = if let Some(span) = cst.get_span(old) {
-                span
-            } else {
-                return;
-            };
+            let span = cst.span(syntax);
+            let old_span = cst.span(old);
             diags.push(Diagnostic::redefinition(&span, binding, &old_span));
         }
     }
@@ -222,9 +214,7 @@ impl<'a> GeneralCheck<'a> {
         if let Some(start) = sema.start {
             for (name, rule) in sema.decl_bindings.iter() {
                 if *rule == start.syntax() {
-                    diags.push(Diagnostic::reference_start_rule(
-                        &cst.get_span(*name).unwrap(),
-                    ));
+                    diags.push(Diagnostic::reference_start_rule(&cst.span(*name)));
                 }
             }
         } else {
@@ -1271,7 +1261,7 @@ impl<'a> LL1Validator {
                 .collect::<BTreeSet<_>>();
             if !intersection.is_empty() {
                 let set = format!("with token set: {:?}", intersection);
-                related.push((cst.get_span(op.syntax()).unwrap().clone(), set));
+                related.push((cst.span(op.syntax()).clone(), set));
             }
         }
         if ordered_choice {
@@ -1322,7 +1312,7 @@ impl<'a> LL1Validator {
                             let set = format!("with token set: {:?}", intersection);
                             let related = vec![(rule.name(cst).unwrap_or_default().1, set)];
                             diags.push(Diagnostic::ll1_conflict_left_rec(
-                                &cst.get_span(op.syntax()).unwrap_or_default(),
+                                &cst.span(op.syntax()),
                                 related,
                             ));
                         }

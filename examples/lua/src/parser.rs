@@ -32,7 +32,7 @@ impl ParserCallbacks for Parser<'_> {
                                 .with_message("unexpected expression kind")
                                 .with_labels(vec![codespan_reporting::diagnostic::Label::primary(
                                     (),
-                                    self.cst.get_span(c).unwrap(),
+                                    self.cst.span(c),
                                 )])
                                 .with_notes(vec!["note: expected call expression".to_string()]),
                         );
@@ -52,7 +52,7 @@ impl ParserCallbacks for Parser<'_> {
                                 .with_message("unexpected expression kind")
                                 .with_labels(vec![codespan_reporting::diagnostic::Label::primary(
                                     (),
-                                    self.cst.get_span(c).unwrap(),
+                                    self.cst.span(c),
                                 )])
                                 .with_notes(vec![
                                     "note: expected name, index, or field expression".to_string(),

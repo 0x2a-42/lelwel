@@ -27,6 +27,6 @@ file [0..28]
                 String "\"c\"" [21..24]
         Comma "," [24..25]
         Whitespace " " [25..26]
-        member
+        member [26..26]
         RBrace "}" [26..27]
     Whitespace "\n" [27..28]

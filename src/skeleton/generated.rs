@@ -248,7 +248,7 @@ impl<'a> Cst<'a> {{
     ///
     /// For rules the span is calculated based on the first and last token.
     /// If there are no tokens the function returns `None`.
-    pub fn get_span(&self, node_ref: NodeRef) -> Option<Span> {{
+    pub fn span(&self, node_ref: NodeRef) -> Span {{
         fn find_token<'a>(mut iter: impl Iterator<Item = &'a Node>) -> Option<usize> {{
             iter.find_map(|node| match node {{
                 Node::Rule(..) => None,
@@ -256,15 +256,17 @@ impl<'a> Cst<'a> {{
             }})
         }}
         match self.nodes[node_ref.0] {{
-            Node::Token(_, idx) => Some(self.spans[usize::from(idx)].clone()),
+            Node::Token(_, idx) => self.spans[usize::from(idx)].clone(),
             Node::Rule(_, end_offset) => {{
                 let end = node_ref.0 + usize::from(end_offset);
                 let first = find_token(self.nodes[node_ref.0 + 1..=end].iter());
                 let last = find_token(self.nodes[node_ref.0 + 1..=end].iter().rev());
                 if let (Some(first), Some(last)) = (first, last) {{
-                    Some(self.spans[first].start..self.spans[last].end)
+                    self.spans[first].start..self.spans[last].end
                 }} else {{
-                    None
+                    let offset = find_token(self.nodes[..node_ref.0].iter().rev())
+                        .map_or(0, |before| self.spans[before].end);
+                    offset..offset
                 }}
             }}
         }}
@@ -296,11 +298,8 @@ impl std::fmt::Display for Cst<'_> {{
         ) -> std::fmt::Result {{
             match cst.get(node_ref) {{
                 Node::Rule(rule, _) => {{
-                    if let Some(span) = cst.get_span(node_ref) {{
-                        writeln!(f, "{{}}{{rule:?}} [{{span:?}}]", DEPTH.repeat(indent),)?;
-                    }} else {{
-                        writeln!(f, "{{}}{{rule:?}}", DEPTH.repeat(indent),)?;
-                    }}
+                    let span = cst.span(node_ref);
+                    writeln!(f, "{{}}{{rule:?}} [{{span:?}}]", DEPTH.repeat(indent))?;
                     for child_node_ref in cst.children(node_ref) {{
                         rec(cst, f, child_node_ref, indent + 1)?;
                     }}

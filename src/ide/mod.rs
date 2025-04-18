@@ -175,10 +175,7 @@ async fn analyze(
                 let ranges = lookup_references(&cst, &sema, pos, with_def)
                     .into_iter()
                     .map(|node| {
-                        Location::new(
-                            uri.clone(),
-                            compat::span_to_range(&file, &cst.get_span(node).unwrap()),
-                        )
+                        Location::new(uri.clone(), compat::span_to_range(&file, &cst.span(node)))
                     })
                     .collect();
                 noti.send(Notification::References(ranges)).await.unwrap();
