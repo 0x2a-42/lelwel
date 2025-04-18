@@ -12,7 +12,7 @@ fn contains(span: &Span, pos: usize) -> bool {
 pub fn lookup_rule_node(cst: &Cst, node: NodeRef, pos: usize) -> Option<NodeRef> {
     cst.children(node)
         .filter(|node| matches!(cst.get(*node), Node::Rule(..)))
-        .find(|node| cst.span(*node).is_some_and(|span| contains(&span, pos)))
+        .find(|node| contains(&cst.span(*node), pos))
         .and_then(|node| lookup_rule_node(cst, node, pos).or(Some(node)))
 }
 pub fn inside_comment(cst: &Cst, node: NodeRef, pos: usize) -> bool {
@@ -23,7 +23,7 @@ pub fn inside_comment(cst: &Cst, node: NodeRef, pos: usize) -> bool {
                 Node::Token(Token::Comment | Token::DocComment, _)
             )
         })
-        .any(|node| cst.span(node).is_some_and(|span| contains(&span, pos)))
+        .any(|node| contains(&cst.span(node), pos))
 }
 pub fn find_node<P: Fn(Rule) -> bool>(
     cst: &Cst,
@@ -39,7 +39,7 @@ pub fn find_node<P: Fn(Rule) -> bool>(
                 false
             }
         })
-        .find(|node| cst.span(*node).is_some_and(|span| contains(&span, pos)))
+        .find(|node| contains(&cst.span(*node), pos))
         .and_then(|node| find_node(cst, node, pos, pred).or(Some(node)))
 }
 
@@ -57,13 +57,10 @@ pub fn lookup_definition(
         } else if let Some((rule_name, number)) = sema.actions.get(&node) {
             lookup_parser_impl_definition("action", rule_name, number, parser_path)
         } else {
-            sema.decl_bindings
-                .get(&node)
-                .and_then(|node| cst.span(*node))
-                .map(|span| Location {
-                    uri: uri.clone(),
-                    range: super::compat::span_to_range(file, &span),
-                })
+            sema.decl_bindings.get(&node).map(|node| Location {
+                uri: uri.clone(),
+                range: super::compat::span_to_range(file, &cst.span(*node)),
+            })
         }
     })
 }

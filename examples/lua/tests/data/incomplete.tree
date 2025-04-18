@@ -50,6 +50,6 @@ chunk [0..58]
                 RParen ")" [52..53]
             Whitespace "\n" [53..54]
             funcbody [54..57]
-                block
+                block [54..54]
                 EndKw "end" [54..57]
     Whitespace "\n" [57..58]

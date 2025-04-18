@@ -7,7 +7,7 @@ use super::lookup::*;
 
 pub fn hover(cst: &Cst, sema: &SemanticData, pos: usize) -> Option<(String, Span)> {
     let node = lookup_rule_node(cst, NodeRef::ROOT, pos)?;
-    let span = cst.span(node)?;
+    let span = cst.span(node);
 
     if let Some(regex) = Regex::cast(cst, node) {
         let first = &sema
@@ -34,15 +34,11 @@ pub fn hover(cst: &Cst, sema: &SemanticData, pos: usize) -> Option<(String, Span
                 ), span))
             }
             Regex::Name(_) | Regex::Symbol(_) => {
-                let comment_attached_node = sema
-                    .decl_bindings
-                    .get(&node)
-                    .and_then(|decl| cst.span(*decl))
-                    .and_then(|span| {
-                        find_node(cst, NodeRef::ROOT, span.start, |r| {
-                            r == Rule::TokenList || r == Rule::RuleDecl
-                        })
-                    });
+                let comment_attached_node = sema.decl_bindings.get(&node).and_then(|decl| {
+                    find_node(cst, NodeRef::ROOT, cst.span(*decl).start, |r| {
+                        r == Rule::TokenList || r == Rule::RuleDecl
+                    })
+                });
                 let mut comment_nodes = vec![];
                 if let Some(comment_attached_node) = comment_attached_node {
                     for i in 1.. {
