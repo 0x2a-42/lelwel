@@ -1,0 +1,41 @@
+token Dot='.' Eq='=' LBrak='[' RBrak=']' Comma=',' LBrace='{' RBrace='}';
+token True='true' False='false';
+token BasicString='<basic string>' LiteralString='<literal string>'
+      MlBasicString='<multi-line basic string>'
+      MlLiteralString='<multi-line literal string>'
+      Integer='<integer>' Float='<float>' OffsetDateTime='<offset date-time>'
+      LocalDateTime='<local date-time>' LocalDate='<local date>'
+      LocalTime='<local time>' UnquotedKey='<bare key>';
+token Newline Whitespace Comment;
+
+skip Whitespace Comment;
+
+start toml;
+
+toml: [expression] (Newline [expression])*;
+expression^: keyval | table;
+
+keyval: key '=' val;
+table^: ?1 std_table | array_table;
+
+std_table: '[' key ']';
+array_table: '[' '[' key !1 ']' ']';
+
+key: simple_key ('.' simple_key)*;
+simple_key: BasicString | LiteralString | UnquotedKey;
+val^:
+  string
+| boolean
+| array
+| inline_table
+| date_time
+| float
+| integer
+;
+string: MlBasicString | BasicString | MlLiteralString | LiteralString;
+boolean: 'true' | 'false';
+array: '[' [?1 Newline* val (?2 Newline* ',' Newline* val)* [?3 Newline* ',']] Newline* ']';
+inline_table: '{' [keyval (',' keyval)*] '}';
+date_time: OffsetDateTime | LocalDateTime | LocalDate | LocalTime;
+integer: Integer;
+float: Float;

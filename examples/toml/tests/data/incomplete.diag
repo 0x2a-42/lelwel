@@ -1,0 +1,24 @@
+error: invalid syntax, expected: ']'
+  ┌─ <input>:1:8
+  │  
+1 │   [table1
+  │ ╭───────^
+2 │ │ a.b = { c = 42, d =
+  │ ╰^
+
+error: invalid syntax, expected one of: <basic string>, 'false', <float>, <integer>, '{', '[', <literal string>, <local date>, <local date-time>, <local time>, <multi-line basic string>, <multi-line literal string>, <offset date-time>, 'true'
+  ┌─ <input>:2:20
+  │  
+2 │   a.b = { c = 42, d =
+  │ ╭───────────────────^
+3 │ │ 
+  │ ╰^
+
+error: invalid syntax, expected one of: <basic string>, 'false', <float>, <integer>, '{', '[', <literal string>, <local date>, <local date-time>, <local time>, <multi-line basic string>, <multi-line literal string>, <offset date-time>, 'true'
+  ┌─ <input>:5:4
+  │  
+5 │   e =
+  │ ╭───^
+6 │ │ 
+  │ ╰^
+
