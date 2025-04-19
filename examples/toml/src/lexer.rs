@@ -523,7 +523,6 @@ pub fn tokenize(source: &str, diags: &mut Vec<Diagnostic>) -> (Vec<Token>, Vec<S
     let mut in_key_context = true;
 
     while let Some(token) = lexer.next() {
-        let span = lexer.span();
         match token {
             Ok(token) => {
                 let token = if in_key_context {
@@ -531,6 +530,7 @@ pub fn tokenize(source: &str, diags: &mut Vec<Diagnostic>) -> (Vec<Token>, Vec<S
                 } else {
                     token
                 };
+                let span = lexer.span();
                 in_key_context = is_key_context(token, &mut context, in_key_context);
                 match token {
                     Token::BasicString => {
@@ -569,10 +569,10 @@ pub fn tokenize(source: &str, diags: &mut Vec<Diagnostic>) -> (Vec<Token>, Vec<S
                     LexerError::UnterminatedMlBasicString => Token::MlBasicString,
                     LexerError::UnterminatedMlLiteralString => Token::MlLiteralString,
                 });
-                diags.push(err.into_diagnostic(span.clone()));
+                diags.push(err.into_diagnostic(lexer.span()));
             }
         }
-        spans.push(span);
+        spans.push(lexer.span());
     }
     (tokens, spans)
 }
