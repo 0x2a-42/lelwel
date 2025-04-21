@@ -20,6 +20,7 @@ token Newline Name Dedent Indent Int Float Imaginary String;
 token Whitespace Comment;
 
 skip Whitespace Comment;
+right '**';
 
 start file_input;
 
