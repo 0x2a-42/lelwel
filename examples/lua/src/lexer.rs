@@ -217,9 +217,9 @@ pub enum Token {
     LiteralString,
     #[regex(r"[0-9]+")]
     #[regex(r"0[xX][a-fA-F0-9]+")]
-    #[regex(r"\d+\.\d*([eE][+-]?\d+)?")]
-    #[regex(r"\.\d+([eE][+-]?\d+)?")]
-    #[regex(r"\d+[eE][+-]?\d+")]
+    #[regex(r"[0-9]+\.[0-9]*([eE][+-]?[0-9]+)?")]
+    #[regex(r"\.[0-9]+([eE][+-]?[0-9]+)?")]
+    #[regex(r"[0-9]+[eE][+-]?[0-9]+")]
     #[regex(r"0[xX][a-fA-F0-9]+\.[a-fA-F0-9]*([pP][+-]?[a-fA-F0-9]+)?")]
     #[regex(r"0[xX]\.[a-fA-F0-9]+([pP][+-]?[a-fA-F0-9]+)?")]
     #[regex(r"0[xX][a-fA-F0-9]+[pP][+-]?[a-fA-F0-9]+")]

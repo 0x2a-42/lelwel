@@ -73,7 +73,7 @@ pub enum Token {
     String,
     #[regex(r"-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?")]
     Number,
-    #[regex(r"[[:alpha:]][[:alnum:]]*", |_| false)]
+    #[regex(r"[a-zA-Z][a-zA-Z0-9]*", |_| false)]
     Error,
 }
 

@@ -109,9 +109,9 @@ pub enum Token {
     And,
     #[token(":")]
     Colon,
-    #[regex("[[:alpha:]][[:alnum:]]*")]
+    #[regex("[a-zA-Z][a-zA-Z0-9]*")]
     Ident,
-    #[regex(r"\d+")]
+    #[regex(r"[0-9]+")]
     Number,
     Error,
 }
