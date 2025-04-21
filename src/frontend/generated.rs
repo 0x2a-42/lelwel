@@ -179,7 +179,7 @@ pub type Span = core::ops::Range<usize>;
 /// foo
 ///   bar
 ///     A
-///     b
+///     B
 ///   C
 /// ```
 /// will have the following `nodes` vector.
