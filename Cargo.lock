@@ -626,6 +626,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "lelwel-wgsl"
+version = "0.0.0"
+dependencies = [
+ "codespan-reporting 0.12.0",
+ "lelwel",
+ "logos",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.172"
 source = "registry+https://github.com/rust-lang/crates.io-index"

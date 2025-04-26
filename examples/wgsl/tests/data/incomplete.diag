@@ -1,0 +1,24 @@
+error: invalid syntax, expected one of: '&', '!', 'false', <floating point literal>, <identifier>, <integer literal>, '(', '-', '*', '~', 'true'
+  ┌─ <input>:3:3
+  │
+3 │   let x = 2 +
+  │   ^^^
+
+error: invalid syntax, expected one of: '&', '!', 'false', <floating point literal>, <identifier>, <integer literal>, '(', '-', '*', '~', 'true'
+  ┌─ <input>:4:1
+  │
+4 │ }
+  │ ^
+
+error: invalid syntax, expected one of: '@', <identifier>, ')'
+  ┌─ <input>:8:1
+  │
+8 │ fn h() {
+  │ ^^
+
+error: invalid syntax, expected one of: '&', '!', 'false', <floating point literal>, <identifier>, <integer literal>, '(', '-', '*', '~', 'true'
+   ┌─ <input>:12:3
+   │
+12 │   var j = k << l;
+   │   ^^^
+
