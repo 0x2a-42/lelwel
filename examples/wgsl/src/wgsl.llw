@@ -74,7 +74,7 @@ expression:
 | expression '|' expression @binary_expression // §8.9
 | expression '&&' expression @binary_expression // §8.6
 | expression '||' expression @binary_expression // §8.6
-| Ident expr_template_list @ident_expression [argument_expression_list @call_expression] // §8.10, §8.11
+| Ident expr_template_list @ident_expression [argument_expression_list_expr @call_expression] // §8.10, §8.11
 | '(' expression ')' @paren_expression // §8.4
 | IntLiteral @int_expression // §8.3
 | FloatLiteral @float_expression // §8.3
@@ -82,6 +82,8 @@ expression:
 | 'false' @bool_expression // §8.3
 ;
 argument_expression_list: '(' [expression (?1 ',' expression)* [',']] ')';
+// extra rule for better error handling
+argument_expression_list_expr: '(' [expression (?1 ',' expression)* [',']] ')' @argument_expression_list;
 
 statement:
   attribute* (

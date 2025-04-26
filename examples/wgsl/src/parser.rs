@@ -151,6 +151,9 @@ impl<'a> ParserCallbacks for Parser<'a> {
     fn predicate_argument_expression_list_1(&self) -> bool {
         self.peek(1) != Token::RPar
     }
+    fn predicate_argument_expression_list_expr_1(&self) -> bool {
+        self.peek(1) != Token::RPar
+    }
     fn predicate_statement_1(&self) -> bool {
         self.peek(1) == Token::If
     }
