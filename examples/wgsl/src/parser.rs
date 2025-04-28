@@ -53,6 +53,7 @@ impl Parser<'_> {
         let mut nesting_depth = 0usize;
         let mut it = self.tokens[self.pos..].iter().enumerate();
         let mut pending = vec![];
+        let mut last_lt_offset = 0;
         while let Some((offset, tok)) = it.next() {
             match tok {
                 Token::LPar | Token::LBrak => nesting_depth += 1,
@@ -67,7 +68,13 @@ impl Parser<'_> {
                         }
                     }
                 }
-                Token::Lt => pending.push((self.pos + offset, nesting_depth)),
+                Token::Lt | Token::Eq if offset == last_lt_offset + 1 => {
+                    pending.pop();
+                }
+                Token::Lt => {
+                    last_lt_offset = offset;
+                    pending.push((self.pos + offset, nesting_depth));
+                }
                 Token::Gt => {
                     if let Some((pending_pos, pending_nesting_depth)) = pending.last().copied() {
                         if pending_nesting_depth == nesting_depth {
