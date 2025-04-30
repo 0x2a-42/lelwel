@@ -57,14 +57,23 @@ impl Parser<'_> {
         while let Some((offset, tok)) = it.next() {
             match tok {
                 Token::LPar | Token::LBrak => nesting_depth += 1,
-                Token::RPar | Token::RBrak => nesting_depth = nesting_depth.saturating_sub(1),
+                Token::RPar | Token::RBrak => {
+                    while let Some((_, pending_nesting_depth)) = pending.last().copied() {
+                        if pending_nesting_depth < nesting_depth {
+                            break;
+                        } else {
+                            pending.pop();
+                        }
+                    }
+                    nesting_depth = nesting_depth.saturating_sub(1);
+                }
                 Token::Semi | Token::LBrace | Token::Colon => break,
                 Token::And2 | Token::Pipe2 => {
                     while let Some((_, pending_nesting_depth)) = pending.last().copied() {
-                        if pending_nesting_depth >= nesting_depth {
-                            pending.pop();
-                        } else {
+                        if pending_nesting_depth < nesting_depth {
                             break;
+                        } else {
+                            pending.pop();
                         }
                     }
                 }

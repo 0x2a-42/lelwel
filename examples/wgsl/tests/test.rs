@@ -18,4 +18,5 @@ macro_rules! check {
 #[test]
 fn incomplete() {
     check!("incomplete");
+    check!("template");
 }
