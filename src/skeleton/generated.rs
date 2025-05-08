@@ -111,7 +111,7 @@ struct MarkTruncation {{
 
 /// An iterator for child nodes of a CST node.
 pub struct CstChildren<'a> {{
-    iter: std::slice::Iter<'a, Node>,
+    iter: core::slice::Iter<'a, Node>,
     offset: usize,
 }}
 impl Iterator for CstChildren<'_> {{
@@ -233,7 +233,7 @@ impl<'a> Cst<'a> {{
         let iter = if let Node::Rule(_, end_offset) = self.nodes[node_ref.0] {{
             self.nodes[node_ref.0 + 1..node_ref.0 + usize::from(end_offset) + 1].iter()
         }} else {{
-            std::slice::Iter::default()
+            core::slice::Iter::default()
         }};
         CstChildren {{
             iter,
@@ -287,15 +287,15 @@ impl<'a> Cst<'a> {{
     }}
 }}
 
-impl std::fmt::Display for Cst<'_> {{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {{
+impl core::fmt::Display for Cst<'_> {{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {{
         const DEPTH: &str = "    ";
         fn rec(
             cst: &Cst,
-            f: &mut std::fmt::Formatter<'_>,
+            f: &mut core::fmt::Formatter<'_>,
             node_ref: NodeRef,
             indent: usize,
-        ) -> std::fmt::Result {{
+        ) -> core::fmt::Result {{
             match cst.get(node_ref) {{
                 Node::Rule(rule, _) => {{
                     let span = cst.span(node_ref);
@@ -321,8 +321,8 @@ impl std::fmt::Display for Cst<'_> {{
         rec(self, f, NodeRef::ROOT, 0)
     }}
 }}
-impl std::fmt::Debug for Rule {{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {{
+impl core::fmt::Debug for Rule {{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {{
         match self {{{3}
         }}
     }}
