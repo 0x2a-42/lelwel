@@ -1,0 +1,13 @@
+[package]
+name = "lelwel-brainfuck"
+version = "0.0.0"
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+edition = "2021"
+
+[dependencies]
+logos = "0.15"
+codespan-reporting = "0.12"
+
+[build-dependencies]
+lelwel = { path = "../.." }
