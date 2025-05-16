@@ -46,4 +46,5 @@ members = [
     "examples/python2",
     "examples/toml",
     "examples/wgsl",
+    "examples/brainfuck"
 ]

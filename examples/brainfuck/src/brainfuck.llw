@@ -1,32 +1,22 @@
 // Each token is a Brainfuck instruction
 // Other characters will be ignored by lexer
 
-token
-  Plus='+'
-  Minus='-'
-  Left='<'
-  Right='>'
-  Dot='.'
-  Comma=','
-  LBrack='['
-  RBrack=']'
-  Ignored='<any>';
+token Plus='+' Minus='-' Lt='<' Gt='>' Dot='.' Comma=',' LBrack='[' RBrack=']';
+token Comment;
 
-skip Ignored;
+skip Comment;
 
 start program;
 
 program: instruction*;
 
-instruction^:
-    Plus
-  | Minus
-  | Left
-  | Right
-  | Dot
-  | Comma
-  | loop
-;
+instruction:
+  '+' @data_incr
+| '-' @data_decr
+| '<' @addr_decr
+| '>' @addr_incr
+| '.' @output_data
+| ',' @accept_input
+| loop ^;
 
-loop:
-    LBrack instruction* RBrack;
+loop: '[' instruction* ']';

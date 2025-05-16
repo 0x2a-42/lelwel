@@ -1,16 +1,18 @@
-use crate::lexer::{tokenize, Token};
+use super::lexer::{Token, tokenize};
 use codespan_reporting::diagnostic::Label;
 
+// TODO: change definition and all uses if codespan_reporting is not used
 pub type Diagnostic = codespan_reporting::diagnostic::Diagnostic<()>;
 
+// TODO: add context information to the parser if required
 #[derive(Default)]
 pub struct Context<'a> {
-    marker: std::marker::PhantomData<&'a ()>,
+    marker: std::marker::PhantomData<&'a ()>
 }
 
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 
-impl ParserCallbacks for Parser<'_> {
+impl<'a> ParserCallbacks for Parser<'a> {
     fn create_tokens(source: &str, diags: &mut Vec<Diagnostic>) -> (Vec<Token>, Vec<Span>) {
         tokenize(source, diags)
     }

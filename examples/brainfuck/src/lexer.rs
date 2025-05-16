@@ -23,15 +23,14 @@ impl LexerError {
 #[logos(error = LexerError)]
 pub enum Token {
     EOF,
-
     #[token("+")]
     Plus,
     #[token("-")]
     Minus,
     #[token("<")]
-    Left,
+    Lt,
     #[token(">")]
-    Right,
+    Gt,
     #[token(".")]
     Dot,
     #[token(",")]
@@ -40,10 +39,8 @@ pub enum Token {
     LBrack,
     #[token("]")]
     RBrack,
-
-    #[regex(r"[^+\-<>.,\[\]]+", logos::skip)]
-    Ignored,
-
+    #[regex(r"[^+\-<>.,\[\]]+")]
+    Comment,
     Error,
 }
 
