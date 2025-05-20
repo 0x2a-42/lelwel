@@ -547,6 +547,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "lelwel-brainfuck"
+version = "0.0.0"
+dependencies = [
+ "codespan-reporting 0.12.0",
+ "lelwel",
+ "logos",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "lelwel-c"
 version = "0.0.0"
 dependencies = [
