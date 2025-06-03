@@ -43,9 +43,10 @@ impl Cache {
             },
         );
     }
-    pub fn invalidate(&self, uri: &Url) {
-        if self.analyzers.contains_key(uri) {
-            self.analyzers[uri].req_tx.send(Request::Cancel).unwrap();
+    pub fn invalidate(&mut self, uri: &Url) {
+        if let Some(analyzer) = self.analyzers.remove(uri) {
+            analyzer.req_tx.send(Request::Cancel).unwrap();
+            analyzer.handle.join().unwrap();
         }
     }
     pub fn get_diagnostics(&mut self, uri: &Url) -> Vec<Diagnostic> {
