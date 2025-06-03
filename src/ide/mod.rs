@@ -3,10 +3,10 @@
 use crate::{Parser, SemanticPass, Span};
 use codespan_reporting::diagnostic::{LabelStyle, Severity};
 use codespan_reporting::files::SimpleFile;
+use lsp_types::*;
 use std::collections::HashMap;
-use tokio::sync::mpsc;
-use tokio::task::JoinHandle;
-use tower_lsp::lsp_types::*;
+use std::sync::mpsc;
+use std::thread::JoinHandle;
 
 use self::completion::*;
 use self::hover::*;
@@ -28,13 +28,14 @@ pub struct Cache {
 }
 
 impl Cache {
-    pub fn analyze(&mut self, uri: &Url, text: String) {
-        let (req_tx, req_rx) = mpsc::channel::<Request>(32);
-        let (noti_tx, noti_rx) = mpsc::channel::<Notification>(32);
-        let handle = tokio::spawn(analyze(uri.clone(), text, req_rx, noti_tx));
+    pub fn analyze(&mut self, uri: Url, text: String) {
+        let (req_tx, req_rx) = mpsc::channel::<Request>();
+        let (noti_tx, noti_rx) = mpsc::channel::<Notification>();
+        let key = uri.clone();
+        let handle = std::thread::spawn(move || analyze(uri, text, req_rx, noti_tx));
 
         self.analyzers.insert(
-            uri.clone(),
+            key,
             Analyzer {
                 handle,
                 req_tx,
@@ -44,69 +45,60 @@ impl Cache {
     }
     pub fn invalidate(&self, uri: &Url) {
         if self.analyzers.contains_key(uri) {
-            self.analyzers[uri].handle.abort();
+            self.analyzers[uri].req_tx.send(Request::Cancel).unwrap();
         }
     }
-    pub async fn get_diagnostics(&mut self, uri: &Url) -> Vec<Diagnostic> {
+    pub fn get_diagnostics(&mut self, uri: &Url) -> Vec<Diagnostic> {
         let analyzer = self.analyzers.get_mut(uri).unwrap();
         assert!(!analyzer.handle.is_finished());
-        analyzer.req_tx.send(Request::Diagnostic).await.unwrap();
-        if let Some(Notification::PublishDiagnostics(items)) = analyzer.noti_rx.recv().await {
+        analyzer.req_tx.send(Request::Diagnostic).unwrap();
+        if let Ok(Notification::PublishDiagnostics(items)) = analyzer.noti_rx.recv() {
             items
         } else {
             vec![]
         }
     }
-    pub async fn hover(&mut self, uri: &Url, pos: Position) -> Option<(String, Range)> {
+    pub fn hover(&mut self, uri: &Url, pos: Position) -> Option<(String, Range)> {
         let analyzer = self.analyzers.get_mut(uri).unwrap();
         assert!(!analyzer.handle.is_finished());
-        analyzer.req_tx.send(Request::Hover(pos)).await.unwrap();
-        if let Some(Notification::Hover(hover)) = analyzer.noti_rx.recv().await {
+        analyzer.req_tx.send(Request::Hover(pos)).unwrap();
+        if let Ok(Notification::Hover(hover)) = analyzer.noti_rx.recv() {
             hover
         } else {
             None
         }
     }
-    pub async fn goto_definition(&mut self, uri: &Url, pos: Position) -> Option<Location> {
+    pub fn goto_definition(&mut self, uri: &Url, pos: Position) -> Option<Location> {
         let analyzer = self.analyzers.get_mut(uri).unwrap();
         assert!(!analyzer.handle.is_finished());
-        analyzer
-            .req_tx
-            .send(Request::GotoDefinition(pos))
-            .await
-            .unwrap();
-        if let Some(Notification::GotoDefinition(location)) = analyzer.noti_rx.recv().await {
+        analyzer.req_tx.send(Request::GotoDefinition(pos)).unwrap();
+        if let Ok(Notification::GotoDefinition(location)) = analyzer.noti_rx.recv() {
             location
         } else {
             None
         }
     }
-    pub async fn references(&mut self, uri: &Url, pos: Position, with_def: bool) -> Vec<Location> {
+    pub fn references(&mut self, uri: &Url, pos: Position, with_def: bool) -> Vec<Location> {
         let analyzer = self.analyzers.get_mut(uri).unwrap();
         assert!(!analyzer.handle.is_finished());
         analyzer
             .req_tx
             .send(Request::References(pos, with_def))
-            .await
             .unwrap();
-        if let Some(Notification::References(ranges)) = analyzer.noti_rx.recv().await {
+        if let Ok(Notification::References(ranges)) = analyzer.noti_rx.recv() {
             ranges
         } else {
             vec![]
         }
     }
-    pub async fn completion(&mut self, params: CompletionParams) -> Option<CompletionResponse> {
+    pub fn completion(&mut self, params: CompletionParams) -> Option<CompletionResponse> {
         let analyzer = self
             .analyzers
             .get_mut(&params.text_document_position.text_document.uri)
             .unwrap();
         assert!(!analyzer.handle.is_finished());
-        analyzer
-            .req_tx
-            .send(Request::Completion(params))
-            .await
-            .unwrap();
-        if let Some(Notification::Completion(resp)) = analyzer.noti_rx.recv().await {
+        analyzer.req_tx.send(Request::Completion(params)).unwrap();
+        if let Ok(Notification::Completion(resp)) = analyzer.noti_rx.recv() {
             resp
         } else {
             None
@@ -120,6 +112,7 @@ enum Request {
     GotoDefinition(Position),
     References(Position, bool),
     Completion(CompletionParams),
+    Cancel,
 }
 
 enum Notification {
@@ -130,10 +123,10 @@ enum Notification {
     Completion(Option<CompletionResponse>),
 }
 
-async fn analyze(
+fn analyze(
     uri: Url,
     source: String,
-    mut req: mpsc::Receiver<Request>,
+    req: mpsc::Receiver<Request>,
     noti: mpsc::Sender<Notification>,
 ) {
     let path = uri.to_file_path().unwrap();
@@ -144,7 +137,7 @@ async fn analyze(
     let sema = SemanticPass::run(&cst, &mut diags);
     let file = SimpleFile::new(path.to_str().unwrap(), source.as_str());
 
-    while let Some(req) = req.recv().await {
+    while let Ok(req) = req.recv() {
         match req {
             Request::Diagnostic => {
                 let mut diags = diags
@@ -153,22 +146,18 @@ async fn analyze(
                     .collect::<Vec<_>>();
                 let mut hints = related_as_hints(&diags);
                 diags.append(&mut hints);
-                noti.send(Notification::PublishDiagnostics(diags))
-                    .await
-                    .unwrap();
+                noti.send(Notification::PublishDiagnostics(diags)).unwrap();
             }
             Request::Hover(pos) => {
                 let pos = compat::position_to_offset(&file, &pos);
                 let res = hover(&cst, &sema, pos)
                     .map(|(msg, span)| (msg, compat::span_to_range(&file, &span)));
-                noti.send(Notification::Hover(res)).await.unwrap();
+                noti.send(Notification::Hover(res)).unwrap();
             }
             Request::GotoDefinition(pos) => {
                 let pos = compat::position_to_offset(&file, &pos);
                 let location = lookup_definition(&cst, &sema, pos, &uri, &file, &parser_path);
-                noti.send(Notification::GotoDefinition(location))
-                    .await
-                    .unwrap();
+                noti.send(Notification::GotoDefinition(location)).unwrap();
             }
             Request::References(pos, with_def) => {
                 let pos = compat::position_to_offset(&file, &pos);
@@ -178,14 +167,16 @@ async fn analyze(
                         Location::new(uri.clone(), compat::span_to_range(&file, &cst.span(node)))
                     })
                     .collect();
-                noti.send(Notification::References(ranges)).await.unwrap();
+                noti.send(Notification::References(ranges)).unwrap();
             }
             Request::Completion(params) => {
                 let pos =
                     compat::position_to_offset(&file, &params.text_document_position.position);
                 noti.send(Notification::Completion(completion(&cst, pos, &sema)))
-                    .await
                     .unwrap();
+            }
+            Request::Cancel => {
+                return;
             }
         }
     }
@@ -233,7 +224,7 @@ fn to_lsp_diag(
     Diagnostic::new(
         diag.labels
             .first()
-            .map_or(tower_lsp::lsp_types::Range::default(), |label| {
+            .map_or(lsp_types::Range::default(), |label| {
                 compat::span_to_range(file, &label.range)
             }),
         Some(match diag.severity {
@@ -268,31 +259,25 @@ fn related_as_hints(diags: &[Diagnostic]) -> Vec<Diagnostic> {
     hints
 }
 
-/// required functions due to different versions of lsp-types in codespan and tower-lsp
+/// required functions due to different versions of lsp-types in codespan
 mod compat {
     use crate::Span;
     use codespan_reporting::files::SimpleFile;
 
-    pub fn position_to_offset(
-        file: &SimpleFile<&str, &str>,
-        pos: &tower_lsp::lsp_types::Position,
-    ) -> usize {
+    pub fn position_to_offset(file: &SimpleFile<&str, &str>, pos: &lsp_types::Position) -> usize {
         codespan_lsp::position_to_byte_index(
             file,
             (),
-            &lsp_types::Position::new(pos.line, pos.character),
+            &lsp_types_old::Position::new(pos.line, pos.character),
         )
         .unwrap()
     }
 
-    pub fn span_to_range(
-        file: &SimpleFile<&str, &str>,
-        span: &Span,
-    ) -> tower_lsp::lsp_types::Range {
+    pub fn span_to_range(file: &SimpleFile<&str, &str>, span: &Span) -> lsp_types::Range {
         let range = codespan_lsp::byte_span_to_range(file, (), span.clone()).unwrap();
-        tower_lsp::lsp_types::Range::new(
-            tower_lsp::lsp_types::Position::new(range.start.line, range.start.character),
-            tower_lsp::lsp_types::Position::new(range.end.line, range.end.character),
+        lsp_types::Range::new(
+            lsp_types::Position::new(range.start.line, range.start.character),
+            lsp_types::Position::new(range.end.line, range.end.character),
         )
     }
 }
