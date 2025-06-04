@@ -1,5 +1,5 @@
 use codespan_reporting::files::{Files, SimpleFile};
-use tower_lsp::lsp_types::{Location, Url};
+use lsp_types::{Location, Url};
 
 use crate::frontend::lexer::Token;
 use crate::frontend::parser::Span;
@@ -102,13 +102,13 @@ fn lookup_parser_impl_definition(
         .find(&format!("fn {kind}_{rule_name}_{number}"))
         .and_then(|offset| file.location((), offset).ok())
         .map(|loc| {
-            let pos = tower_lsp::lsp_types::Position::new(
+            let pos = lsp_types::Position::new(
                 (loc.line_number - 1) as u32,
                 (loc.column_number - 1) as u32,
             );
             Location {
                 uri,
-                range: tower_lsp::lsp_types::Range::new(pos, pos),
+                range: lsp_types::Range::new(pos, pos),
             }
         })
 }
