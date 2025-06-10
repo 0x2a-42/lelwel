@@ -125,7 +125,11 @@ impl RustOutput {
             \n    /// Called at the start of the parse to generate all tokens and corresponding spans.\
             \n    fn create_tokens(source: &str, diags: &mut Vec<Diagnostic>) -> (Vec<Token>, Vec<Span>);\
             \n    /// Called when diagnostic is created.\
-            \n    fn create_diagnostic(&self, span: Span, message: String) -> Diagnostic;\n\n"
+            \n    fn create_diagnostic(&self, span: Span, message: String) -> Diagnostic;\
+            \n    /// This predicate can be used to skip normal tokens.\
+            \n    fn predicate_skip(&self, _token: Token) -> bool {\
+            \n        false\
+            \n    }\n\n"
         } else {
             b"impl<'a> ParserCallbacks for Parser<'a> {\
             \n    fn create_tokens(source: &str, diags: &mut Vec<Diagnostic>) -> (Vec<Token>, Vec<Span>) {\

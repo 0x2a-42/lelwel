@@ -455,6 +455,10 @@ impl<'a> Parser<'a> {
                     self.cst.advance(*token, true);
                     continue;
                 }
+                Some(token) if self.predicate_skip(*token) => {
+                    self.cst.advance(*token, true);
+                    continue;
+                }
                 Some(token) => {
                     self.current = *token;
                     break;
@@ -478,6 +482,11 @@ impl<'a> Parser<'a> {
                 Some(
                     token @ (Token::Error | Token::Comment | Token::DocComment | Token::Whitespace),
                 ) => {
+                    self.pos += 1;
+                    self.cst.advance(*token, true);
+                    continue;
+                }
+                Some(token) if self.predicate_skip(*token) => {
                     self.pos += 1;
                     self.cst.advance(*token, true);
                     continue;
@@ -1200,6 +1209,10 @@ trait ParserCallbacks {
     fn create_tokens(source: &str, diags: &mut Vec<Diagnostic>) -> (Vec<Token>, Vec<Span>);
     /// Called when diagnostic is created.
     fn create_diagnostic(&self, span: Span, message: String) -> Diagnostic;
+    /// This predicate can be used to skip normal tokens.
+    fn predicate_skip(&self, _token: Token) -> bool {
+        false
+    }
 
     /// Called when `action` node is created.
     fn create_node_action(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}

@@ -391,6 +391,10 @@ impl<'a> Parser<'a> {{
                     self.cst.advance(*token, true);
                     continue;
                 }}
+                Some(token) if self.predicate_skip(*token) => {{
+                    self.cst.advance(*token, true);
+                    continue;
+                }}
                 Some(token) => {{
                     self.current = *token;
                     break;
@@ -409,6 +413,11 @@ impl<'a> Parser<'a> {{
         loop {{
             match self.tokens.get(self.pos) {{
                 Some(token @ (Token::Error{1})) => {{
+                    self.pos += 1;
+                    self.cst.advance(*token, true);
+                    continue;
+                }}
+                Some(token) if self.predicate_skip(*token) => {{
                     self.pos += 1;
                     self.cst.advance(*token, true);
                     continue;
