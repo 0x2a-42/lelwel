@@ -13,15 +13,17 @@ categories = ["parsing"]
 logos = "0.15"
 codespan-reporting = "0.11"
 codespan-lsp = { version = "0.11", optional = true }
-tokio = { version = "1.40", features = ["io-std", "macros", "rt", "rt-multi-thread"], optional = true  }
 clap = { version = "4.5", features = ["cargo"], optional = true }
-lsp-types = { version = "0.88", optional = true }
-tower-lsp = { version = "0.20", optional = true }
+lsp-types = { version = "0.95", optional = true }
+lsp-types_old = { package = "lsp-types", version = "0.88", optional = true }
+lsp-server = { version = "0.7", optional = true }
+serde = { version = "1.0", optional = true }
+serde_json = { version = "1.0", optional = true }
 wasm-bindgen = { version = "0.2", optional = true }
 
 [features]
 cli = ["clap"]
-lsp = ["tokio", "tower-lsp", "codespan-lsp", "lsp-types"]
+lsp = ["lsp-server", "codespan-lsp", "lsp-types", "lsp-types_old", "serde", "serde_json"]
 wasm = ["wasm-bindgen"]
 
 [[bin]]
@@ -46,4 +48,5 @@ members = [
     "examples/python2",
     "examples/toml",
     "examples/wgsl",
+    "examples/brainfuck"
 ]
