@@ -5,13 +5,13 @@ use std::error::Error;
 use lelwel::ide::Cache;
 use lsp_server::{Connection, ExtractError, Message, Notification, RequestId, Response};
 use lsp_types::{
+    CompletionOptions, GotoDefinitionResponse, Hover, HoverContents, HoverProviderCapability,
+    InitializeParams, MarkupContent, MarkupKind, OneOf, PublishDiagnosticsParams,
+    ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind,
     notification::{
         DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, PublishDiagnostics,
     },
     request::{Completion, GotoDefinition, HoverRequest, References},
-    CompletionOptions, GotoDefinitionResponse, Hover, HoverContents, HoverProviderCapability,
-    InitializeParams, MarkupContent, MarkupKind, OneOf, PublishDiagnosticsParams,
-    ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind,
 };
 
 macro_rules! request_match {
@@ -166,7 +166,7 @@ impl RequestHandler for Completion {
 impl NotificationHandler for DidOpenTextDocument {
     fn handle(cache: &mut Cache, params: Self::Params) -> Option<Notification> {
         let uri = params.text_document.uri;
-        eprintln!("opened document {:?}", uri);
+        eprintln!("opened document {uri:?}");
         let text = params.text_document.text;
         let diagnostics = {
             cache.invalidate(&uri);
@@ -201,7 +201,7 @@ impl NotificationHandler for DidChangeTextDocument {
 impl NotificationHandler for DidCloseTextDocument {
     fn handle(cache: &mut Cache, params: Self::Params) -> Option<Notification> {
         let uri = params.text_document.uri;
-        eprintln!("closed document {:?}", uri);
+        eprintln!("closed document {uri:?}");
         cache.invalidate(&uri);
         None
     }

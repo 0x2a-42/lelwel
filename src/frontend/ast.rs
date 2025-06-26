@@ -126,7 +126,10 @@ impl File {
         cst: &'a Cst,
     ) -> std::iter::FilterMap<
         std::iter::Flatten<
-            std::iter::FilterMap<CstChildren<'a>, impl FnMut(NodeRef) -> Option<CstChildren<'a>> + use<'a>>,
+            std::iter::FilterMap<
+                CstChildren<'a>,
+                impl FnMut(NodeRef) -> Option<CstChildren<'a>> + use<'a>,
+            >,
         >,
         impl FnMut(NodeRef) -> Option<TokenDecl> + 'a + use<'a>,
     > {
@@ -138,25 +141,33 @@ impl File {
     pub fn rule_decls<'a>(
         &self,
         cst: &'a Cst,
-    ) -> std::iter::FilterMap<CstChildren<'a>, impl FnMut(NodeRef) -> Option<RuleDecl> + 'a + use<'a>> {
+    ) -> std::iter::FilterMap<CstChildren<'a>, impl FnMut(NodeRef) -> Option<RuleDecl> + 'a + use<'a>>
+    {
         cst.child_node_iter(self.syntax)
     }
     pub fn start_decls<'a>(
         &self,
         cst: &'a Cst,
-    ) -> std::iter::FilterMap<CstChildren<'a>, impl FnMut(NodeRef) -> Option<StartDecl> + 'a + use<'a>> {
+    ) -> std::iter::FilterMap<
+        CstChildren<'a>,
+        impl FnMut(NodeRef) -> Option<StartDecl> + 'a + use<'a>,
+    > {
         cst.child_node_iter(self.syntax)
     }
     pub fn right_decls<'a>(
         &self,
         cst: &'a Cst,
-    ) -> std::iter::FilterMap<CstChildren<'a>, impl FnMut(NodeRef) -> Option<RightDecl> + 'a + use<'a>> {
+    ) -> std::iter::FilterMap<
+        CstChildren<'a>,
+        impl FnMut(NodeRef) -> Option<RightDecl> + 'a + use<'a>,
+    > {
         cst.child_node_iter(self.syntax)
     }
     pub fn skip_decls<'a>(
         &self,
         cst: &'a Cst,
-    ) -> std::iter::FilterMap<CstChildren<'a>, impl FnMut(NodeRef) -> Option<SkipDecl> + 'a + use<'a>> {
+    ) -> std::iter::FilterMap<CstChildren<'a>, impl FnMut(NodeRef) -> Option<SkipDecl> + 'a + use<'a>>
+    {
         cst.child_node_iter(self.syntax)
     }
 }
@@ -212,7 +223,8 @@ impl OrderedChoice {
     pub fn operands<'a>(
         &self,
         cst: &'a Cst,
-    ) -> std::iter::FilterMap<CstChildren<'a>, impl FnMut(NodeRef) -> Option<Regex> + 'a + use<'a>> {
+    ) -> std::iter::FilterMap<CstChildren<'a>, impl FnMut(NodeRef) -> Option<Regex> + 'a + use<'a>>
+    {
         cst.child_node_iter(self.syntax)
     }
 }
@@ -220,7 +232,8 @@ impl Alternation {
     pub fn operands<'a>(
         &self,
         cst: &'a Cst,
-    ) -> std::iter::FilterMap<CstChildren<'a>, impl FnMut(NodeRef) -> Option<Regex> + 'a + use<'a>> {
+    ) -> std::iter::FilterMap<CstChildren<'a>, impl FnMut(NodeRef) -> Option<Regex> + 'a + use<'a>>
+    {
         cst.child_node_iter(self.syntax)
     }
 }
@@ -228,7 +241,8 @@ impl Concat {
     pub fn operands<'a>(
         &self,
         cst: &'a Cst,
-    ) -> std::iter::FilterMap<CstChildren<'a>, impl FnMut(NodeRef) -> Option<Regex> + 'a + use<'a>> {
+    ) -> std::iter::FilterMap<CstChildren<'a>, impl FnMut(NodeRef) -> Option<Regex> + 'a + use<'a>>
+    {
         cst.child_node_iter(self.syntax)
     }
 }

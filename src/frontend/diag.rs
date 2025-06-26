@@ -118,7 +118,7 @@ impl LanguageErrors for Diagnostic {
     fn redefinition(span: &Span, binding: &str, old_span: &Span) -> Self {
         Diagnostic::error()
             .with_code(REDEFINITION)
-            .with_message(format!("redefinition of {}", binding,))
+            .with_message(format!("redefinition of {binding}"))
             .with_labels(vec![
                 Label::primary((), span.clone()),
                 Label::secondary((), old_span.clone()).with_message("previous definition"),
@@ -137,7 +137,7 @@ impl LanguageErrors for Diagnostic {
                 ),
             )])
             .with_notes(vec![
-                "note: rule names must start with a lower case letter".to_string()
+                "note: rule names must start with a lower case letter".to_string(),
             ])
     }
 
@@ -224,7 +224,7 @@ impl LanguageErrors for Diagnostic {
             .with_code(LL1_CONFLICT_REP)
             .with_message("LL(1) conflict in repetition")
             .with_labels(vec![
-                Label::primary((), span.clone()).with_message(conflicting)
+                Label::primary((), span.clone()).with_message(conflicting),
             ])
             .with_notes(vec![
                 "note: transform the grammar or add a predicate to the start of the repetition"
@@ -237,7 +237,7 @@ impl LanguageErrors for Diagnostic {
             .with_code(LL1_CONFLICT_OPT)
             .with_message("LL(1) conflict in option")
             .with_labels(vec![
-                Label::primary((), span.clone()).with_message(conflicting)
+                Label::primary((), span.clone()).with_message(conflicting),
             ])
             .with_notes(vec![
                 "note: transform the grammar or add a predicate to the start of the option"
@@ -251,7 +251,7 @@ impl LanguageErrors for Diagnostic {
             .with_message("no tokens consumed")
             .with_labels(vec![Label::primary((), span.clone())])
             .with_notes(vec![
-                "note: such a rule would cause a stack overflow".to_string()
+                "note: such a rule would cause a stack overflow".to_string(),
             ])
     }
 

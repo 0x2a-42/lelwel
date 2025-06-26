@@ -29,9 +29,12 @@ pub fn hover(cst: &Cst, sema: &SemanticData, pos: usize) -> Option<(String, Span
                     .recovery_sets
                     .get(&regex.syntax())
                     .map_or("{}".to_string(), |s| format!("{s:?}"));
-                Some((format!(
-                    "**First:** {first}\n**Follow:** {follow}\n**Predict:** {predict}\n**Recovery:** {recovery}\n"
-                ), span))
+                Some((
+                    format!(
+                        "**First:** {first}\n**Follow:** {follow}\n**Predict:** {predict}\n**Recovery:** {recovery}\n"
+                    ),
+                    span,
+                ))
             }
             Regex::Name(_) | Regex::Symbol(_) => {
                 let comment_attached_node = sema.decl_bindings.get(&node).and_then(|decl| {
@@ -60,7 +63,9 @@ pub fn hover(cst: &Cst, sema: &SemanticData, pos: usize) -> Option<(String, Span
                     comment.push_str("---\n")
                 }
                 Some((
-                    format!("{comment}**First:** {first}\n**Follow:** {follow}\n**Predict:** {predict}\n"),
+                    format!(
+                        "{comment}**First:** {first}\n**Follow:** {follow}\n**Predict:** {predict}\n"
+                    ),
                     span,
                 ))
             }

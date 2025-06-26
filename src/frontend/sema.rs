@@ -1260,7 +1260,7 @@ impl<'a> LL1Validator {
                 .copied()
                 .collect::<BTreeSet<_>>();
             if !intersection.is_empty() {
-                let set = format!("with token set: {:?}", intersection);
+                let set = format!("with token set: {intersection:?}");
                 related.push((cst.span(op.syntax()).clone(), set));
             }
         }
@@ -1309,7 +1309,7 @@ impl<'a> LL1Validator {
                             .copied()
                             .collect::<BTreeSet<_>>();
                         if !intersection.is_empty() {
-                            let set = format!("with token set: {:?}", intersection);
+                            let set = format!("with token set: {intersection:?}");
                             let related = vec![(rule.name(cst).unwrap_or_default().1, set)];
                             diags.push(Diagnostic::ll1_conflict_left_rec(
                                 &cst.span(op.syntax()),
@@ -1370,7 +1370,7 @@ impl<'a> LL1Validator {
                         .copied()
                         .collect::<BTreeSet<_>>();
                     if !Self::has_predicate(cst, op) && !intersection.is_empty() {
-                        let set = format!("with token set: {:?}", intersection);
+                        let set = format!("with token set: {intersection:?}");
                         diags.push(Diagnostic::ll1_conflict_rep(&regex.span(cst), set));
                     }
                     Self::check_regex(cst, sema, diags, op, rule, None);
@@ -1383,7 +1383,7 @@ impl<'a> LL1Validator {
                         .copied()
                         .collect::<BTreeSet<_>>();
                     if !Self::has_predicate(cst, op) && !intersection.is_empty() {
-                        let set = format!("with token set: {:?}", intersection);
+                        let set = format!("with token set: {intersection:?}");
                         diags.push(Diagnostic::ll1_conflict_rep(&regex.span(cst), set));
                     }
                     Self::check_regex(cst, sema, diags, op, rule, None);
@@ -1396,7 +1396,7 @@ impl<'a> LL1Validator {
                         .copied()
                         .collect::<BTreeSet<_>>();
                     if !Self::has_predicate(cst, op) && !intersection.is_empty() {
-                        let set = format!("with token set: {:?}", intersection);
+                        let set = format!("with token set: {intersection:?}");
                         diags.push(Diagnostic::ll1_conflict_opt(&regex.span(cst), set));
                     }
                     Self::check_regex(cst, sema, diags, op, rule, None);

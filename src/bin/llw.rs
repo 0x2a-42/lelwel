@@ -1,6 +1,6 @@
 #![cfg(feature = "cli")]
 
-use clap::{arg, crate_name, crate_version, error::ErrorKind, ArgAction, Command};
+use clap::{ArgAction, Command, arg, crate_name, crate_version, error::ErrorKind};
 
 fn main() {
     let mut cmd = Command::new(crate_name!())
@@ -32,6 +32,6 @@ fn main() {
         matches.get_flag("short"),
     ) {
         Ok(success) => std::process::exit(if success { 0 } else { 1 }),
-        Err(e) => cmd.error(ErrorKind::InvalidValue, format!("{}", e)).exit(),
+        Err(e) => cmd.error(ErrorKind::InvalidValue, format!("{e}")).exit(),
     }
 }

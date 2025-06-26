@@ -91,8 +91,8 @@ pub fn compile(
 pub fn generate_syntax_tree(source: &str) -> Vec<String> {
     use std::io::BufWriter;
 
-    use codespan_reporting::term::termcolor::NoColor;
     use codespan_reporting::term::Config;
+    use codespan_reporting::term::termcolor::NoColor;
 
     let mut diags = vec![];
     let cst = Parser::parse(source, &mut diags);

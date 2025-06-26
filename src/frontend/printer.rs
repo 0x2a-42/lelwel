@@ -162,15 +162,15 @@ impl DebugPrinter {
         let first = &sema
             .first_sets
             .get(&regex.syntax())
-            .map_or("{}".to_string(), |set| format!("{:?}", set));
+            .map_or("{}".to_string(), |set| format!("{set:?}"));
         let follow = &sema
             .follow_sets
             .get(&regex.syntax())
-            .map_or("{}".to_string(), |set| format!("{:?}", set));
+            .map_or("{}".to_string(), |set| format!("{set:?}"));
         let recovery = &sema
             .recovery_sets
             .get(&regex.syntax())
-            .map_or("{}".to_string(), |set| format!("{:?}", set));
+            .map_or("{}".to_string(), |set| format!("{set:?}"));
         match regex {
             Regex::OrderedChoice(choice) => {
                 println!(
