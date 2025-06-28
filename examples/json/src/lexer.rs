@@ -118,7 +118,7 @@ fn check_string(value: &str, span: &Span, diags: &mut Vec<Diagnostic>) {
             c => {
                 diags.push(
                     Diagnostic::error()
-                        .with_message(format!("string contains invalid character {:?}", c))
+                        .with_message(format!("string contains invalid character {c:?}"))
                         .with_labels(vec![Label::primary((), span.start + i..span.start + i + 1)
                             .with_message("after this character")]),
                 );

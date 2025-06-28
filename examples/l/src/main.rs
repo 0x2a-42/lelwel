@@ -16,6 +16,7 @@ fn main() -> std::io::Result<()> {
     let mut diags = vec![];
     let cst = Parser::parse(&source, &mut diags);
     println!("{cst}");
+
     let writer = StandardStream::stderr(ColorChoice::Auto);
     let config = Config::default();
     let file = SimpleFile::new(&args[1], &source);

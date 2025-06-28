@@ -23,8 +23,7 @@ impl LexerError {
 }
 
 fn lex_line_comment(lexer: &mut Lexer<'_, Token>) -> Result<(), LexerError> {
-    let mut it = lexer.remainder().chars();
-    while let Some(c) = it.next() {
+    for c in lexer.remainder().chars() {
         match c {
             '\n' => {
                 lexer.bump(1);
@@ -35,7 +34,7 @@ fn lex_line_comment(lexer: &mut Lexer<'_, Token>) -> Result<(), LexerError> {
             }
         }
     }
-    return Ok(());
+    Ok(())
 }
 fn lex_block_comment(lexer: &mut Lexer<'_, Token>) -> Result<(), LexerError> {
     let mut it = lexer.remainder().chars();

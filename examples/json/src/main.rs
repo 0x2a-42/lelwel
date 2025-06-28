@@ -13,12 +13,13 @@ fn main() -> std::io::Result<()> {
         std::process::exit(1);
     }
 
-    let writer = StandardStream::stderr(ColorChoice::Auto);
-    let config = Config::default();
     let source = std::fs::read_to_string(&args[1])?;
     let mut diags = vec![];
     let cst = Parser::parse(&source, &mut diags);
     println!("{cst}");
+
+    let writer = StandardStream::stderr(ColorChoice::Auto);
+    let config = Config::default();
     let file = SimpleFile::new(&args[1], &source);
     for diag in diags.iter() {
         term::emit(&mut writer.lock(), &config, &file, diag).unwrap();

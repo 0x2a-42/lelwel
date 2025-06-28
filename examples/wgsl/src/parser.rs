@@ -1,4 +1,4 @@
-use super::lexer::{tokenize, Token};
+use super::lexer::{Token, tokenize};
 use codespan_reporting::diagnostic::Label;
 use std::collections::HashSet;
 
@@ -51,10 +51,9 @@ impl Parser<'_> {
             return;
         }
         let mut nesting_depth = 0usize;
-        let mut it = self.tokens[self.pos..].iter().enumerate();
         let mut pending = vec![];
         let mut last_lt_offset = 0;
-        while let Some((offset, tok)) = it.next() {
+        for (offset, tok) in self.tokens[self.pos..].iter().enumerate() {
             match tok {
                 Token::LPar | Token::LBrak => nesting_depth += 1,
                 Token::RPar | Token::RBrak => {

@@ -1,5 +1,5 @@
 use crate::ast::{AstNode, Exp};
-use crate::lexer::{tokenize, Token};
+use crate::lexer::{Token, tokenize};
 use codespan_reporting::diagnostic::Label;
 
 pub type Diagnostic = codespan_reporting::diagnostic::Diagnostic<()>;
@@ -71,7 +71,7 @@ impl ParserCallbacks for Parser<'_> {
                 if *value != "const" && *value != "close" {
                     diags.push(
                         Diagnostic::error()
-                            .with_message(format!("unexpected attribute name: '{}'", value))
+                            .with_message(format!("unexpected attribute name: '{value}'"))
                             .with_labels(vec![codespan_reporting::diagnostic::Label::primary(
                                 (),
                                 span.clone(),

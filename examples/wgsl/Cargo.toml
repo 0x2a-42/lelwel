@@ -3,7 +3,7 @@ name = "lelwel-wgsl"
 version = "0.0.0"
 readme = "README.md"
 license = "MIT OR Apache-2.0"
-edition = "2021"
+edition = "2024"
 
 [lib]
 crate-type = ["lib", "cdylib"]

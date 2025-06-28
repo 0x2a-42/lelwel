@@ -98,8 +98,10 @@ impl InitDeclaratorList {
     pub fn init_declarators<'a>(
         &self,
         cst: &'a Cst,
-    ) -> std::iter::FilterMap<CstChildren<'a>, impl FnMut(NodeRef) -> Option<InitDeclarator> + 'a>
-    {
+    ) -> std::iter::FilterMap<
+        CstChildren<'a>,
+        impl FnMut(NodeRef) -> Option<InitDeclarator> + 'a + use<'a>,
+    > {
         cst.children(self.syntax)
             .filter_map(|c| InitDeclarator::cast(cst, c))
     }

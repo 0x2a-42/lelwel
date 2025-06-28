@@ -225,9 +225,9 @@ arg_list: '(' [expr (?1 ',' expr)* [',']] ')';
        let cst = Parser::parse(&source, &mut diags);
        println!("{cst}");
 
-       let file = SimpleFile::new(&args[1], &source);
        let writer = StandardStream::stderr(ColorChoice::Auto);
        let config = Config::default();
+       let file = SimpleFile::new(&args[1], &source);
        for diag in diags.iter() {
            term::emit(&mut writer.lock(), &config, &file, diag).unwrap();
        }

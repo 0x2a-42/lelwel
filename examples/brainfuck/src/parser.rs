@@ -1,4 +1,4 @@
-use super::lexer::{tokenize, Token};
+use super::lexer::{Token, tokenize};
 use codespan_reporting::diagnostic::Label;
 
 pub type Diagnostic = codespan_reporting::diagnostic::Diagnostic<()>;
