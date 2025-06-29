@@ -14,7 +14,7 @@ impl LexerError {
         match self {
             Self::Invalid => Diagnostic::error()
                 .with_message("invalid token")
-                .with_labels(vec![Label::primary((), span)]),
+                .with_label(Label::primary((), span)),
         }
     }
 }

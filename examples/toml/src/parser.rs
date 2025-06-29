@@ -26,7 +26,7 @@ impl<'a> ParserCallbacks for Parser<'a> {
     fn create_diagnostic(&self, span: Span, message: String) -> Diagnostic {
         Diagnostic::error()
             .with_message(message)
-            .with_labels(vec![Label::primary((), span)])
+            .with_label(Label::primary((), span))
     }
     fn predicate_table_1(&self) -> bool {
         // don't skip whitespaces
@@ -48,7 +48,7 @@ impl<'a> ParserCallbacks for Parser<'a> {
             return Some(
                 Diagnostic::error()
                     .with_message("invalid syntax, expected: ']]'")
-                    .with_labels(vec![Label::primary((), self.span())]),
+                    .with_label(Label::primary((), self.span())),
             );
         }
         None

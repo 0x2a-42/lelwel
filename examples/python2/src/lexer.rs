@@ -15,13 +15,13 @@ impl LexerError {
         match self {
             Self::Invalid => Diagnostic::error()
                 .with_message("invalid token")
-                .with_labels(vec![Label::primary((), span)]),
+                .with_label(Label::primary((), span)),
             Self::UnterminatedString => Diagnostic::error()
                 .with_message("unterminated string")
-                .with_labels(vec![Label::primary((), span)]),
+                .with_label(Label::primary((), span)),
             Self::Indent => Diagnostic::error()
                 .with_message("unindent does not match any outer indentation level")
-                .with_labels(vec![Label::primary((), span)]),
+                .with_label(Label::primary((), span)),
         }
     }
 }

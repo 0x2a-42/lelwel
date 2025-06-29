@@ -18,7 +18,7 @@ impl ParserCallbacks for Parser<'_> {
     fn create_diagnostic(&self, span: Span, message: String) -> Diagnostic {
         Diagnostic::error()
             .with_message(message)
-            .with_labels(vec![Label::primary((), span)])
+            .with_label(Label::primary((), span))
     }
 
     fn create_node_expstat(&mut self, node: NodeRef, diags: &mut Vec<Diagnostic>) {
@@ -30,11 +30,8 @@ impl ParserCallbacks for Parser<'_> {
                         diags.push(
                             Diagnostic::error()
                                 .with_message("unexpected expression kind")
-                                .with_labels(vec![codespan_reporting::diagnostic::Label::primary(
-                                    (),
-                                    self.cst.span(c),
-                                )])
-                                .with_notes(vec!["note: expected call expression".to_string()]),
+                                .with_label(Label::primary((), self.cst.span(c)))
+                                .with_note("note: expected call expression"),
                         );
                     }
                 }
@@ -50,13 +47,8 @@ impl ParserCallbacks for Parser<'_> {
                         diags.push(
                             Diagnostic::error()
                                 .with_message("unexpected expression kind")
-                                .with_labels(vec![codespan_reporting::diagnostic::Label::primary(
-                                    (),
-                                    self.cst.span(c),
-                                )])
-                                .with_notes(vec![
-                                    "note: expected name, index, or field expression".to_string(),
-                                ]),
+                                .with_label(Label::primary((), self.cst.span(c)))
+                                .with_note("note: expected name, index, or field expression"),
                         );
                     }
                 }
@@ -72,11 +64,8 @@ impl ParserCallbacks for Parser<'_> {
                     diags.push(
                         Diagnostic::error()
                             .with_message(format!("unexpected attribute name: '{value}'"))
-                            .with_labels(vec![codespan_reporting::diagnostic::Label::primary(
-                                (),
-                                span.clone(),
-                            )])
-                            .with_notes(vec!["note: expected 'const' or 'close'".to_string()]),
+                            .with_label(Label::primary((), span.clone()))
+                            .with_note("note: expected 'const' or 'close'"),
                     );
                 }
             });

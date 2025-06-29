@@ -14,10 +14,10 @@ impl LexerError {
         match self {
             Self::Invalid => Diagnostic::error()
                 .with_message("invalid token")
-                .with_labels(vec![Label::primary((), span)]),
+                .with_label(Label::primary((), span)),
             Self::UnterminatedString => Diagnostic::error()
                 .with_message("unterminated string")
-                .with_labels(vec![Label::primary((), span)]),
+                .with_label(Label::primary((), span)),
         }
     }
 }
@@ -93,10 +93,10 @@ fn check_string(value: &str, span: &Span, diags: &mut Vec<Diagnostic>) {
                             diags.push(
                                 Diagnostic::error()
                                     .with_message("invalid unicode escape sequence")
-                                    .with_labels(vec![Label::primary(
+                                    .with_label(Label::primary(
                                         (),
                                         span.start + i - 1..span.start + i + j + 1,
-                                    )]),
+                                    )),
                             );
                             break;
                         }
@@ -106,10 +106,7 @@ fn check_string(value: &str, span: &Span, diags: &mut Vec<Diagnostic>) {
                     diags.push(
                         Diagnostic::error()
                             .with_message("invalid escape sequence")
-                            .with_labels(vec![Label::primary(
-                                (),
-                                span.start + j - 1..span.start + j + 1,
-                            )]),
+                            .with_label(Label::primary((), span.start + j - 1..span.start + j + 1)),
                     );
                 }
                 _ => unreachable!(),
@@ -119,8 +116,10 @@ fn check_string(value: &str, span: &Span, diags: &mut Vec<Diagnostic>) {
                 diags.push(
                     Diagnostic::error()
                         .with_message(format!("string contains invalid character {c:?}"))
-                        .with_labels(vec![Label::primary((), span.start + i..span.start + i + 1)
-                            .with_message("after this character")]),
+                        .with_label(
+                            Label::primary((), span.start + i..span.start + i + 1)
+                                .with_message("after this character"),
+                        ),
                 );
             }
         }
@@ -152,7 +151,7 @@ pub fn tokenize(source: &str, diags: &mut Vec<Diagnostic>) -> (Vec<Token>, Vec<S
                     diags.push(
                         Diagnostic::error()
                             .with_message("bracket nesting level exceeded maximum of 256")
-                            .with_labels(vec![Label::primary((), span)]),
+                            .with_label(Label::primary((), span)),
                     );
                     break;
                 }

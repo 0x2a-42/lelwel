@@ -16,16 +16,16 @@ impl LexerError {
         match self {
             Self::Invalid => Diagnostic::error()
                 .with_message("invalid token")
-                .with_labels(vec![Label::primary((), span)]),
+                .with_label(Label::primary((), span)),
             LexerError::UnterminatedString => Diagnostic::error()
                 .with_message("unterminated string literal")
-                .with_labels(vec![Label::primary((), span)]),
+                .with_label(Label::primary((), span)),
             LexerError::UnterminatedChar => Diagnostic::error()
                 .with_message("unterminated character constant")
-                .with_labels(vec![Label::primary((), span)]),
+                .with_label(Label::primary((), span)),
             LexerError::UnterminatedComment => Diagnostic::error()
                 .with_message("unterminated comment")
-                .with_labels(vec![Label::primary((), span)]),
+                .with_label(Label::primary((), span)),
         }
     }
 }
@@ -396,7 +396,7 @@ pub fn tokenize(source: &str, diags: &mut Vec<Diagnostic>) -> (Vec<Token>, Vec<S
                     diags.push(
                         Diagnostic::error()
                             .with_message("bracket nesting level exceeded maximum of 256")
-                            .with_labels(vec![Label::primary((), span)]),
+                            .with_label(Label::primary((), span)),
                     );
                     break;
                 }

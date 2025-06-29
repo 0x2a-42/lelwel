@@ -13,7 +13,7 @@ impl LexerError {
         match self {
             Self::Invalid => Diagnostic::error()
                 .with_message("invalid token")
-                .with_labels(vec![Label::primary((), span)]),
+                .with_label(Label::primary((), span)),
         }
     }
 }
@@ -62,7 +62,7 @@ pub fn tokenize(source: &str, diags: &mut Vec<Diagnostic>) -> (Vec<Token>, Vec<S
                             diags.push(
                                 Diagnostic::error()
                                     .with_message("unmatched closing bracket ']'")
-                                    .with_labels(vec![Label::primary((), span.clone())]),
+                                    .with_label(Label::primary((), span.clone())),
                             );
                         }
                     }
@@ -83,7 +83,7 @@ pub fn tokenize(source: &str, diags: &mut Vec<Diagnostic>) -> (Vec<Token>, Vec<S
         diags.push(
             Diagnostic::error()
                 .with_message("unclosed bracket '['")
-                .with_labels(vec![Label::primary((), unclosed_span)]),
+                .with_label(Label::primary((), unclosed_span)),
         );
     }
 

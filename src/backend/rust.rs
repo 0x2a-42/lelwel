@@ -138,7 +138,7 @@ impl RustOutput {
             \n    fn create_diagnostic(&self, span: Span, message: String) -> Diagnostic {\
             \n        Diagnostic::error()\
             \n            .with_message(message)\
-            \n            .with_labels(vec![Label::primary((), span)])\
+            \n            .with_label(Label::primary((), span))\
             \n    }\n"
         })?;
         if is_trait {

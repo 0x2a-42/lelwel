@@ -78,7 +78,7 @@ impl Parser<'_> {
                     .with_message(
                         "type specifier missing, ISO C99 and later do not support implicit int",
                     )
-                    .with_labels(vec![Label::primary((), span)]),
+                    .with_label(Label::primary((), span)),
             );
         }
     }
@@ -150,7 +150,7 @@ impl ParserCallbacks for Parser<'_> {
     fn create_diagnostic(&self, span: Span, message: String) -> Diagnostic {
         Diagnostic::error()
             .with_message(message)
-            .with_labels(vec![Label::primary((), span)])
+            .with_label(Label::primary((), span))
     }
 
     fn create_node_declaration(&mut self, node: NodeRef, diags: &mut Vec<Diagnostic>) {
@@ -190,7 +190,7 @@ impl ParserCallbacks for Parser<'_> {
                         diags.push(
                             Diagnostic::error()
                                 .with_message("redeclaration as different kind of symbol")
-                                .with_labels(vec![Label::primary((), name_span)]),
+                                .with_label(Label::primary((), name_span)),
                         );
                     }
                 }
@@ -216,7 +216,7 @@ impl ParserCallbacks for Parser<'_> {
                     diags.push(
                         Diagnostic::error()
                             .with_message("redeclaration as different kind of symbol")
-                            .with_labels(vec![Label::primary((), name_span)]),
+                            .with_label(Label::primary((), name_span)),
                     );
                 }
             }
@@ -477,7 +477,7 @@ impl ParserCallbacks for Parser<'_> {
             diags.push(
                 Diagnostic::error()
                     .with_message("typedef not allowed in this scope")
-                    .with_labels(vec![Label::primary((), self.span())]),
+                    .with_label(Label::primary((), self.span())),
             );
             return;
         }
@@ -517,7 +517,7 @@ impl ParserCallbacks for Parser<'_> {
                 diags.push(
                     Diagnostic::error()
                         .with_message("typedef in function definition")
-                        .with_labels(vec![Label::primary((), typedef_span.clone())]),
+                        .with_label(Label::primary((), typedef_span.clone())),
                 );
                 self.context
                     .scopes
