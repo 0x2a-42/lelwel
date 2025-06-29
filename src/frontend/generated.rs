@@ -140,6 +140,7 @@ struct MarkTruncation {
 }
 
 /// An iterator for child nodes of a CST node.
+#[derive(Default)]
 pub struct CstChildren<'a> {
     iter: std::slice::Iter<'a, Node>,
     offset: usize,
