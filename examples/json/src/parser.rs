@@ -1,6 +1,6 @@
 use codespan_reporting::diagnostic::Label;
 
-use crate::lexer::{tokenize, Token};
+use crate::lexer::{Token, tokenize};
 
 pub type Diagnostic = codespan_reporting::diagnostic::Diagnostic<()>;
 
