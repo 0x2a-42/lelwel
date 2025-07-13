@@ -264,7 +264,7 @@ impl<'a> Cst<'a> {
         self.non_skip_len = mark.non_skip_len;
     }
     /// Returns an iterator over the children of the node referenced by `node_ref`.
-    pub fn children(&self, node_ref: NodeRef) -> CstChildren {
+    pub fn children(&self, node_ref: NodeRef) -> CstChildren<'_> {
         let iter = if let Node::Rule(_, end_offset) = self.nodes[node_ref.0] {
             self.nodes[node_ref.0 + 1..node_ref.0 + usize::from(end_offset) + 1].iter()
         } else {
@@ -326,7 +326,7 @@ impl std::fmt::Display for Cst<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         const DEPTH: &str = "    ";
         fn rec(
-            cst: &Cst,
+            cst: &Cst<'_>,
             f: &mut std::fmt::Formatter<'_>,
             node_ref: NodeRef,
             indent: usize,
@@ -1060,7 +1060,7 @@ impl<'a> Parser<'a> {
     }
     #[allow(unused_assignments)]
     fn rule_postfix(&mut self, diags: &mut Vec<Diagnostic>) {
-        fn rec(parser: &mut Parser, diags: &mut Vec<Diagnostic>, mut lhs: MarkClosed) {
+        fn rec(parser: &mut Parser<'_>, diags: &mut Vec<Diagnostic>, mut lhs: MarkClosed) {
             let mut node_kind = Rule::Postfix;
             match parser.current {
                 Token::LPar => {

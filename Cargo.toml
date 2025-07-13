@@ -9,6 +9,9 @@ edition = "2024"
 keywords = ["parser", "generator", "LL", "grammar"]
 categories = ["parsing"]
 
+[lints.rust]
+rust-2018-idioms = { level = "deny" }
+
 [dependencies]
 logos = "0.15"
 codespan-reporting = "0.11"
