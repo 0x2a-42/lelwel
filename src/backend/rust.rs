@@ -1234,9 +1234,14 @@ impl RustOutput {
             }
             Regex::Return(_) => {
                 output.write_all(
-                    format!("if {parser_name}.active_error() {{\n    return;\n}}\n")
-                        .indent(level)
-                        .as_bytes(),
+                    format!(
+                        "if {parser_name}.active_error() {{\
+                       \n    return{};\
+                       \n}}\n",
+                        if in_choice { " None" } else { "" }
+                    )
+                    .indent(level)
+                    .as_bytes(),
                 )?;
             }
             Regex::Predicate(_) => {}
