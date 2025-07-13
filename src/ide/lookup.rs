@@ -9,13 +9,13 @@ fn contains(span: &Span, pos: usize) -> bool {
     span.start <= pos && pos < span.end
 }
 
-pub fn lookup_rule_node(cst: &Cst, node: NodeRef, pos: usize) -> Option<NodeRef> {
+pub fn lookup_rule_node(cst: &Cst<'_>, node: NodeRef, pos: usize) -> Option<NodeRef> {
     cst.children(node)
         .filter(|node| matches!(cst.get(*node), Node::Rule(..)))
         .find(|node| contains(&cst.span(*node), pos))
         .and_then(|node| lookup_rule_node(cst, node, pos).or(Some(node)))
 }
-pub fn inside_comment(cst: &Cst, node: NodeRef, pos: usize) -> bool {
+pub fn inside_comment(cst: &Cst<'_>, node: NodeRef, pos: usize) -> bool {
     cst.children(node)
         .filter(|node| {
             matches!(
@@ -26,7 +26,7 @@ pub fn inside_comment(cst: &Cst, node: NodeRef, pos: usize) -> bool {
         .any(|node| contains(&cst.span(node), pos))
 }
 pub fn find_node<P: Fn(Rule) -> bool>(
-    cst: &Cst,
+    cst: &Cst<'_>,
     node: NodeRef,
     pos: usize,
     pred: P,
@@ -44,8 +44,8 @@ pub fn find_node<P: Fn(Rule) -> bool>(
 }
 
 pub fn lookup_definition(
-    cst: &Cst,
-    sema: &SemanticData,
+    cst: &Cst<'_>,
+    sema: &SemanticData<'_>,
     pos: usize,
     uri: &Url,
     file: &SimpleFile<&str, &str>,
@@ -66,8 +66,8 @@ pub fn lookup_definition(
 }
 
 pub fn lookup_references(
-    cst: &Cst,
-    sema: &SemanticData,
+    cst: &Cst<'_>,
+    sema: &SemanticData<'_>,
     pos: usize,
     with_def: bool,
 ) -> Vec<NodeRef> {
