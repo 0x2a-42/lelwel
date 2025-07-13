@@ -282,7 +282,11 @@ fn inside_decl(cst: &Cst<'_>, node: NodeRef, pos: usize) -> bool {
         .is_none_or(|(_, range)| pos < range.end)
 }
 
-pub fn completion(cst: &Cst<'_>, pos: usize, sema: &SemanticData<'_>) -> Option<CompletionResponse> {
+pub fn completion(
+    cst: &Cst<'_>,
+    pos: usize,
+    sema: &SemanticData<'_>,
+) -> Option<CompletionResponse> {
     let mut items = vec![];
 
     let file = File::cast(cst, NodeRef::ROOT)?;
