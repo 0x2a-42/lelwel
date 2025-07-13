@@ -79,7 +79,8 @@ ast_node!(
         NodeElision,
         NodeMarker,
         NodeCreation,
-        Commit
+        Commit,
+        Return
     )
 );
 ast_node!(OrderedChoice);
@@ -99,6 +100,7 @@ ast_node!(NodeElision);
 ast_node!(NodeMarker);
 ast_node!(NodeCreation);
 ast_node!(Commit);
+ast_node!(Return);
 
 impl Cst<'_> {
     fn child_node<T: AstNode>(&self, syntax: NodeRef) -> Option<T> {

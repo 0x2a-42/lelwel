@@ -60,6 +60,7 @@ pub enum Rule {
     Postfix,
     Predicate,
     Regex,
+    Return,
     RightDecl,
     RuleDecl,
     SkipDecl,
@@ -379,6 +380,7 @@ impl std::fmt::Debug for Rule {
             Rule::Postfix => write!(f, "postfix"),
             Rule::Predicate => write!(f, "predicate"),
             Rule::Regex => write!(f, "regex"),
+            Rule::Return => write!(f, "return"),
             Rule::RightDecl => write!(f, "right_decl"),
             Rule::RuleDecl => write!(f, "rule_decl"),
             Rule::SkipDecl => write!(f, "skip_decl"),
@@ -435,8 +437,11 @@ pub struct Parser<'a> {
 }
 #[allow(clippy::while_let_loop, dead_code, unused_parens)]
 impl<'a> Parser<'a> {
+    fn active_error(&self) -> bool {
+        self.error_cooldown || self.last_error_span == self.span()
+    }
     fn error(&mut self, diags: &mut Vec<Diagnostic>, diag: Diagnostic) {
-        if self.error_cooldown || self.last_error_span == self.span() {
+        if self.active_error() {
             return;
         }
         self.last_error_span = self.span();
@@ -575,6 +580,7 @@ impl<'a> Parser<'a> {
             Rule::Postfix => self.create_node_postfix(node_ref, diags),
             Rule::Predicate => self.create_node_predicate(node_ref, diags),
             Rule::Regex => self.create_node_regex(node_ref, diags),
+            Rule::Return => self.create_node_return(node_ref, diags),
             Rule::RightDecl => self.create_node_right_decl(node_ref, diags),
             Rule::RuleDecl => self.create_node_rule_decl(node_ref, diags),
             Rule::SkipDecl => self.create_node_skip_decl(node_ref, diags),
@@ -838,6 +844,7 @@ impl<'a> Parser<'a> {
         expect!(Colon, ":", self, diags);
         match self.current {
             Token::Action
+            | Token::And
             | Token::Assertion
             | Token::Hat
             | Token::Id
@@ -858,6 +865,7 @@ impl<'a> Parser<'a> {
                     err![
                         self,
                         "<semantic action>",
+                        "&",
                         "<semantic assertion>",
                         "^",
                         "<identifier>",
@@ -961,6 +969,7 @@ impl<'a> Parser<'a> {
         self.rule_postfix(diags);
         match self.current {
             Token::Action
+            | Token::And
             | Token::Assertion
             | Token::Hat
             | Token::Id
@@ -976,6 +985,7 @@ impl<'a> Parser<'a> {
                 loop {
                     match self.current {
                         Token::Action
+                        | Token::And
                         | Token::Assertion
                         | Token::Hat
                         | Token::Id
@@ -1005,6 +1015,7 @@ impl<'a> Parser<'a> {
                                 err![
                                     self,
                                     "<semantic action>",
+                                    "&",
                                     "<semantic assertion>",
                                     "^",
                                     "<identifier>",
@@ -1037,6 +1048,7 @@ impl<'a> Parser<'a> {
                     err![
                         self,
                         "<semantic action>",
+                        "&",
                         "<semantic assertion>",
                         "^",
                         "<identifier>",
@@ -1151,12 +1163,20 @@ impl<'a> Parser<'a> {
                     let closed = parser.cst.close(m, node_kind);
                     parser.create_node(node_kind, NodeRef(closed.0), diags);
                 }
+                Token::And => {
+                    let m = parser.cst.open();
+                    expect!(And, "&", parser, diags);
+                    node_kind = Rule::Return;
+                    let closed = parser.cst.close(m, node_kind);
+                    parser.create_node(node_kind, NodeRef(closed.0), diags);
+                }
                 _ => {
                     parser.error(
                         diags,
                         err![
                             parser,
                             "<semantic action>",
+                            "&",
                             "<semantic assertion>",
                             "^",
                             "<identifier>",
@@ -1255,6 +1275,8 @@ trait ParserCallbacks {
     fn create_node_predicate(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
     /// Called when `regex` node is created.
     fn create_node_regex(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+    /// Called when `return` node is created.
+    fn create_node_return(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
     /// Called when `right_decl` node is created.
     fn create_node_right_decl(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
     /// Called when `rule_decl` node is created.

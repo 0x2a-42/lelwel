@@ -106,6 +106,8 @@ pub enum Token {
     Hat,
     #[token("~")]
     Tilde,
+    #[token("&")]
+    And,
     #[token("/")]
     Slash,
     #[regex("[a-zA-Z][a-zA-Z_0-9]*")]

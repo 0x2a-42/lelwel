@@ -1232,6 +1232,13 @@ impl RustOutput {
                         .as_bytes(),
                 )?;
             }
+            Regex::Return(_) => {
+                output.write_all(
+                    format!("if {parser_name}.active_error() {{\n    return;\n}}\n")
+                        .indent(level)
+                        .as_bytes(),
+                )?;
+            }
             Regex::Predicate(_) => {}
         }
         Ok(())

@@ -369,6 +369,15 @@ impl DebugPrinter {
                     syntax!(commit.syntax().0),
                 );
             }
+            Regex::Return(commit) => {
+                println!(
+                    "Return {} {} {} {}",
+                    set!(first),
+                    set!(follow),
+                    pos!(commit.span(cst)),
+                    syntax!(commit.syntax().0),
+                );
+            }
         }
     }
 }

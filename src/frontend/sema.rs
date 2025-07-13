@@ -508,6 +508,7 @@ impl<'a> GeneralCheck<'a> {
                 RuleNodeElision::None
             }
             Regex::Commit(_) => RuleNodeElision::None,
+            Regex::Return(_) => RuleNodeElision::None,
         };
         sema.elision.insert(regex.syntax(), elision);
         elision
@@ -704,7 +705,8 @@ impl<'a> GeneralCheck<'a> {
             | Regex::Assertion(_)
             | Regex::NodeRename(_)
             | Regex::NodeElision(_)
-            | Regex::Commit(_) => {}
+            | Regex::Commit(_)
+            | Regex::Return(_) => {}
         };
     }
 }
@@ -810,7 +812,8 @@ impl<'a> OrderedChoiceValidator {
             | Regex::NodeElision(_)
             | Regex::NodeMarker(_)
             | Regex::NodeCreation(_)
-            | Regex::Commit(_) => {}
+            | Regex::Commit(_)
+            | Regex::Return(_) => {}
         };
     }
     fn check_containment(
@@ -875,7 +878,8 @@ impl<'a> OrderedChoiceValidator {
             | Regex::NodeRename(_)
             | Regex::NodeElision(_)
             | Regex::NodeMarker(_)
-            | Regex::NodeCreation(_) => {}
+            | Regex::NodeCreation(_)
+            | Regex::Return(_) => {}
         };
     }
 }
@@ -1040,7 +1044,8 @@ impl<'a> LL1Validator {
             | Regex::NodeElision(_)
             | Regex::NodeMarker(_)
             | Regex::NodeCreation(_)
-            | Regex::Commit(_) => {
+            | Regex::Commit(_)
+            | Regex::Return(_) => {
                 entry.insert(TokenName("ɛ"));
             }
         };
@@ -1188,7 +1193,8 @@ impl<'a> LL1Validator {
             | Regex::NodeElision(_)
             | Regex::NodeMarker(_)
             | Regex::NodeCreation(_)
-            | Regex::Commit(_) => {}
+            | Regex::Commit(_)
+            | Regex::Return(_) => {}
         };
     }
 
@@ -1447,7 +1453,8 @@ impl<'a> LL1Validator {
             | Regex::NodeElision(_)
             | Regex::NodeMarker(_)
             | Regex::NodeCreation(_)
-            | Regex::Commit(_) => {}
+            | Regex::Commit(_)
+            | Regex::Return(_) => {}
         };
     }
 }
@@ -1535,7 +1542,8 @@ impl UsageValidator {
             | Regex::NodeElision(_)
             | Regex::NodeMarker(_)
             | Regex::NodeCreation(_)
-            | Regex::Commit(_) => {}
+            | Regex::Commit(_)
+            | Regex::Return(_) => {}
         }
     }
 }
@@ -1700,7 +1708,8 @@ impl RecoverySetGenerator {
             | Regex::NodeElision(_)
             | Regex::NodeMarker(_)
             | Regex::NodeCreation(_)
-            | Regex::Commit(_) => {}
+            | Regex::Commit(_)
+            | Regex::Return(_) => {}
         }
     }
 }
