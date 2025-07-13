@@ -114,9 +114,9 @@ fn token_name_symbol(name_or_symbol: &str) -> Option<(String, &str)> {
 }
 
 fn add_top_level_items(
-    cst: &Cst,
+    cst: &Cst<'_>,
     file: File,
-    sema: &SemanticData,
+    sema: &SemanticData<'_>,
     items: &mut Vec<CompletionItem>,
 ) {
     if file.start_decls(cst).count() == 0 {
@@ -156,7 +156,7 @@ fn add_top_level_items(
     }
 }
 
-fn add_token(sema: &SemanticData, items: &mut Vec<CompletionItem>) {
+fn add_token(sema: &SemanticData<'_>, items: &mut Vec<CompletionItem>) {
     for token_name_or_symbol in sema.undefined_tokens.iter() {
         if let Some((token_name, symbol_name)) = token_name_symbol(token_name_or_symbol) {
             items.push(CompletionItem {
@@ -175,9 +175,9 @@ fn add_token(sema: &SemanticData, items: &mut Vec<CompletionItem>) {
 }
 
 fn add_reference_items(
-    cst: &Cst,
+    cst: &Cst<'_>,
     file: File,
-    sema: &SemanticData,
+    sema: &SemanticData<'_>,
     items: &mut Vec<CompletionItem>,
     with_rules: bool,
     with_tokens: bool,
@@ -276,13 +276,17 @@ fn add_reference_items(
     }
 }
 
-fn inside_decl(cst: &Cst, node: NodeRef, pos: usize) -> bool {
+fn inside_decl(cst: &Cst<'_>, node: NodeRef, pos: usize) -> bool {
     cst.children(node)
         .find_map(|n| cst.match_token(n, Token::Semi))
         .is_none_or(|(_, range)| pos < range.end)
 }
 
-pub fn completion(cst: &Cst, pos: usize, sema: &SemanticData) -> Option<CompletionResponse> {
+pub fn completion(
+    cst: &Cst<'_>,
+    pos: usize,
+    sema: &SemanticData<'_>,
+) -> Option<CompletionResponse> {
     let mut items = vec![];
 
     let file = File::cast(cst, NodeRef::ROOT)?;

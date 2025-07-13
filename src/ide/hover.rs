@@ -5,7 +5,7 @@ use logos::Span;
 
 use super::lookup::*;
 
-pub fn hover(cst: &Cst, sema: &SemanticData, pos: usize) -> Option<(String, Span)> {
+pub fn hover(cst: &Cst<'_>, sema: &SemanticData<'_>, pos: usize) -> Option<(String, Span)> {
     let node = lookup_rule_node(cst, NodeRef::ROOT, pos)?;
     let span = cst.span(node);
 

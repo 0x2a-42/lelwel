@@ -67,7 +67,7 @@ impl DebugPrinter {
         visit(self);
         self.active.pop();
     }
-    pub fn run(&mut self, cst: &Cst, sema: &SemanticData) {
+    pub fn run(&mut self, cst: &Cst<'_>, sema: &SemanticData<'_>) {
         if let Some(file) = File::cast(cst, NodeRef::ROOT) {
             println!("File {}", syntax!(file.syntax().0));
             self.branch(false, |s| {
@@ -107,7 +107,7 @@ impl DebugPrinter {
             });
         }
     }
-    fn print_token_decl(&mut self, cst: &Cst, decl: TokenDecl) {
+    fn print_token_decl(&mut self, cst: &Cst<'_>, decl: TokenDecl) {
         let name = decl.name(cst).map_or("", |(val, _)| val);
         let symbol = decl.symbol(cst).map_or("", |(val, _)| val);
         println!(
@@ -118,7 +118,7 @@ impl DebugPrinter {
             syntax!(decl.syntax().0),
         );
     }
-    fn print_rule_decl(&mut self, cst: &Cst, sema: &SemanticData, decl: RuleDecl) {
+    fn print_rule_decl(&mut self, cst: &Cst<'_>, sema: &SemanticData<'_>, decl: RuleDecl) {
         let name = decl.name(cst).map_or("", |(val, _)| val);
         println!(
             "Rule {} {} {}",
@@ -129,7 +129,7 @@ impl DebugPrinter {
         decl.regex(cst)
             .inspect(|r| self.branch(true, |s| s.print_regex(cst, sema, *r)));
     }
-    fn print_start_decl(&mut self, cst: &Cst, decl: StartDecl) {
+    fn print_start_decl(&mut self, cst: &Cst<'_>, decl: StartDecl) {
         let rule_name = decl.rule_name(cst).map_or("", |(val, _)| val);
         println!(
             "Start {} {} {}",
@@ -138,7 +138,7 @@ impl DebugPrinter {
             syntax!(decl.syntax().0),
         );
     }
-    fn print_right_decl(&mut self, cst: &Cst, decl: RightDecl) {
+    fn print_right_decl(&mut self, cst: &Cst<'_>, decl: RightDecl) {
         let mut token_names = vec![];
         decl.token_names(cst, |(val, _)| token_names.push(val));
         println!(
@@ -148,7 +148,7 @@ impl DebugPrinter {
             syntax!(decl.syntax().0),
         );
     }
-    fn print_skip_decl(&mut self, cst: &Cst, decl: SkipDecl) {
+    fn print_skip_decl(&mut self, cst: &Cst<'_>, decl: SkipDecl) {
         let mut token_names = vec![];
         decl.token_names(cst, |(val, _)| token_names.push(val));
         println!(
@@ -158,7 +158,7 @@ impl DebugPrinter {
             syntax!(decl.syntax().0),
         );
     }
-    fn print_regex(&mut self, cst: &Cst, sema: &SemanticData, regex: Regex) {
+    fn print_regex(&mut self, cst: &Cst<'_>, sema: &SemanticData<'_>, regex: Regex) {
         let first = &sema
             .first_sets
             .get(&regex.syntax())
