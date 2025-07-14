@@ -1249,11 +1249,11 @@ impl RustOutput {
                     }
                     RuleNodeElision::Conditional => {
                         output.write_all(
-                            "if !elide {{\
+                            "if !elide {\
                            \n    let m = self.cst.open_before(start);\
                            \n    let closed = self.cst.close(m, Rule::Error);\
                            \n    self.create_node_error(NodeRef(closed.0), diags);\
-                           \n}}\n"
+                           \n}\n"
                                 .indent(level + 1)
                                 .as_bytes(),
                         )?;
