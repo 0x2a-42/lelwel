@@ -1234,9 +1234,35 @@ impl RustOutput {
             }
             Regex::Return(_) => {
                 output.write_all(
+                    format!("if {parser_name}.active_error() {{\n")
+                        .indent(level)
+                        .as_bytes(),
+                )?;
+                match rule_elision {
+                    RuleNodeElision::None => {
+                        output.write_all(
+                            "let closed = self.cst.close(m, Rule::Error);\
+                           \nself.create_node_error(NodeRef(closed.0), diags);\n"
+                                .indent(level + 1)
+                                .as_bytes(),
+                        )?;
+                    }
+                    RuleNodeElision::Conditional => {
+                        output.write_all(
+                            "if !elide {{\
+                           \n    let m = self.cst.open_before(start);\
+                           \n    let closed = self.cst.close(m, Rule::Error);\
+                           \n    self.create_node_error(NodeRef(closed.0), diags);\
+                           \n}}\n"
+                                .indent(level + 1)
+                                .as_bytes(),
+                        )?;
+                    }
+                    RuleNodeElision::Unconditional => {}
+                }
+                output.write_all(
                     format!(
-                        "if {parser_name}.active_error() {{\
-                       \n    return{};\
+                        "    return{};\
                        \n}}\n",
                         if in_choice { " None" } else { "" }
                     )
