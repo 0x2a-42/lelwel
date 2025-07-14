@@ -206,10 +206,10 @@ impl<'a> GeneralCheck<'a> {
                 .for_each(|decl| self.check_right_decl(cst, decl, diags, sema));
             file.skip_decls(cst)
                 .for_each(|decl| self.check_skip_decl(cst, decl, diags, sema));
-            file.rule_decls(cst)
-                .for_each(|decl| self.check_rule_decl(cst, decl, diags, sema));
             file.start_decls(cst)
                 .for_each(|decl| self.check_start_decl(cst, decl, diags, sema));
+            file.rule_decls(cst)
+                .for_each(|decl| self.check_rule_decl(cst, decl, diags, sema));
         }
         if let Some(start) = sema.start {
             for (name, rule) in sema.decl_bindings.iter() {
@@ -508,7 +508,12 @@ impl<'a> GeneralCheck<'a> {
                 RuleNodeElision::None
             }
             Regex::Commit(_) => RuleNodeElision::None,
-            Regex::Return(_) => RuleNodeElision::None,
+            Regex::Return(regex) => {
+                if Some(rule) == sema.start {
+                    diags.push(Diagnostic::return_in_start_rule(&regex.span(cst)));
+                }
+                RuleNodeElision::None
+            }
         };
         sema.elision.insert(regex.syntax(), elision);
         elision
