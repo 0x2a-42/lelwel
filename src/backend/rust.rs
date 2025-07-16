@@ -1242,21 +1242,25 @@ impl RustOutput {
                 match rule_elision {
                     RuleNodeElision::None => {
                         output.write_all(
-                            "let closed = self.cst.close(m, Rule::Error);\
-                           \nself.create_node_error(NodeRef(closed.0), diags);\n"
-                                .indent(level + 1)
-                                .as_bytes(),
+                            format!(
+                                "let closed = {parser_name}.cst.close(m, Rule::Error);\
+                               \n{parser_name}.create_node_error(NodeRef(closed.0), diags);\n"
+                            )
+                            .indent(level + 1)
+                            .as_bytes(),
                         )?;
                     }
                     RuleNodeElision::Conditional => {
                         output.write_all(
-                            "if !elide {\
-                           \n    let m = self.cst.open_before(start);\
-                           \n    let closed = self.cst.close(m, Rule::Error);\
-                           \n    self.create_node_error(NodeRef(closed.0), diags);\
-                           \n}\n"
-                                .indent(level + 1)
-                                .as_bytes(),
+                            format!(
+                                "if !elide {{\
+                               \n    let m = {parser_name}.cst.open_before(start);\
+                               \n    let closed = {parser_name}.cst.close(m, Rule::Error);\
+                               \n    {parser_name}.create_node_error(NodeRef(closed.0), diags);\
+                               \n}}\n"
+                            )
+                            .indent(level + 1)
+                            .as_bytes(),
                         )?;
                     }
                     RuleNodeElision::Unconditional => {}
