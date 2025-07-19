@@ -10,6 +10,7 @@
 * [Error Resilience](#error-resilience)
 * [Grammar Examples](#grammar-examples)
 * [Quickstart](#quickstart)
+* [Error Recovery](#error-recovery)
 * [Grammar Specification](#grammar-specification)
 * [License](#license)
 
@@ -194,7 +195,7 @@ arg_list: '(' [expr (?1 ',' expr)* [',']] ')';
    codespan-reporting = "0.12"
 
    [build-dependencies]
-   lelwel = "0.8"
+   lelwel = "0.9"
    ```
    ```rust
    fn main() {
@@ -234,6 +235,20 @@ arg_list: '(' [expr (?1 ',' expr)* [',']] ')';
        Ok(())
    }
    ```
+
+## Error Recovery
+The lexer may emit an `Error` token which will always be skipped by the parser. This can be used for some kinds of lexical errors, where there is no other appropriate token.
+
+> [!TIP]
+> Usually it makes more sense to generate an error in the lexer and still emit a valid token for the parser.
+> For example you should still emit a string token if your string contains invalid escape sequences, as this will result in a better syntax tree.
+
+The parser tries to parse rules in their entirety. If the parser encounters an invalid token an error is reported via the `create_diagnostic` method of the `ParserCallbacks` trait. To avoid cascading errors there is an _active error state_ where no new errors are reported until the next valid token has been consumed.
+
+There are multiple possibilities for the parser to continue after an error, depending on the context in which it occurs.
+1. The parser skips the expected token in the grammar and tries to match the current input token with the next expected token.
+1. The parser skips the expected token in the grammar and advances to the next input token. The consumed token is put inside of an `error` node in the CST. This is used inside of loops (`*` or `+`) and alternations with predicates to ensure that the parser makes progress.
+1. If an error occurs inside of a loop and the token is in the recovery set, the loop breaks and parsing continues after the loop.
 
 ## Grammar Specification
 
@@ -324,18 +339,19 @@ Regular expressions are built from the following syntactic constructs.
 - **Symbol**: `'token symbol'`
 - **Concatenation**: `A B` which is `A` followed by `B`
 - **Alternation**: `A | B` which is either `A` or `B`
-- **Ordered Choice**: `A / B` which is `A` or else `B`
+- [**Ordered Choice**](#ordered-choice): `A / B` which is `A` or else `B`
 - **Optional**: `[A]` which is either `A` or nothing
 - **Star Repetition**: `A*` which is a repetition of 0 or more `A`
 - **Plus Repetition**: `A+` which is a repetition of 1 or more `A`
-- **Semantic Predicate**: `?1` which is the semantic predicate number 1
-- **Semantic Action**: `#1` which is the semantic action number 1
-- **Semantic Assertion**: `!1` which is the semantic assertion number 1
-- **Node Rename**: `@new_node_name` renames the rule syntax tree node
-- **Node Elision**: `^` prevents creation of the rule syntax tree node
-- **Node Marker**: `<1` marker with index 1 for a new node
-- **Node Creation**: `1>new_node_name` insert node at position of marker with index 1
-- **Commit**: `~` commits to a parse in an ordered choice
+- [**Semantic Predicate**](#semantic-actions-predicates-and-assertions): `?1` which is the semantic predicate number 1
+- [**Semantic Action**](#semantic-actions-predicates-and-assertions): `#1` which is the semantic action number 1
+- [**Semantic Assertion**](#semantic-actions-predicates-and-assertions): `!1` which is the semantic assertion number 1
+- [**Node Rename**](#node-rename): `@new_node_name` renames the rule syntax tree node
+- [**Node Elision**](#node-elision): `^` prevents creation of the rule syntax tree node
+- [**Node Marker**](#node-marker-and-creation): `<1` marker with index 1 for a new node
+- [**Node Creation**](#node-marker-and-creation): `1>new_node_name` insert node at position of marker with index 1
+- [**Commit**](#ordered-choice): `~` commits to a parse in an ordered choice
+- [**Return**](#return): `&` returns to the parent rule if there is an active error
 
 #### Ordered Choice
 The ordered choice operator `/` has a precedence between alternation and concatenation. Unlike in the PEG formalism, the operator is restricted, such that only one ordered choice can be active at a time.
@@ -566,6 +582,16 @@ A node creation with missing index is not allowed in left recursive rules.
 >   foo A > // ❌ error
 > | B >     // ❌ error
 > ;
+> ```
+
+#### Return
+The return operator `&` stops the parsing of a rule if the parser is in the [active error state](#error-recovery). Afterwards parsing continues in the parent rule and the consumed tokens are put inside an `error` node.
+
+The operator cannot be used in the start rule.
+
+> **Example**
+> ```antlr
+> block: '{' & stmts* '}'; // only parse a block if the opening brace exists
 > ```
 
 ## License
