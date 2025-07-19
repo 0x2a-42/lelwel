@@ -373,8 +373,11 @@ pub struct Parser<'a> {{
 }}
 #[allow(clippy::while_let_loop, dead_code, unused_parens)]
 impl<'a> Parser<'a> {{
+    fn active_error(&self) -> bool {{
+        self.error_cooldown || self.last_error_span == self.span()
+    }}
     fn error(&mut self, diags: &mut Vec<Diagnostic>, diag: Diagnostic) {{
-        if self.error_cooldown || self.last_error_span == self.span() {{
+        if self.active_error() {{
             return;
         }}
         self.last_error_span = self.span();

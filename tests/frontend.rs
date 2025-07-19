@@ -307,13 +307,23 @@ fn redundant_elision() {
 
 #[test]
 #[rustfmt::skip]
+fn return_start() {
+    let diags = gen_diags("tests/frontend/return_start.llw");
+    let mut lines = diags.lines();
+
+    assert_eq!(lines.next(), Some("tests/frontend/return_start.llw:3:4: error[E030]: return is not allowed in start rule"));
+    assert_eq!(lines.next(), None);
+}
+
+#[test]
+#[rustfmt::skip]
 fn syntax_error() {
     let diags = gen_diags("tests/frontend/syntax_error.llw");
     let mut lines = diags.lines();
 
     assert_eq!(lines.next(), Some("tests/frontend/syntax_error.llw:2:1: error: invalid syntax, expected one of: '=', <identifier>, ';'"));
     assert_eq!(lines.next(), Some("tests/frontend/syntax_error.llw:8:1: error: invalid syntax, expected: ')'"));
-    assert_eq!(lines.next(), Some("tests/frontend/syntax_error.llw:13:2: error: invalid syntax, expected one of: <semantic action>, <semantic assertion>, '^', <identifier>, '[', '(', <node creation>, <node marker>, <node rename>, '|', <semantic predicate>, ']', ')', ';', '/', <string literal>, '~'"));
+    assert_eq!(lines.next(), Some("tests/frontend/syntax_error.llw:13:2: error: invalid syntax, expected one of: <semantic action>, '&', <semantic assertion>, '^', <identifier>, '[', '(', <node creation>, <node marker>, <node rename>, '|', <semantic predicate>, ']', ')', ';', '/', <string literal>, '~'"));
     assert_eq!(lines.next(), Some("tests/frontend/syntax_error.llw:13:1: error[E003]: use of undefined rule `b`"));
     assert_eq!(lines.next(), None);
 }

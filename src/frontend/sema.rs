@@ -206,10 +206,10 @@ impl<'a> GeneralCheck<'a> {
                 .for_each(|decl| self.check_right_decl(cst, decl, diags, sema));
             file.skip_decls(cst)
                 .for_each(|decl| self.check_skip_decl(cst, decl, diags, sema));
-            file.rule_decls(cst)
-                .for_each(|decl| self.check_rule_decl(cst, decl, diags, sema));
             file.start_decls(cst)
                 .for_each(|decl| self.check_start_decl(cst, decl, diags, sema));
+            file.rule_decls(cst)
+                .for_each(|decl| self.check_rule_decl(cst, decl, diags, sema));
         }
         if let Some(start) = sema.start {
             for (name, rule) in sema.decl_bindings.iter() {
@@ -508,6 +508,12 @@ impl<'a> GeneralCheck<'a> {
                 RuleNodeElision::None
             }
             Regex::Commit(_) => RuleNodeElision::None,
+            Regex::Return(regex) => {
+                if Some(rule) == sema.start {
+                    diags.push(Diagnostic::return_in_start_rule(&regex.span(cst)));
+                }
+                RuleNodeElision::None
+            }
         };
         sema.elision.insert(regex.syntax(), elision);
         elision
@@ -704,7 +710,8 @@ impl<'a> GeneralCheck<'a> {
             | Regex::Assertion(_)
             | Regex::NodeRename(_)
             | Regex::NodeElision(_)
-            | Regex::Commit(_) => {}
+            | Regex::Commit(_)
+            | Regex::Return(_) => {}
         };
     }
 }
@@ -810,7 +817,8 @@ impl<'a> OrderedChoiceValidator {
             | Regex::NodeElision(_)
             | Regex::NodeMarker(_)
             | Regex::NodeCreation(_)
-            | Regex::Commit(_) => {}
+            | Regex::Commit(_)
+            | Regex::Return(_) => {}
         };
     }
     fn check_containment(
@@ -875,7 +883,8 @@ impl<'a> OrderedChoiceValidator {
             | Regex::NodeRename(_)
             | Regex::NodeElision(_)
             | Regex::NodeMarker(_)
-            | Regex::NodeCreation(_) => {}
+            | Regex::NodeCreation(_)
+            | Regex::Return(_) => {}
         };
     }
 }
@@ -1040,7 +1049,8 @@ impl<'a> LL1Validator {
             | Regex::NodeElision(_)
             | Regex::NodeMarker(_)
             | Regex::NodeCreation(_)
-            | Regex::Commit(_) => {
+            | Regex::Commit(_)
+            | Regex::Return(_) => {
                 entry.insert(TokenName("ɛ"));
             }
         };
@@ -1188,7 +1198,8 @@ impl<'a> LL1Validator {
             | Regex::NodeElision(_)
             | Regex::NodeMarker(_)
             | Regex::NodeCreation(_)
-            | Regex::Commit(_) => {}
+            | Regex::Commit(_)
+            | Regex::Return(_) => {}
         };
     }
 
@@ -1447,7 +1458,8 @@ impl<'a> LL1Validator {
             | Regex::NodeElision(_)
             | Regex::NodeMarker(_)
             | Regex::NodeCreation(_)
-            | Regex::Commit(_) => {}
+            | Regex::Commit(_)
+            | Regex::Return(_) => {}
         };
     }
 }
@@ -1535,7 +1547,8 @@ impl UsageValidator {
             | Regex::NodeElision(_)
             | Regex::NodeMarker(_)
             | Regex::NodeCreation(_)
-            | Regex::Commit(_) => {}
+            | Regex::Commit(_)
+            | Regex::Return(_) => {}
         }
     }
 }
@@ -1700,7 +1713,8 @@ impl RecoverySetGenerator {
             | Regex::NodeElision(_)
             | Regex::NodeMarker(_)
             | Regex::NodeCreation(_)
-            | Regex::Commit(_) => {}
+            | Regex::Commit(_)
+            | Regex::Return(_) => {}
         }
     }
 }

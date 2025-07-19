@@ -1175,6 +1175,7 @@ impl RustOutput {
                 output.write_all(
                     format!(
                         "if let Some(diag) = {parser_name}.assertion_{rule_name}_{}() {{{}\
+                       \n    {parser_name}.last_error_span = {parser_name}.span();\
                        \n    diags.push(diag);\
                        \n}}\n",
                         &assertion.value(cst).unwrap().0[1..],
@@ -1230,6 +1231,48 @@ impl RustOutput {
                     format!("{parser_name}.in_ordered_choice = false;\n")
                         .indent(level)
                         .as_bytes(),
+                )?;
+            }
+            Regex::Return(_) => {
+                output.write_all(
+                    format!("if {parser_name}.active_error() {{\n")
+                        .indent(level)
+                        .as_bytes(),
+                )?;
+                match rule_elision {
+                    RuleNodeElision::None => {
+                        output.write_all(
+                            format!(
+                                "let closed = {parser_name}.cst.close(m, Rule::Error);\
+                               \n{parser_name}.create_node_error(NodeRef(closed.0), diags);\n"
+                            )
+                            .indent(level + 1)
+                            .as_bytes(),
+                        )?;
+                    }
+                    RuleNodeElision::Conditional => {
+                        output.write_all(
+                            format!(
+                                "if !elide {{\
+                               \n    let m = {parser_name}.cst.open_before(start);\
+                               \n    let closed = {parser_name}.cst.close(m, Rule::Error);\
+                               \n    {parser_name}.create_node_error(NodeRef(closed.0), diags);\
+                               \n}}\n"
+                            )
+                            .indent(level + 1)
+                            .as_bytes(),
+                        )?;
+                    }
+                    RuleNodeElision::Unconditional => {}
+                }
+                output.write_all(
+                    format!(
+                        "    return{};\
+                       \n}}\n",
+                        if in_choice { " None" } else { "" }
+                    )
+                    .indent(level)
+                    .as_bytes(),
                 )?;
             }
             Regex::Predicate(_) => {}

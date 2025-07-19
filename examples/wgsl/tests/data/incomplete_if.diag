@@ -1,0 +1,6 @@
+error: invalid syntax, expected one of: '&', '!', 'false', <floating point literal>, <identifier>, <integer literal>, '(', '-', '*', '~', 'true'
+  ┌─ <input>:3:3
+  │
+3 │   let a = 5;
+  │   ^^^
+

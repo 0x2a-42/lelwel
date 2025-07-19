@@ -126,7 +126,7 @@ case_clause: 'case' case_selectors [':'] compound_statement;
 case_selectors: case_selector (?1 ',' case_selector)* [','];
 case_selector: 'default' | expression;
 default_alone_clause: 'default' [':'] compound_statement;
-compound_statement: attribute* '{' statement* '}'; // §9.1
+compound_statement: attribute* '{' & statement* '}'; // §9.1
 
 func_call: Ident template_list argument_expression_list;
 

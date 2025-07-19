@@ -31,6 +31,7 @@ pub const EXPECTED_RULE: &str = "E026";
 pub const MISSING_NODE_NAME: &str = "E027";
 pub const NESTED_ORDERED_CHOICE: &str = "E028";
 pub const ACTION_IN_ORDERED_CHOICE: &str = "E029";
+pub const RETURN_IN_START_RULE: &str = "E030";
 
 pub const UNUSED_RULE: &str = "W001";
 pub const UNUSED_TOKEN: &str = "W002";
@@ -77,6 +78,7 @@ pub trait LanguageErrors {
     fn useless_commit(span: &Span) -> Self;
     fn replaceable_ordered_choice(span: &Span) -> Self;
     fn action_in_ordered_choice(span: &Span) -> Self;
+    fn return_in_start_rule(span: &Span) -> Self;
 }
 
 impl LanguageErrors for Diagnostic {
@@ -413,5 +415,12 @@ impl LanguageErrors for Diagnostic {
                 "note: this is not allowed to prevent side effects where backtracking is possible"
                     .to_string(),
             ])
+    }
+
+    fn return_in_start_rule(span: &Span) -> Self {
+        Diagnostic::error()
+            .with_code(RETURN_IN_START_RULE)
+            .with_message("return is not allowed in start rule")
+            .with_labels(vec![Label::primary((), span.clone())])
     }
 }
