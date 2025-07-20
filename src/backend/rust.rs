@@ -644,7 +644,7 @@ impl RustOutput {
         }
         let name = rule.name(cst).unwrap().0;
         let recursive = sema.recursive.get(&rule);
-        let is_start = sema.start.unwrap() == rule;
+        let is_start = sema.start_rule.unwrap() == rule;
         let has_rule_rename = sema.has_rule_rename.contains(&rule);
         let has_rule_creation = sema.has_rule_creation.contains(&rule);
         let elision = if rule.is_elided(cst) {
@@ -1384,7 +1384,7 @@ impl RustOutput {
                 include_str!("../skeleton/generated.rs"),
                 rules,
                 skip,
-                sema.start.unwrap().name(cst).unwrap().0,
+                sema.start_rule.unwrap().name(cst).unwrap().0,
                 rules_fmt,
                 rules_create,
                 rules_delete,
