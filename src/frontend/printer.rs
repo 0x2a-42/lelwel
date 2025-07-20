@@ -23,7 +23,7 @@ macro_rules! set {
 }
 macro_rules! pos {
     ($id: expr) => {
-        format!(concat!("\x1b[34m<{:?}>\x1b[0m"), $id)
+        format!("\x1b[34m<{:?}>\x1b[0m", $id)
     };
 }
 macro_rules! syntax {
