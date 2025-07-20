@@ -1,0 +1,8 @@
+token A;
+
+start foo;
+start foo;
+start bar;
+
+foo: A;
+bar: A;
