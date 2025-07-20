@@ -32,6 +32,7 @@ pub const MISSING_NODE_NAME: &str = "E027";
 pub const NESTED_ORDERED_CHOICE: &str = "E028";
 pub const ACTION_IN_ORDERED_CHOICE: &str = "E029";
 pub const RETURN_IN_START_RULE: &str = "E030";
+pub const MULTIPLE_START_RULES: &str = "E031";
 
 pub const UNUSED_RULE: &str = "W001";
 pub const UNUSED_TOKEN: &str = "W002";
@@ -79,6 +80,7 @@ pub trait LanguageErrors {
     fn replaceable_ordered_choice(span: &Span) -> Self;
     fn action_in_ordered_choice(span: &Span) -> Self;
     fn return_in_start_rule(span: &Span) -> Self;
+    fn multiple_start_rules(span: &Span, old_span: &Span) -> Self;
 }
 
 impl LanguageErrors for Diagnostic {
@@ -422,5 +424,18 @@ impl LanguageErrors for Diagnostic {
             .with_code(RETURN_IN_START_RULE)
             .with_message("return is not allowed in start rule")
             .with_labels(vec![Label::primary((), span.clone())])
+    }
+
+    fn multiple_start_rules(span: &Span, old_span: &Span) -> Self {
+        Diagnostic::error()
+            .with_code(MULTIPLE_START_RULES)
+            .with_message("multiple start rules defined")
+            .with_labels(vec![
+                Label::primary((), span.clone()),
+                Label::secondary((), old_span.clone()).with_message("previous definition"),
+            ])
+            .with_notes(vec![
+                "note: a grammar must have exactly one start rule".to_string(),
+            ])
     }
 }
