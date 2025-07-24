@@ -102,9 +102,6 @@ impl Parser<'_> {
     fn is_func_call(&self) -> bool {
         matches!(self.peek(1), Token::LPar | Token::Lt) && self.peek(2) != Token::Lt
     }
-    fn is_diagnostic(&self) -> bool {
-        &self.cst.source[self.span()] == "diagnostic"
-    }
 }
 
 impl<'a> ParserCallbacks for Parser<'a> {
@@ -117,9 +114,6 @@ impl<'a> ParserCallbacks for Parser<'a> {
             .with_label(Label::primary((), span))
     }
     fn predicate_global_directive_1(&self) -> bool {
-        self.is_diagnostic()
-    }
-    fn predicate_global_directive_2(&self) -> bool {
         self.peek(1) != Token::Semi
     }
     fn predicate_parameters_1(&self) -> bool {
@@ -129,9 +123,6 @@ impl<'a> ParserCallbacks for Parser<'a> {
         self.peek(1) != Token::RBrace
     }
     fn predicate_attribute_1(&self) -> bool {
-        self.is_diagnostic()
-    }
-    fn predicate_attribute_2(&self) -> bool {
         self.peek(1) != Token::RPar
     }
     fn action_template_list_1(&mut self, _diags: &mut Vec<Diagnostic>) {

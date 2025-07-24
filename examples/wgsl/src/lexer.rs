@@ -125,6 +125,8 @@ pub enum Token {
     True,
     #[token("false")]
     False,
+    #[token("diagnostic")]
+    Diagnostic,
     #[token(";")]
     Semi,
     #[token("(")]
