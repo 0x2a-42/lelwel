@@ -215,8 +215,6 @@ fn multiple_start() {
     let diags = gen_diags("tests/frontend/multiple_start.llw");
     let mut lines = diags.lines();
 
-    assert_eq!(lines.next(), Some("tests/frontend/multiple_start.llw:4:1: error[E031]: multiple start rules defined"));
-    assert_eq!(lines.next(), Some("tests/frontend/multiple_start.llw:5:1: error[E031]: multiple start rules defined"));
     assert_eq!(lines.next(), None);
 }
 

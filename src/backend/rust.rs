@@ -644,7 +644,7 @@ impl RustOutput {
         }
         let name = rule.name(cst).unwrap().0;
         let recursive = sema.recursive.get(&rule);
-        let is_start = sema.start_rule.unwrap() == rule;
+        let is_start = sema.start_rule.contains(&rule);
         let has_rule_rename = sema.has_rule_rename.contains(&rule);
         let has_rule_creation = sema.has_rule_creation.contains(&rule);
         let elision = if rule.is_elided(cst) {
@@ -705,6 +705,46 @@ impl RustOutput {
             output.write_all(b"        Some(())\n")?;
         }
         output.write_all(b"    }\n")?;
+        Ok(())
+    }
+
+    fn output_parse_start_rules(
+        cst: &Cst<'_>,
+        sema: &SemanticData<'_>,
+        output: &mut std::fs::File,
+    ) -> std::io::Result<()> {
+        for (i, start_rule) in sema.start_rule.iter().enumerate() {
+            let name = start_rule.name(cst).unwrap().0;
+            let parse_name = if i == 0 {
+                "parse".to_string()
+            } else {
+                format!("parse_{}", name)
+            };
+            output.write_all(format!(
+                 "    /// Returns the CST for a parse with the given `source` file and writes diagnostics to `diags`.\
+                \n    ///\
+                \n    /// The context can be explicitly defined for the parse.\
+                \n    pub fn {parse_name}_with_context(\
+                \n        source: &'a str,\
+                \n        diags: &mut Vec<Diagnostic>,\
+                \n        context: Context<'a>,\
+                \n    ) -> Cst<'a> {{\
+                \n        let mut parser = Self::new(source, diags, context);\
+                \n        parser.rule_{name}(diags);
+                \n        parser.cst\
+                \n    }}\
+                \n    /// Returns the CST for a parse with the given `source` file and writes diagnostics to `diags`.\
+                \n    ///\
+                \n    /// The context will be default initialized for the parse.\
+                \n    pub fn {parse_name}(
+                \n        source: &'a str,\
+                \n        diags: &mut Vec<Diagnostic>,\
+                \n    ) -> Cst<'a> {{\
+                \n        Self::{parse_name}_with_context(source, diags, Context::default())\
+                \n    }}\
+                \n").as_bytes()
+            )?;
+        }
         Ok(())
     }
 
@@ -1382,15 +1422,11 @@ impl RustOutput {
         output.write_all(
             format!(
                 include_str!("../skeleton/generated.rs"),
-                rules,
-                skip,
-                sema.start_rule.unwrap().name(cst).unwrap().0,
-                rules_fmt,
-                rules_create,
-                rules_delete,
+                rules, skip, rules_fmt, rules_create, rules_delete,
             )
             .as_bytes(),
         )?;
+        Self::output_parse_start_rules(cst, sema, output)?;
         for rule in file.rule_decls(cst) {
             Self::output_rule(cst, sema, rule, output, &token_symbols)?;
         }

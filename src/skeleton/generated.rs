@@ -324,7 +324,7 @@ impl std::fmt::Display for Cst<'_> {{
 }}
 impl std::fmt::Debug for Rule {{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {{
-        match self {{{3}
+        match self {{{2}
         }}
     }}
 }}
@@ -487,23 +487,20 @@ impl<'a> Parser<'a> {{
         self.cst.truncate(state.truncation_mark.clone());
     }}
     fn create_node(&mut self, rule: Rule, node_ref: NodeRef, diags: &mut Vec<Diagnostic>) {{
-        match rule {{{4}
+        match rule {{{3}
         }}
     }}
     fn delete_node(&mut self, _rule: Rule, _node_ref: NodeRef) {{
-        {5}
+        {4}
     }}
-    /// Returns the CST for a parse with the given `source` file and writes diagnostics to `diags`.
-    ///
-    /// The context can be explicitly defined for the parse.
-    pub fn parse_with_context(
+    fn new(
         source: &'a str,
         diags: &mut Vec<Diagnostic>,
         context: Context<'a>,
-    ) -> Cst<'a> {{
+    ) -> Parser<'a> {{
         let (tokens, spans) = Self::create_tokens(source, diags);
         let max_offset = source.len();
-        let mut parser = Self {{
+        Self {{
             current: Token::EOF,
             cst: Cst::new(source, spans),
             tokens,
@@ -513,16 +510,5 @@ impl<'a> Parser<'a> {{
             context,
             error_cooldown: false,
             in_ordered_choice: false,
-        }};
-        parser.rule_{2}(diags);
-        parser.cst
-    }}
-    /// Returns the CST for a parse with the given `source` file and writes diagnostics to `diags`.
-    ///
-    /// The context will be default initialized for the parse.
-    pub fn parse(
-        source: &'a str,
-        diags: &mut Vec<Diagnostic>,
-    ) -> Cst<'a> {{
-        Self::parse_with_context(source, diags, Context::default())
+        }}
     }}
