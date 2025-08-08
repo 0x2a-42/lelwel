@@ -1,12 +1,12 @@
 use crate::frontend::ast::{AstNode, File, Named, Regex, RuleDecl, TokenDecl};
 use crate::{Cst, NodeRef, SemanticData};
-use std::io::Write;
+use std::io::{BufWriter, Write};
 
 pub struct GraphvizOutput;
 
 impl GraphvizOutput {
     pub fn run(cst: &Cst<'_>, sema: &SemanticData<'_>) -> std::io::Result<()> {
-        let mut graph_file = std::fs::File::create("parser.gv")?;
+        let mut graph_file = BufWriter::new(std::fs::File::create("parser.gv")?);
         graph_file.write_all(b"digraph {\n")?;
         if let Some(file) = File::cast(cst, NodeRef::ROOT) {
             for rule in file.rule_decls(cst) {
@@ -20,7 +20,7 @@ impl GraphvizOutput {
         cst: &Cst<'_>,
         sema: &SemanticData<'_>,
         rule: RuleDecl,
-        output: &mut std::fs::File,
+        output: &mut BufWriter<std::fs::File>,
     ) -> std::io::Result<()> {
         let name = rule.name(cst).unwrap().0;
         output
@@ -98,7 +98,7 @@ impl GraphvizOutput {
         cst: &Cst<'_>,
         sema: &SemanticData<'_>,
         regex: Regex,
-        output: &mut std::fs::File,
+        output: &mut BufWriter<std::fs::File>,
     ) -> std::io::Result<()> {
         match regex {
             Regex::Name(name) => {
