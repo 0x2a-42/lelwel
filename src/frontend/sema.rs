@@ -132,8 +132,8 @@ pub struct SemanticData<'a> {
     pub elision: HashMap<NodeRef, RuleNodeElision>,
     pub right_associative: HashSet<&'a str>,
     pub skipped: BTreeSet<TokenDecl>,
-    pub start_decl: Option<StartDecl>,
-    pub start_rule: Option<RuleDecl>,
+    pub start_decl: Vec<StartDecl>,
+    pub start_rule: Vec<RuleDecl>,
     pub predicates: BTreeMap<NodeRef, (&'a str, &'a str)>,
     pub actions: BTreeMap<NodeRef, (&'a str, &'a str)>,
     pub assertions: BTreeMap<NodeRef, (&'a str, &'a str)>,
@@ -212,14 +212,16 @@ impl<'a> GeneralCheck<'a> {
             file.rule_decls(cst)
                 .for_each(|decl| self.check_rule_decl(cst, decl, diags, sema));
         }
-        if let Some(start) = sema.start_rule {
-            for (name, rule) in sema.decl_bindings.iter() {
-                if *rule == start.syntax() {
-                    diags.push(Diagnostic::reference_start_rule(&cst.span(*name)));
+        if sema.start_rule.is_empty() {
+            diags.push(Diagnostic::missing_start_rule());
+        } else {
+            for start in sema.start_decl.iter() {
+                for (name, rule) in sema.decl_bindings.iter() {
+                    if *rule == start.syntax() {
+                        diags.push(Diagnostic::reference_start_rule(&cst.span(*name)));
+                    }
                 }
             }
-        } else {
-            diags.push(Diagnostic::missing_start_rule());
         }
     }
     fn check_token_decl(&mut self, cst: &'a Cst<'_>, decl: TokenDecl, diags: &mut Vec<Diagnostic>) {
@@ -292,20 +294,13 @@ impl<'a> GeneralCheck<'a> {
         diags: &mut Vec<Diagnostic>,
         sema: &mut SemanticData<'a>,
     ) {
-        if let Some(prev_start_decl) = sema.start_decl {
-            diags.push(Diagnostic::multiple_start_rules(
-                &start_decl.span(cst),
-                &prev_start_decl.span(cst),
-            ));
-        } else {
-            sema.start_decl = Some(start_decl);
-            if let Some((name, name_span)) = start_decl.rule_name(cst) {
-                if let Some(node) = self.get_symbol_binding(name, true, &name_span, diags, sema) {
-                    if let Some(rule_decl) = RuleDecl::cast(cst, node) {
-                        sema.start_rule = Some(rule_decl);
-                    } else {
-                        diags.push(Diagnostic::expected_rule(&name_span));
-                    }
+        sema.start_decl.push(start_decl);
+        if let Some((name, name_span)) = start_decl.rule_name(cst) {
+            if let Some(node) = self.get_symbol_binding(name, true, &name_span, diags, sema) {
+                if let Some(rule_decl) = RuleDecl::cast(cst, node) {
+                    sema.start_rule.push(rule_decl);
+                } else {
+                    diags.push(Diagnostic::expected_rule(&name_span));
                 }
             }
         }
@@ -518,7 +513,7 @@ impl<'a> GeneralCheck<'a> {
             }
             Regex::Commit(_) => RuleNodeElision::None,
             Regex::Return(regex) => {
-                if Some(rule) == sema.start_rule {
+                if sema.start_rule.contains(&rule) {
                     diags.push(Diagnostic::return_in_start_rule(&regex.span(cst)));
                 }
                 RuleNodeElision::None
@@ -1068,7 +1063,7 @@ impl<'a> LL1Validator {
 
     /// Calculates the follow set for each grammar rule.
     fn calc_follow(cst: &'a Cst<'_>, sema: &mut SemanticData<'a>, file: File) {
-        if let Some(start_rule_regex) = sema.start_rule.and_then(|start| start.regex(cst)) {
+        for start_rule_regex in sema.start_rule.iter().filter_map(|start| start.regex(cst)) {
             sema.follow_sets
                 .entry(start_rule_regex.syntax())
                 .or_default()
@@ -1478,7 +1473,7 @@ struct UsageValidator;
 impl UsageValidator {
     fn run(cst: &Cst<'_>, diags: &mut Vec<Diagnostic>, sema: &mut SemanticData<'_>) {
         if let Some(file) = File::cast(cst, NodeRef::ROOT) {
-            if let Some(rule) = sema.start_rule {
+            for rule in sema.start_rule.iter() {
                 sema.used.insert(rule.syntax());
             }
             for token in sema.skipped.iter() {
@@ -1578,11 +1573,11 @@ impl RecoverySetGenerator {
             return;
         };
 
-        let start = if let Some(start_regex) = sema.start_rule.and_then(|start| start.regex(cst)) {
-            start_regex
-        } else {
-            return;
-        };
+        let starts: Vec<_> = sema
+            .start_rule
+            .iter()
+            .flat_map(|start| start.regex(cst))
+            .collect();
         for rule in file.rule_decls(cst) {
             if sema.used.contains(&rule.syntax()) {
                 if let Some(regex) = rule.regex(cst) {
@@ -1593,10 +1588,12 @@ impl RecoverySetGenerator {
 
         let nodes_no_start: HashSet<_> = self.pred.keys().copied().collect();
         let mut nodes = nodes_no_start.clone();
-        nodes.insert(start);
+        for start in starts.iter() {
+            nodes.insert(*start);
 
-        // start node dominates itself
-        self.dom.insert(start, HashSet::from_iter([start]));
+            // start node dominates itself
+            self.dom.insert(*start, HashSet::from_iter([*start]));
+        }
         // other nodes are initialized with all nodes as dominators
         for regex in nodes_no_start.iter() {
             self.dom.insert(*regex, nodes.clone());
@@ -1624,8 +1621,10 @@ impl RecoverySetGenerator {
         }
 
         // calculate recovery set for loops
-        if let Regex::Star(_) | Regex::Plus(_) = start {
-            sema.recovery_sets.entry(start.syntax()).or_default();
+        for start in starts.iter() {
+            if let Regex::Star(_) | Regex::Plus(_) = *start {
+                sema.recovery_sets.entry(start.syntax()).or_default();
+            }
         }
         for regex in nodes_no_start.iter() {
             let op = if let Regex::Star(star) = regex {
