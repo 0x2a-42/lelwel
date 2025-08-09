@@ -332,7 +332,7 @@ impl std::fmt::Debug for Rule {{
 macro_rules! expect {{
     ($token:ident, $sym:literal, $self:expr, $diags:expr) => {{
         if let Token::$token = $self.current {{
-            $self.advance(false);
+            $self.advance(false, $diags);
         }} else {{
             $self.error($diags, err![$self, $sym]);
         }}
@@ -342,7 +342,7 @@ macro_rules! expect {{
 macro_rules! try_expect {{
     ($token:ident, $sym:literal, $self:expr, $diags:expr) => {{
         if let Token::$token = $self.current {{
-            $self.advance(false);
+            $self.advance(false, $diags);
         }} else {{
             if $self.in_ordered_choice {{
                 return None;
@@ -367,14 +367,14 @@ pub struct Parser<'a> {{
     max_offset: usize,
     #[allow(dead_code)]
     context: Context<'a>,
-    error_cooldown: bool,
+    error_node: Option<MarkOpened>,
     #[allow(dead_code)]
     in_ordered_choice: bool,
 }}
 #[allow(clippy::while_let_loop, dead_code, unused_parens)]
 impl<'a> Parser<'a> {{
     fn active_error(&self) -> bool {{
-        self.error_cooldown || self.last_error_span == self.span()
+        self.error_node.is_some() || self.last_error_span == self.span()
     }}
     fn error(&mut self, diags: &mut Vec<Diagnostic>, diag: Diagnostic) {{
         if self.active_error() {{
@@ -383,9 +383,11 @@ impl<'a> Parser<'a> {{
         self.last_error_span = self.span();
         diags.push(diag);
     }}
-    fn advance(&mut self, error: bool) {{
-        if !error {{
-            self.error_cooldown = false;
+    fn advance(&mut self, error: bool, diags: &mut Vec<Diagnostic>) {{
+        if !error && let Some(error_node) = self.error_node {{
+            self.cst.close(error_node, Rule::Error);
+            self.create_node_error(NodeRef(error_node.0), diags);
+            self.error_node = None;
         }}
         self.cst.advance(self.current, false);
         loop {{
@@ -438,12 +440,11 @@ impl<'a> Parser<'a> {{
         }}
     }}
     fn advance_with_error(&mut self, diags: &mut Vec<Diagnostic>, diag: Diagnostic) {{
-        let m = self.cst.open();
         self.error(diags, diag);
-        self.error_cooldown = true;
-        self.advance(true);
-        self.cst.close(m, Rule::Error);
-        self.create_node_error(NodeRef(m.0), diags);
+        if self.error_node.is_none() {{
+            self.error_node = Some(self.cst.open());
+        }}
+        self.advance(true, diags);
     }}
     fn peek(&self, lookahead: usize) -> Token {{
         self.tokens
@@ -511,7 +512,7 @@ impl<'a> Parser<'a> {{
             last_error_span: Span::default(),
             max_offset,
             context,
-            error_cooldown: false,
+            error_node: None,
             in_ordered_choice: false,
         }};
         parser.rule_{2}(diags);
