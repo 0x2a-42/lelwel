@@ -27,3 +27,7 @@ fn template() {
 fn incomplete_if() {
     check!("incomplete_if");
 }
+#[test]
+fn missing_comma() {
+    check!("missing_comma");
+}
