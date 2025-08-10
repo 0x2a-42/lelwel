@@ -33,6 +33,7 @@ pub const NESTED_ORDERED_CHOICE: &str = "E028";
 pub const ACTION_IN_ORDERED_CHOICE: &str = "E029";
 pub const RETURN_IN_START_RULE: &str = "E030";
 pub const MULTIPLE_START_RULES: &str = "E031";
+pub const ELISION_IN_START_RULE: &str = "E032";
 
 pub const UNUSED_RULE: &str = "W001";
 pub const UNUSED_TOKEN: &str = "W002";
@@ -81,6 +82,7 @@ pub trait LanguageErrors {
     fn action_in_ordered_choice(span: &Span) -> Self;
     fn return_in_start_rule(span: &Span) -> Self;
     fn multiple_start_rules(span: &Span, old_span: &Span) -> Self;
+    fn elision_in_start_rule(span: &Span) -> Self;
 }
 
 impl LanguageErrors for Diagnostic {
@@ -437,5 +439,12 @@ impl LanguageErrors for Diagnostic {
             .with_notes(vec![
                 "note: a grammar must have exactly one start rule".to_string(),
             ])
+    }
+
+    fn elision_in_start_rule(span: &Span) -> Self {
+        Diagnostic::error()
+            .with_code(ELISION_IN_START_RULE)
+            .with_message("start rule node cannot be elided")
+            .with_labels(vec![Label::primary((), span.clone())])
     }
 }

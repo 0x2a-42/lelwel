@@ -192,8 +192,11 @@ impl RuleDecl {
     pub fn regex(&self, cst: &Cst<'_>) -> Option<Regex> {
         cst.child_node(self.syntax)
     }
+    pub fn elision<'a>(&self, cst: &'a Cst<'_>) -> Option<(&'a str, Span)> {
+        cst.child_token(self.syntax, Token::Hat)
+    }
     pub fn is_elided(&self, cst: &Cst<'_>) -> bool {
-        cst.child_token(self.syntax, Token::Hat).is_some()
+        self.elision(cst).is_some()
     }
 }
 impl StartDecl {

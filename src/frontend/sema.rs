@@ -259,6 +259,11 @@ impl<'a> GeneralCheck<'a> {
         } else {
             diags.push(Diagnostic::empty_rule(&rule.span(cst)));
         }
+        if Some(rule) == sema.start_rule
+            && let Some((_, elision_span)) = rule.elision(cst)
+        {
+            diags.push(Diagnostic::elision_in_start_rule(&elision_span));
+        }
         self.check_recursive(cst, sema, rule, diags);
         if let Some(regex) = rule.regex(cst) {
             let mut open = HashSet::new();
@@ -497,7 +502,12 @@ impl<'a> GeneralCheck<'a> {
                 }
                 RuleNodeElision::None
             }
-            Regex::NodeElision(_) => RuleNodeElision::Unconditional,
+            Regex::NodeElision(elision) => {
+                if Some(rule) == sema.start_rule {
+                    diags.push(Diagnostic::elision_in_start_rule(&elision.span(cst)));
+                }
+                RuleNodeElision::Unconditional
+            }
             Regex::NodeMarker(_) => RuleNodeElision::None,
             Regex::NodeCreation(regex) => {
                 if let Some(name) = regex.node_name(cst) {
