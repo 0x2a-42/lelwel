@@ -18,9 +18,10 @@ expression^: keyval | table;
 keyval: key '=' val;
 table^: ?1 std_table | array_table;
 
-std_table: '[' key ']';
-array_table: '[' '[' key !1 ']' ']';
+std_table: '[' header_key ']';
+array_table: '[' '[' header_key !1 ']' ']';
 
+header_key: simple_key ('.' simple_key)* @key; // extra rule for better error messages
 key: simple_key ('.' simple_key)*;
 simple_key: BasicString | LiteralString | UnquotedKey;
 val^:

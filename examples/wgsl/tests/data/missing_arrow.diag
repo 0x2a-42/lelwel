@@ -1,0 +1,12 @@
+error: invalid syntax, expected one of: '@', '{', '->'
+  ┌─ <input>:1:10
+  │
+1 │ fn foo() i32 {
+  │          ^^^
+
+error: invalid syntax, expected one of: '@', '{', '->'
+  ┌─ <input>:5:10
+  │
+5 │ fn bar() S<T, i32> {
+  │          ^
+

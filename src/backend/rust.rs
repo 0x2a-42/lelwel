@@ -367,7 +367,7 @@ impl RustOutput {
             RuleNodeElision::Conditional => {
                 output.write_all(
                     b"        if !elide {\
-                                 \n            let m = self.cst.open_before(start);\n",
+                   \n            let m = self.cst.open_before(start);\n",
                 )?;
                 Self::output_cst_close(output, has_rule_rename, name, 3, false, "self", is_start)?;
                 output.write_all(b"        }\n")
@@ -732,6 +732,96 @@ impl RustOutput {
     }
 
     #[allow(clippy::too_many_arguments)]
+    fn output_recovering_operation(
+        cst: &Cst<'_>,
+        sema: &SemanticData<'_>,
+        regex: Regex,
+        output: &mut BufWriter<std::fs::File>,
+        level: usize,
+        token_symbols: &HashMap<&str, &str>,
+        open_before: bool,
+        rule_name: &str,
+        rule_elision: RuleNodeElision,
+        parser_name: &str,
+        has_rule_rename: bool,
+        op: Regex,
+        ordered_choice_return: &str,
+        is_loop: bool,
+    ) -> std::io::Result<()> {
+        output.write_all(
+            format!(
+                "loop {{\
+               \n    match {parser_name}.current {{\
+               \n        {}{} => {{\n",
+                sema.first_sets[&op.syntax()].pattern(2),
+                Self::get_predicate(cst, rule_name, op, parser_name)
+            )
+            .indent(level)
+            .as_bytes(),
+        )?;
+        if open_before {
+            output.write_all(
+                format!(
+                    "if m.is_none() {{\
+                   \n    m = Some({parser_name}.cst.open_before(lhs));\
+                   \n}}\n"
+                )
+                .indent(5)
+                .as_bytes(),
+            )?;
+        }
+        Self::output_regex(
+            cst,
+            sema,
+            op,
+            output,
+            level + 3,
+            token_symbols,
+            false,
+            rule_name,
+            rule_elision,
+            parser_name,
+            has_rule_rename,
+        )?;
+
+        let ordered_choice_return = ordered_choice_return.indent(3);
+        let follow = sema.follow_sets[&regex.syntax()].pattern(2);
+        let expected = if is_loop {
+            sema.follow_sets[&op.syntax()].error(5, token_symbols)
+        } else {
+            sema.predict_sets[&regex.syntax()].error(5, token_symbols)
+        };
+        let recovery = &sema.recovery_sets[&regex.syntax()];
+        let recovery = if recovery.is_empty() {
+            "".to_string()
+        } else {
+            format!(
+                "\n        | {} => {{{ordered_choice_return}\
+                 \n            {parser_name}.error(diags, err![{parser_name}, {expected}]);\
+                 \n            break;\
+                 \n        }}",
+                recovery.pattern(2)
+            )
+        };
+        if !is_loop {
+            output.write_all("            break;\n".indent(level).as_bytes())?;
+        }
+        output.write_all(
+            format!(
+                "        }}\
+               \n        {follow} => break,{recovery}\
+               \n        _ => {{{ordered_choice_return}\
+               \n            {parser_name}.advance_with_error(diags, err![{parser_name}, {expected}]);\
+               \n        }}\
+               \n    }}\
+               \n}}\n",
+            )
+            .indent(level)
+            .as_bytes(),
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
     fn output_regex(
         cst: &Cst<'_>,
         sema: &SemanticData<'_>,
@@ -961,64 +1051,21 @@ impl RustOutput {
                 )?;
             }
             Regex::Star(star) => {
-                let op = star.operand(cst).unwrap();
-                output.write_all(
-                    format!(
-                        "loop {{\
-                       \n    match {parser_name}.current {{\
-                       \n        {}{} => {{\n",
-                        sema.first_sets[&op.syntax()].pattern(2),
-                        Self::get_predicate(cst, rule_name, op, parser_name)
-                    )
-                    .indent(level)
-                    .as_bytes(),
-                )?;
-                if open_before {
-                    output.write_all(
-                        format!(
-                            "if m.is_none() {{\
-                           \n    m = Some({parser_name}.cst.open_before(lhs));\
-                           \n}}\n"
-                        )
-                        .indent(5)
-                        .as_bytes(),
-                    )?;
-                }
-                Self::output_regex(
+                Self::output_recovering_operation(
                     cst,
                     sema,
-                    op,
+                    regex,
                     output,
-                    level + 3,
+                    level,
                     token_symbols,
-                    false,
+                    open_before,
                     rule_name,
                     rule_elision,
                     parser_name,
                     has_rule_rename,
-                )?;
-                let recovery = &sema.recovery_sets[&regex.syntax()];
-                output.write_all(
-                    format!(
-                        "        }}\
-                       \n        {}{}{} => break,\
-                       \n        _ => {{{}\
-                       \n            {parser_name}.advance_with_error(diags, err![{parser_name}, {}]);\
-                       \n        }}\
-                       \n    }}\
-                       \n}}\n",
-                        sema.follow_sets[&regex.syntax()].pattern(2),
-                        if recovery.is_empty() {
-                            ""
-                        } else {
-                            "\n        | "
-                        },
-                        recovery.pattern(2),
-                        ordered_choice_return.indent(3),
-                        sema.predict_sets[&regex.syntax()].error(5, token_symbols),
-                    )
-                    .indent(level)
-                    .as_bytes(),
+                    star.operand(cst).unwrap(),
+                    &ordered_choice_return,
+                    true,
                 )?;
             }
             Regex::Plus(plus) => {
@@ -1036,115 +1083,39 @@ impl RustOutput {
                     parser_name,
                     has_rule_rename,
                 )?;
-                output.write_all(
-                    format!(
-                        "loop {{\
-                       \n    match {parser_name}.current {{\
-                       \n        {}{} => {{\n",
-                        sema.first_sets[&op.syntax()].pattern(2),
-                        Self::get_predicate(cst, rule_name, op, parser_name)
-                    )
-                    .indent(level)
-                    .as_bytes(),
-                )?;
-                if open_before {
-                    output.write_all(
-                        format!(
-                            "if m.is_none() {{\
-                           \n    m = Some({parser_name}.cst.open_before(lhs));\
-                           \n}}\n"
-                        )
-                        .indent(5)
-                        .as_bytes(),
-                    )?;
-                }
-                Self::output_regex(
+                Self::output_recovering_operation(
                     cst,
                     sema,
-                    op,
+                    regex,
                     output,
-                    level + 3,
+                    level,
                     token_symbols,
-                    false,
+                    open_before,
                     rule_name,
                     rule_elision,
                     parser_name,
                     has_rule_rename,
-                )?;
-                let recovery = &sema.recovery_sets[&regex.syntax()];
-                output.write_all(
-                    format!(
-                        "        }}\
-                       \n        {}{}{} => break,\
-                       \n        _ => {{{}\
-                       \n            {parser_name}.advance_with_error(diags, err![{parser_name}, {}]);\
-                       \n        }}\
-                       \n    }}\
-                       \n}}\n",
-                        sema.follow_sets[&regex.syntax()].pattern(2),
-                        if recovery.is_empty() {
-                            ""
-                        } else {
-                            "\n        | "
-                        },
-                        recovery.pattern(2),
-                        ordered_choice_return.indent(3),
-                        sema.follow_sets[&op.syntax()].error(5, token_symbols),
-                    )
-                    .indent(level)
-                    .as_bytes(),
+                    op,
+                    &ordered_choice_return,
+                    true,
                 )?;
             }
             Regex::Optional(opt) => {
-                let op = opt.operand(cst).unwrap();
-                output.write_all(
-                    format!(
-                        "match {parser_name}.current {{\
-                       \n    {}{} => {{\n",
-                        sema.first_sets[&op.syntax()].pattern(1),
-                        Self::get_predicate(cst, rule_name, op, parser_name)
-                    )
-                    .indent(level)
-                    .as_bytes(),
-                )?;
-                if open_before {
-                    output.write_all(
-                        format!(
-                            "if m.is_none() {{\
-                           \n    m = Some({parser_name}.cst.open_before(lhs));\
-                           \n}}\n"
-                        )
-                        .indent(4)
-                        .as_bytes(),
-                    )?;
-                }
-                Self::output_regex(
+                Self::output_recovering_operation(
                     cst,
                     sema,
-                    op,
+                    regex,
                     output,
-                    level + 2,
+                    level,
                     token_symbols,
-                    false,
+                    open_before,
                     rule_name,
                     rule_elision,
                     parser_name,
                     has_rule_rename,
-                )?;
-                output.write_all(
-                    format!(
-                        "    }}\
-                       \n    {} => {{}}\
-                       \n    _ => {{{}\
-                       \n        {parser_name}.error(diags, err![{parser_name}, {}]);\
-                       \n    }}\
-                       \n}}\n",
-                        sema.follow_sets[&regex.syntax()].pattern(1),
-                        ordered_choice_return.indent(2),
-                        sema.predict_sets[&regex.syntax()].error(5, token_symbols),
-                    )
-                    .indent(level)
-                    .as_bytes(),
+                    opt.operand(cst).unwrap(),
+                    &ordered_choice_return,
+                    false,
                 )?;
             }
             Regex::Paren(paren) => {

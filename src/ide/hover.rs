@@ -24,7 +24,7 @@ pub fn hover(cst: &Cst<'_>, sema: &SemanticData<'_>, pos: usize) -> Option<(Stri
             .map_or("{}".to_string(), |s| format!("{s:?}"));
 
         match regex {
-            Regex::Star(_) | Regex::Plus(_) => {
+            Regex::Star(_) | Regex::Plus(_) | Regex::Optional(_) => {
                 let recovery = &sema
                     .recovery_sets
                     .get(&regex.syntax())

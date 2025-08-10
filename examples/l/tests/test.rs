@@ -19,3 +19,7 @@ macro_rules! check {
 fn incomplete() {
     check!("incomplete");
 }
+#[test]
+fn missing_arrow() {
+    check!("missing_arrow");
+}

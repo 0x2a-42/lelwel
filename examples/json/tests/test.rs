@@ -19,3 +19,7 @@ macro_rules! check {
 fn incomplete() {
     check!("incomplete");
 }
+#[test]
+fn wrong_key() {
+    check!("wrong_key");
+}

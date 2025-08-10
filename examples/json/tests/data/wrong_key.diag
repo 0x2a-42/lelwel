@@ -1,0 +1,6 @@
+error: invalid syntax, expected one of: '}', <string>
+  ┌─ <input>:1:3
+  │
+1 │ { 1: 2 }
+  │   ^
+

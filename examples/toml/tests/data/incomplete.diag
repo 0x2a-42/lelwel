@@ -1,4 +1,4 @@
-error: invalid syntax, expected: ']'
+error: invalid syntax, expected one of: '.', ']'
   ┌─ <input>:1:8
   │  
 1 │   [table1
