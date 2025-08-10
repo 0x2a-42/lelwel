@@ -396,7 +396,7 @@ impl std::fmt::Debug for Rule {
 macro_rules! expect {
     ($token:ident, $sym:literal, $self:expr, $diags:expr) => {
         if let Token::$token = $self.current {
-            $self.advance(false);
+            $self.advance(false, $diags);
         } else {
             $self.error($diags, err![$self, $sym]);
         }
@@ -406,7 +406,7 @@ macro_rules! expect {
 macro_rules! try_expect {
     ($token:ident, $sym:literal, $self:expr, $diags:expr) => {
         if let Token::$token = $self.current {
-            $self.advance(false);
+            $self.advance(false, $diags);
         } else {
             if $self.in_ordered_choice {
                 return None;
@@ -431,14 +431,14 @@ pub struct Parser<'a> {
     max_offset: usize,
     #[allow(dead_code)]
     context: Context<'a>,
-    error_cooldown: bool,
+    error_node: Option<MarkOpened>,
     #[allow(dead_code)]
     in_ordered_choice: bool,
 }
 #[allow(clippy::while_let_loop, dead_code, unused_parens)]
 impl<'a> Parser<'a> {
     fn active_error(&self) -> bool {
-        self.error_cooldown || self.last_error_span == self.span()
+        self.error_node.is_some() || self.last_error_span == self.span()
     }
     fn error(&mut self, diags: &mut Vec<Diagnostic>, diag: Diagnostic) {
         if self.active_error() {
@@ -447,9 +447,9 @@ impl<'a> Parser<'a> {
         self.last_error_span = self.span();
         diags.push(diag);
     }
-    fn advance(&mut self, error: bool) {
+    fn advance(&mut self, error: bool, diags: &mut Vec<Diagnostic>) {
         if !error {
-            self.error_cooldown = false;
+            self.close_error_node(diags);
         }
         self.cst.advance(self.current, false);
         loop {
@@ -509,12 +509,11 @@ impl<'a> Parser<'a> {
         }
     }
     fn advance_with_error(&mut self, diags: &mut Vec<Diagnostic>, diag: Diagnostic) {
-        let m = self.cst.open();
         self.error(diags, diag);
-        self.error_cooldown = true;
-        self.advance(true);
-        self.cst.close(m, Rule::Error);
-        self.create_node_error(NodeRef(m.0), diags);
+        if self.error_node.is_none() {
+            self.error_node = Some(self.cst.open());
+        }
+        self.advance(true, diags);
     }
     fn peek(&self, lookahead: usize) -> Token {
         self.tokens
@@ -532,6 +531,21 @@ impl<'a> Parser<'a> {
             .filter(|token| !Self::is_skipped(**token))
             .nth(lookbehind)
             .map_or(Token::EOF, |it| *it)
+    }
+    fn close_error_node(&mut self, diags: &mut Vec<Diagnostic>) {
+        if let Some(error_node) = self.error_node {
+            self.cst.close(error_node, Rule::Error);
+            self.create_node_error(NodeRef(error_node.0), diags);
+            self.error_node = None;
+        }
+    }
+    fn open(&mut self, diags: &mut Vec<Diagnostic>) -> MarkOpened {
+        self.close_error_node(diags);
+        self.cst.open()
+    }
+    fn mark(&mut self, diags: &mut Vec<Diagnostic>) -> MarkClosed {
+        self.close_error_node(diags);
+        self.cst.mark()
     }
     fn span(&self) -> Span {
         self.cst
@@ -610,7 +624,7 @@ impl<'a> Parser<'a> {
             last_error_span: Span::default(),
             max_offset,
             context,
-            error_cooldown: false,
+            error_node: None,
             in_ordered_choice: false,
         };
         parser.rule_file(diags);
@@ -623,7 +637,7 @@ impl<'a> Parser<'a> {
         Self::parse_with_context(source, diags, Context::default())
     }
     fn rule_file(&mut self, diags: &mut Vec<Diagnostic>) {
-        let m = self.cst.open();
+        let m = self.open(diags);
         self.init_skip();
         loop {
             match self.current {
@@ -649,7 +663,7 @@ impl<'a> Parser<'a> {
         }
         if self.current != Token::EOF {
             self.error(diags, err![self, "<end of file>"]);
-            let error_tree = self.cst.open();
+            let error_tree = self.open(diags);
             loop {
                 match self.tokens.get(self.pos) {
                     None => break,
@@ -692,7 +706,7 @@ impl<'a> Parser<'a> {
         }
     }
     fn rule_start_decl(&mut self, diags: &mut Vec<Diagnostic>) {
-        let m = self.cst.open();
+        let m = self.open(diags);
         expect!(Start, "start", self, diags);
         expect!(Id, "<identifier>", self, diags);
         expect!(Semi, ";", self, diags);
@@ -700,7 +714,7 @@ impl<'a> Parser<'a> {
         self.create_node_start_decl(NodeRef(closed.0), diags);
     }
     fn rule_right_decl(&mut self, diags: &mut Vec<Diagnostic>) {
-        let m = self.cst.open();
+        let m = self.open(diags);
         expect!(Right, "right", self, diags);
         match self.current {
             Token::Id => {
@@ -745,7 +759,7 @@ impl<'a> Parser<'a> {
         self.create_node_right_decl(NodeRef(closed.0), diags);
     }
     fn rule_skip_decl(&mut self, diags: &mut Vec<Diagnostic>) {
-        let m = self.cst.open();
+        let m = self.open(diags);
         expect!(Skip, "skip", self, diags);
         match self.current {
             Token::Id => {
@@ -790,7 +804,7 @@ impl<'a> Parser<'a> {
         self.create_node_skip_decl(NodeRef(closed.0), diags);
     }
     fn rule_token_list(&mut self, diags: &mut Vec<Diagnostic>) {
-        let m = self.cst.open();
+        let m = self.open(diags);
         expect!(Token, "token", self, diags);
         self.rule_token_decl(diags);
         loop {
@@ -814,7 +828,7 @@ impl<'a> Parser<'a> {
         self.create_node_token_list(NodeRef(closed.0), diags);
     }
     fn rule_token_decl(&mut self, diags: &mut Vec<Diagnostic>) {
-        let m = self.cst.open();
+        let m = self.open(diags);
         expect!(Id, "<identifier>", self, diags);
         match self.current {
             Token::Equal => {
@@ -830,7 +844,7 @@ impl<'a> Parser<'a> {
         self.create_node_token_decl(NodeRef(closed.0), diags);
     }
     fn rule_rule_decl(&mut self, diags: &mut Vec<Diagnostic>) {
-        let m = self.cst.open();
+        let m = self.open(diags);
         expect!(Id, "<identifier>", self, diags);
         match self.current {
             Token::Hat => {
@@ -890,7 +904,7 @@ impl<'a> Parser<'a> {
         self.rule_alternation(diags);
     }
     fn rule_alternation(&mut self, diags: &mut Vec<Diagnostic>) {
-        let start = self.cst.mark();
+        let start = self.mark(diags);
         self.rule_ordered_choice(diags);
         match self.current {
             Token::Or => {
@@ -927,7 +941,7 @@ impl<'a> Parser<'a> {
         }
     }
     fn rule_ordered_choice(&mut self, diags: &mut Vec<Diagnostic>) {
-        let start = self.cst.mark();
+        let start = self.mark(diags);
         self.rule_concat(diags);
         match self.current {
             Token::Slash => {
@@ -965,7 +979,7 @@ impl<'a> Parser<'a> {
         }
     }
     fn rule_concat(&mut self, diags: &mut Vec<Diagnostic>) {
-        let start = self.cst.mark();
+        let start = self.mark(diags);
         self.rule_postfix(diags);
         match self.current {
             Token::Action
@@ -1219,7 +1233,7 @@ impl<'a> Parser<'a> {
                 }
             }
         }
-        let lhs = self.cst.mark();
+        let lhs = self.mark(diags);
         rec(self, diags, lhs);
     }
 }
