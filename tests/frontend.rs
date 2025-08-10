@@ -328,6 +328,18 @@ fn return_start() {
 
 #[test]
 #[rustfmt::skip]
+fn start_elision() {
+    let diags = gen_diags("tests/frontend/start_elision.llw");
+    let mut lines = diags.lines();
+
+    assert_eq!(lines.next(), Some("tests/frontend/start_elision.llw:4:9: error[E032]: start rule node cannot be elided"));
+    assert_eq!(lines.next(), Some("tests/frontend/start_elision.llw:4:9: warning[W004]: node elision is redundant"));
+    assert_eq!(lines.next(), Some("tests/frontend/start_elision.llw:4:4: error[E032]: start rule node cannot be elided"));
+    assert_eq!(lines.next(), None);
+}
+
+#[test]
+#[rustfmt::skip]
 fn syntax_error() {
     let diags = gen_diags("tests/frontend/syntax_error.llw");
     let mut lines = diags.lines();

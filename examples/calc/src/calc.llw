@@ -7,7 +7,7 @@ skip Whitespace;
 right '^';
 start calc;
 
-calc^: expr;
+calc: expr;
 expr:
   expr '^' expr @binary_expr
 | ('-' | '+') expr @unary_expr
