@@ -384,10 +384,8 @@ impl<'a> Parser<'a> {{
         diags.push(diag);
     }}
     fn advance(&mut self, error: bool, diags: &mut Vec<Diagnostic>) {{
-        if !error && let Some(error_node) = self.error_node {{
-            self.cst.close(error_node, Rule::Error);
-            self.create_node_error(NodeRef(error_node.0), diags);
-            self.error_node = None;
+        if !error {{
+            self.close_error_node(diags);
         }}
         self.cst.advance(self.current, false);
         loop {{
@@ -463,13 +461,20 @@ impl<'a> Parser<'a> {{
             .nth(lookbehind)
             .map_or(Token::EOF, |it| *it)
     }}
-    fn open(&mut self, diags: &mut Vec<Diagnostic>) -> MarkOpened {{
+    fn close_error_node(&mut self, diags: &mut Vec<Diagnostic>) {{
         if let Some(error_node) = self.error_node {{
             self.cst.close(error_node, Rule::Error);
             self.create_node_error(NodeRef(error_node.0), diags);
             self.error_node = None;
         }}
+    }}
+    fn open(&mut self, diags: &mut Vec<Diagnostic>) -> MarkOpened {{
+        self.close_error_node(diags);
         self.cst.open()
+    }}
+    fn mark(&mut self, diags: &mut Vec<Diagnostic>) -> MarkClosed {{
+        self.close_error_node(diags);
+        self.cst.mark()
     }}
     fn span(&self) -> Span {{
         self.cst.spans

@@ -317,12 +317,12 @@ impl RustOutput {
         match elision {
             RuleNodeElision::None => output.write_all(b"        let m = self.open(diags);\n")?,
             RuleNodeElision::Conditional => output.write_all(
-                b"        let start = self.cst.mark();\
+                b"        let start = self.mark(diags);\
                 \n        let mut elide = false;\n",
             )?,
             RuleNodeElision::Unconditional => {
                 if has_rule_creation {
-                    output.write_all(b"        let start = self.cst.mark();\n")?;
+                    output.write_all(b"        let start = self.mark(diags);\n")?;
                 }
             }
         }
@@ -465,7 +465,7 @@ impl RustOutput {
                     if i == index {
                         output.write_all(
                             format!(
-                                "let lhs = parser.cst.mark();\n{}",
+                                "let lhs = parser.mark(diags);\n{}",
                                 call_rec("parser", binding_power, "lhs")
                             )
                             .indent(5)
@@ -585,7 +585,7 @@ impl RustOutput {
                     let binding_power = binding_power.1;
                     output.write_all(
                         format!(
-                            "let rhs = parser.cst.mark();\n{}",
+                            "let rhs = parser.mark(diags);\n{}",
                             call_rec("parser", binding_power, "rhs")
                         )
                         .indent(6)
@@ -623,7 +623,7 @@ impl RustOutput {
             format!(
                 "    }}{}\
                \n}}\
-               \nlet lhs = self.cst.mark();\n{}",
+               \nlet lhs = self.mark(diags);\n{}",
                 if in_choice { "\n    Some(())" } else { "" },
                 call_rec("self", 0, "lhs")
             )
@@ -1204,7 +1204,7 @@ impl RustOutput {
             Regex::NodeMarker(marker) => {
                 let number = marker.number(cst);
                 output.write_all(
-                    format!("let m{number} = {parser_name}.cst.mark();\n")
+                    format!("let m{number} = {parser_name}.mark(diags);\n")
                         .indent(level)
                         .as_bytes(),
                 )?;
