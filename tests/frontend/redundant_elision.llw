@@ -1,6 +1,6 @@
 token A B C D;
-start test;
-
+start s;
+s: test;
 test: A ^ ^ foo | B ^;
 foo^: C ^ ^ bar | B ^;
 bar: [C ^] ^;
