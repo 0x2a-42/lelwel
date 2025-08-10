@@ -1,0 +1,12 @@
+error: invalid syntax, expected: ';'
+  ┌─ <input>:2:16
+  │
+2 │   for(let i = 0, i < 3, i = i + 1) {}
+  │                ^
+
+error: invalid syntax, expected: ';'
+  ┌─ <input>:2:23
+  │
+2 │   for(let i = 0, i < 3, i = i + 1) {}
+  │                       ^
+

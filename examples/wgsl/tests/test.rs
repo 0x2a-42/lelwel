@@ -31,3 +31,11 @@ fn incomplete_if() {
 fn missing_comma() {
     check!("missing_comma");
 }
+#[test]
+fn missing_arrow() {
+    check!("missing_arrow");
+}
+#[test]
+fn invalid_for() {
+    check!("invalid_for");
+}

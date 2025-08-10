@@ -1624,7 +1624,7 @@ impl RecoverySetGenerator {
         }
 
         // calculate recovery set for loops
-        if let Regex::Star(_) | Regex::Plus(_) = start {
+        if let Regex::Star(_) | Regex::Plus(_) | Regex::Optional(_) = start {
             sema.recovery_sets.entry(start.syntax()).or_default();
         }
         for regex in nodes_no_start.iter() {
@@ -1632,9 +1632,12 @@ impl RecoverySetGenerator {
                 star.operand(cst).unwrap()
             } else if let Regex::Plus(plus) = regex {
                 plus.operand(cst).unwrap()
+            } else if let Regex::Optional(opt) = regex {
+                opt.operand(cst).unwrap()
             } else {
                 continue;
             };
+            let op_first = &sema.first_sets[&op.syntax()];
             let op_follow = &sema.follow_sets[&op.syntax()];
             for dom in self.dom[regex].iter() {
                 let dom_follow = &sema.follow_sets[&dom.syntax()];
@@ -1642,6 +1645,12 @@ impl RecoverySetGenerator {
                     .entry(regex.syntax())
                     .or_default()
                     .extend(dom_follow);
+            }
+            for sym in op_first.iter() {
+                sema.recovery_sets
+                    .entry(regex.syntax())
+                    .or_default()
+                    .remove(sym);
             }
             for sym in op_follow.iter() {
                 sema.recovery_sets

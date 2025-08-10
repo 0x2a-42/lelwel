@@ -247,7 +247,7 @@ The parser tries to parse rules in their entirety. If the parser encounters an i
 
 There are multiple possibilities for the parser to continue after an error, depending on the context in which it occurs.
 1. The parser skips the expected token in the grammar and tries to match the current input token with the next expected token.
-1. The parser skips the expected token in the grammar and advances to the next input token. The consumed token is put inside of an `error` node in the CST. This is used inside of loops (`*` or `+`) and alternations with predicates to ensure that the parser makes progress.
+1. The parser skips the expected token in the grammar and advances to the next input token. The consumed token is put inside of an `error` node in the CST. This is used inside of loops (`*` or `+`), optionals, and alternations with predicates to ensure that the parser makes progress.
 1. If an error occurs inside of a loop and the token is in the recovery set, the loop breaks and parsing continues after the loop.
 
 ## Grammar Specification

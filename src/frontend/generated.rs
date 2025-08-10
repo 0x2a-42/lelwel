@@ -740,12 +740,11 @@ impl<'a> Parser<'a> {
                         self.error(diags, err![self, "<identifier>", "<string literal>"]);
                     }
                 },
-                Token::Semi
-                | Token::EOF
-                | Token::Right
-                | Token::Skip
-                | Token::Start
-                | Token::Token => break,
+                Token::Semi => break,
+                Token::EOF | Token::Right | Token::Skip | Token::Start | Token::Token => {
+                    self.error(diags, err![self, "<identifier>", ";", "<string literal>"]);
+                    break;
+                }
                 _ => {
                     self.advance_with_error(
                         diags,
@@ -785,12 +784,11 @@ impl<'a> Parser<'a> {
                         self.error(diags, err![self, "<identifier>", "<string literal>"]);
                     }
                 },
-                Token::Semi
-                | Token::EOF
-                | Token::Right
-                | Token::Skip
-                | Token::Start
-                | Token::Token => break,
+                Token::Semi => break,
+                Token::EOF | Token::Right | Token::Skip | Token::Start | Token::Token => {
+                    self.error(diags, err![self, "<identifier>", ";", "<string literal>"]);
+                    break;
+                }
                 _ => {
                     self.advance_with_error(
                         diags,
@@ -812,12 +810,11 @@ impl<'a> Parser<'a> {
                 Token::Id => {
                     self.rule_token_decl(diags);
                 }
-                Token::Semi
-                | Token::EOF
-                | Token::Right
-                | Token::Skip
-                | Token::Start
-                | Token::Token => break,
+                Token::Semi => break,
+                Token::EOF | Token::Right | Token::Skip | Token::Start | Token::Token => {
+                    self.error(diags, err![self, "<identifier>", ";"]);
+                    break;
+                }
                 _ => {
                     self.advance_with_error(diags, err![self, "<identifier>", ";"]);
                 }
@@ -830,14 +827,21 @@ impl<'a> Parser<'a> {
     fn rule_token_decl(&mut self, diags: &mut Vec<Diagnostic>) {
         let m = self.open(diags);
         expect!(Id, "<identifier>", self, diags);
-        match self.current {
-            Token::Equal => {
-                expect!(Equal, "=", self, diags);
-                expect!(Str, "<string literal>", self, diags);
-            }
-            Token::Id | Token::Semi => {}
-            _ => {
-                self.error(diags, err![self, "=", "<identifier>", ";"]);
+        loop {
+            match self.current {
+                Token::Equal => {
+                    expect!(Equal, "=", self, diags);
+                    expect!(Str, "<string literal>", self, diags);
+                    break;
+                }
+                Token::Id | Token::Semi => break,
+                Token::EOF | Token::Right | Token::Skip | Token::Start | Token::Token => {
+                    self.error(diags, err![self, "=", "<identifier>", ";"]);
+                    break;
+                }
+                _ => {
+                    self.advance_with_error(diags, err![self, "=", "<identifier>", ";"]);
+                }
             }
         }
         let closed = self.cst.close(m, Rule::TokenDecl);
@@ -846,54 +850,92 @@ impl<'a> Parser<'a> {
     fn rule_rule_decl(&mut self, diags: &mut Vec<Diagnostic>) {
         let m = self.open(diags);
         expect!(Id, "<identifier>", self, diags);
-        match self.current {
-            Token::Hat => {
-                expect!(Hat, "^", self, diags);
-            }
-            Token::Colon => {}
-            _ => {
-                self.error(diags, err![self, ":", "^"]);
+        loop {
+            match self.current {
+                Token::Hat => {
+                    expect!(Hat, "^", self, diags);
+                    break;
+                }
+                Token::Colon => break,
+                Token::EOF
+                | Token::Id
+                | Token::Right
+                | Token::Skip
+                | Token::Start
+                | Token::Token => {
+                    self.error(diags, err![self, ":", "^"]);
+                    break;
+                }
+                _ => {
+                    self.advance_with_error(diags, err![self, ":", "^"]);
+                }
             }
         }
         expect!(Colon, ":", self, diags);
-        match self.current {
-            Token::Action
-            | Token::And
-            | Token::Assertion
-            | Token::Hat
-            | Token::Id
-            | Token::LBrak
-            | Token::LPar
-            | Token::NodeCreation
-            | Token::NodeMarker
-            | Token::NodeRename
-            | Token::Predicate
-            | Token::Str
-            | Token::Tilde => {
-                self.rule_regex(diags);
-            }
-            Token::Semi => {}
-            _ => {
-                self.error(
-                    diags,
-                    err![
-                        self,
-                        "<semantic action>",
-                        "&",
-                        "<semantic assertion>",
-                        "^",
-                        "<identifier>",
-                        "[",
-                        "(",
-                        "<node creation>",
-                        "<node marker>",
-                        "<node rename>",
-                        "<semantic predicate>",
-                        ";",
-                        "<string literal>",
-                        "~"
-                    ],
-                );
+        loop {
+            match self.current {
+                Token::Action
+                | Token::And
+                | Token::Assertion
+                | Token::Hat
+                | Token::Id
+                | Token::LBrak
+                | Token::LPar
+                | Token::NodeCreation
+                | Token::NodeMarker
+                | Token::NodeRename
+                | Token::Predicate
+                | Token::Str
+                | Token::Tilde => {
+                    self.rule_regex(diags);
+                    break;
+                }
+                Token::Semi => break,
+                Token::EOF | Token::Right | Token::Skip | Token::Start | Token::Token => {
+                    self.error(
+                        diags,
+                        err![
+                            self,
+                            "<semantic action>",
+                            "&",
+                            "<semantic assertion>",
+                            "^",
+                            "<identifier>",
+                            "[",
+                            "(",
+                            "<node creation>",
+                            "<node marker>",
+                            "<node rename>",
+                            "<semantic predicate>",
+                            ";",
+                            "<string literal>",
+                            "~"
+                        ],
+                    );
+                    break;
+                }
+                _ => {
+                    self.advance_with_error(
+                        diags,
+                        err![
+                            self,
+                            "<semantic action>",
+                            "&",
+                            "<semantic assertion>",
+                            "^",
+                            "<identifier>",
+                            "[",
+                            "(",
+                            "<node creation>",
+                            "<node marker>",
+                            "<node rename>",
+                            "<semantic predicate>",
+                            ";",
+                            "<string literal>",
+                            "~"
+                        ],
+                    );
+                }
             }
         }
         expect!(Semi, ";", self, diags);
@@ -906,181 +948,260 @@ impl<'a> Parser<'a> {
     fn rule_alternation(&mut self, diags: &mut Vec<Diagnostic>) {
         let start = self.mark(diags);
         self.rule_ordered_choice(diags);
-        match self.current {
-            Token::Or => {
-                expect!(Or, "|", self, diags);
-                self.rule_ordered_choice(diags);
-                loop {
-                    match self.current {
-                        Token::Or => {
-                            expect!(Or, "|", self, diags);
-                            self.rule_ordered_choice(diags);
-                        }
-                        Token::RBrak
-                        | Token::RPar
-                        | Token::Semi
-                        | Token::EOF
-                        | Token::Id
-                        | Token::Right
-                        | Token::Skip
-                        | Token::Start
-                        | Token::Token => break,
-                        _ => {
-                            self.advance_with_error(diags, err![self, "|", "]", ")", ";"]);
+        loop {
+            match self.current {
+                Token::Or => {
+                    expect!(Or, "|", self, diags);
+                    self.rule_ordered_choice(diags);
+                    loop {
+                        match self.current {
+                            Token::Or => {
+                                expect!(Or, "|", self, diags);
+                                self.rule_ordered_choice(diags);
+                            }
+                            Token::RBrak | Token::RPar | Token::Semi => break,
+                            Token::EOF
+                            | Token::Id
+                            | Token::Right
+                            | Token::Skip
+                            | Token::Start
+                            | Token::Token => {
+                                self.error(diags, err![self, "|", "]", ")", ";"]);
+                                break;
+                            }
+                            _ => {
+                                self.advance_with_error(diags, err![self, "|", "]", ")", ";"]);
+                            }
                         }
                     }
+                    let open_node = self.cst.open_before(start);
+                    self.cst.close(open_node, Rule::Alternation);
+                    self.create_node_alternation(NodeRef(start.0), diags);
+                    break;
                 }
-                let open_node = self.cst.open_before(start);
-                self.cst.close(open_node, Rule::Alternation);
-                self.create_node_alternation(NodeRef(start.0), diags);
-            }
-            Token::RBrak | Token::RPar | Token::Semi => {}
-            _ => {
-                self.error(diags, err![self, "|", "]", ")", ";"]);
+                Token::RBrak | Token::RPar | Token::Semi => break,
+                Token::EOF
+                | Token::Id
+                | Token::Right
+                | Token::Skip
+                | Token::Start
+                | Token::Token => {
+                    self.error(diags, err![self, "|", "]", ")", ";"]);
+                    break;
+                }
+                _ => {
+                    self.advance_with_error(diags, err![self, "|", "]", ")", ";"]);
+                }
             }
         }
     }
     fn rule_ordered_choice(&mut self, diags: &mut Vec<Diagnostic>) {
         let start = self.mark(diags);
         self.rule_concat(diags);
-        match self.current {
-            Token::Slash => {
-                expect!(Slash, "/", self, diags);
-                self.rule_concat(diags);
-                loop {
-                    match self.current {
-                        Token::Slash => {
-                            expect!(Slash, "/", self, diags);
-                            self.rule_concat(diags);
-                        }
-                        Token::Or
-                        | Token::RBrak
-                        | Token::RPar
-                        | Token::Semi
-                        | Token::EOF
-                        | Token::Id
-                        | Token::Right
-                        | Token::Skip
-                        | Token::Start
-                        | Token::Token => break,
-                        _ => {
-                            self.advance_with_error(diags, err![self, "|", "]", ")", ";", "/"]);
+        loop {
+            match self.current {
+                Token::Slash => {
+                    expect!(Slash, "/", self, diags);
+                    self.rule_concat(diags);
+                    loop {
+                        match self.current {
+                            Token::Slash => {
+                                expect!(Slash, "/", self, diags);
+                                self.rule_concat(diags);
+                            }
+                            Token::Or | Token::RBrak | Token::RPar | Token::Semi => break,
+                            Token::EOF
+                            | Token::Id
+                            | Token::Right
+                            | Token::Skip
+                            | Token::Start
+                            | Token::Token => {
+                                self.error(diags, err![self, "|", "]", ")", ";", "/"]);
+                                break;
+                            }
+                            _ => {
+                                self.advance_with_error(diags, err![self, "|", "]", ")", ";", "/"]);
+                            }
                         }
                     }
+                    let open_node = self.cst.open_before(start);
+                    self.cst.close(open_node, Rule::OrderedChoice);
+                    self.create_node_ordered_choice(NodeRef(start.0), diags);
+                    break;
                 }
-                let open_node = self.cst.open_before(start);
-                self.cst.close(open_node, Rule::OrderedChoice);
-                self.create_node_ordered_choice(NodeRef(start.0), diags);
-            }
-            Token::Or | Token::RBrak | Token::RPar | Token::Semi => {}
-            _ => {
-                self.error(diags, err![self, "|", "]", ")", ";", "/"]);
+                Token::Or | Token::RBrak | Token::RPar | Token::Semi => break,
+                Token::EOF
+                | Token::Id
+                | Token::Right
+                | Token::Skip
+                | Token::Start
+                | Token::Token => {
+                    self.error(diags, err![self, "|", "]", ")", ";", "/"]);
+                    break;
+                }
+                _ => {
+                    self.advance_with_error(diags, err![self, "|", "]", ")", ";", "/"]);
+                }
             }
         }
     }
     fn rule_concat(&mut self, diags: &mut Vec<Diagnostic>) {
         let start = self.mark(diags);
         self.rule_postfix(diags);
-        match self.current {
-            Token::Action
-            | Token::And
-            | Token::Assertion
-            | Token::Hat
-            | Token::Id
-            | Token::LBrak
-            | Token::LPar
-            | Token::NodeCreation
-            | Token::NodeMarker
-            | Token::NodeRename
-            | Token::Predicate
-            | Token::Str
-            | Token::Tilde => {
-                self.rule_postfix(diags);
-                loop {
-                    match self.current {
-                        Token::Action
-                        | Token::And
-                        | Token::Assertion
-                        | Token::Hat
-                        | Token::Id
-                        | Token::LBrak
-                        | Token::LPar
-                        | Token::NodeCreation
-                        | Token::NodeMarker
-                        | Token::NodeRename
-                        | Token::Predicate
-                        | Token::Str
-                        | Token::Tilde => {
-                            self.rule_postfix(diags);
-                        }
-                        Token::Or
-                        | Token::RBrak
-                        | Token::RPar
-                        | Token::Semi
-                        | Token::Slash
-                        | Token::EOF
-                        | Token::Right
-                        | Token::Skip
-                        | Token::Start
-                        | Token::Token => break,
-                        _ => {
-                            self.advance_with_error(
-                                diags,
-                                err![
-                                    self,
-                                    "<semantic action>",
-                                    "&",
-                                    "<semantic assertion>",
-                                    "^",
-                                    "<identifier>",
-                                    "[",
-                                    "(",
-                                    "<node creation>",
-                                    "<node marker>",
-                                    "<node rename>",
-                                    "|",
-                                    "<semantic predicate>",
-                                    "]",
-                                    ")",
-                                    ";",
-                                    "/",
-                                    "<string literal>",
-                                    "~"
-                                ],
-                            );
+        loop {
+            match self.current {
+                Token::Action
+                | Token::And
+                | Token::Assertion
+                | Token::Hat
+                | Token::Id
+                | Token::LBrak
+                | Token::LPar
+                | Token::NodeCreation
+                | Token::NodeMarker
+                | Token::NodeRename
+                | Token::Predicate
+                | Token::Str
+                | Token::Tilde => {
+                    self.rule_postfix(diags);
+                    loop {
+                        match self.current {
+                            Token::Action
+                            | Token::And
+                            | Token::Assertion
+                            | Token::Hat
+                            | Token::Id
+                            | Token::LBrak
+                            | Token::LPar
+                            | Token::NodeCreation
+                            | Token::NodeMarker
+                            | Token::NodeRename
+                            | Token::Predicate
+                            | Token::Str
+                            | Token::Tilde => {
+                                self.rule_postfix(diags);
+                            }
+                            Token::Or | Token::RBrak | Token::RPar | Token::Semi | Token::Slash => {
+                                break
+                            }
+                            Token::EOF
+                            | Token::Right
+                            | Token::Skip
+                            | Token::Start
+                            | Token::Token => {
+                                self.error(
+                                    diags,
+                                    err![
+                                        self,
+                                        "<semantic action>",
+                                        "&",
+                                        "<semantic assertion>",
+                                        "^",
+                                        "<identifier>",
+                                        "[",
+                                        "(",
+                                        "<node creation>",
+                                        "<node marker>",
+                                        "<node rename>",
+                                        "|",
+                                        "<semantic predicate>",
+                                        "]",
+                                        ")",
+                                        ";",
+                                        "/",
+                                        "<string literal>",
+                                        "~"
+                                    ],
+                                );
+                                break;
+                            }
+                            _ => {
+                                self.advance_with_error(
+                                    diags,
+                                    err![
+                                        self,
+                                        "<semantic action>",
+                                        "&",
+                                        "<semantic assertion>",
+                                        "^",
+                                        "<identifier>",
+                                        "[",
+                                        "(",
+                                        "<node creation>",
+                                        "<node marker>",
+                                        "<node rename>",
+                                        "|",
+                                        "<semantic predicate>",
+                                        "]",
+                                        ")",
+                                        ";",
+                                        "/",
+                                        "<string literal>",
+                                        "~"
+                                    ],
+                                );
+                            }
                         }
                     }
+                    let open_node = self.cst.open_before(start);
+                    self.cst.close(open_node, Rule::Concat);
+                    self.create_node_concat(NodeRef(start.0), diags);
+                    break;
                 }
-                let open_node = self.cst.open_before(start);
-                self.cst.close(open_node, Rule::Concat);
-                self.create_node_concat(NodeRef(start.0), diags);
-            }
-            Token::Or | Token::RBrak | Token::RPar | Token::Semi | Token::Slash => {}
-            _ => {
-                self.error(
-                    diags,
-                    err![
-                        self,
-                        "<semantic action>",
-                        "&",
-                        "<semantic assertion>",
-                        "^",
-                        "<identifier>",
-                        "[",
-                        "(",
-                        "<node creation>",
-                        "<node marker>",
-                        "<node rename>",
-                        "|",
-                        "<semantic predicate>",
-                        "]",
-                        ")",
-                        ";",
-                        "/",
-                        "<string literal>",
-                        "~"
-                    ],
-                );
+                Token::Or | Token::RBrak | Token::RPar | Token::Semi | Token::Slash => break,
+                Token::EOF | Token::Right | Token::Skip | Token::Start | Token::Token => {
+                    self.error(
+                        diags,
+                        err![
+                            self,
+                            "<semantic action>",
+                            "&",
+                            "<semantic assertion>",
+                            "^",
+                            "<identifier>",
+                            "[",
+                            "(",
+                            "<node creation>",
+                            "<node marker>",
+                            "<node rename>",
+                            "|",
+                            "<semantic predicate>",
+                            "]",
+                            ")",
+                            ";",
+                            "/",
+                            "<string literal>",
+                            "~"
+                        ],
+                    );
+                    break;
+                }
+                _ => {
+                    self.advance_with_error(
+                        diags,
+                        err![
+                            self,
+                            "<semantic action>",
+                            "&",
+                            "<semantic assertion>",
+                            "^",
+                            "<identifier>",
+                            "[",
+                            "(",
+                            "<node creation>",
+                            "<node marker>",
+                            "<node rename>",
+                            "|",
+                            "<semantic predicate>",
+                            "]",
+                            ")",
+                            ";",
+                            "/",
+                            "<string literal>",
+                            "~"
+                        ],
+                    );
+                }
             }
         }
     }

@@ -1,0 +1,6 @@
+error: invalid syntax, expected one of: '->', '{'
+  ┌─ <input>:1:10
+  │
+1 │ fn foo() i32 {
+  │          ^^^
+
