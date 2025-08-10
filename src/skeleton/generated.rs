@@ -463,6 +463,14 @@ impl<'a> Parser<'a> {{
             .nth(lookbehind)
             .map_or(Token::EOF, |it| *it)
     }}
+    fn open(&mut self, diags: &mut Vec<Diagnostic>) -> MarkOpened {{
+        if let Some(error_node) = self.error_node {{
+            self.cst.close(error_node, Rule::Error);
+            self.create_node_error(NodeRef(error_node.0), diags);
+            self.error_node = None;
+        }}
+        self.cst.open()
+    }}
     fn span(&self) -> Span {{
         self.cst.spans
             .get(self.pos)

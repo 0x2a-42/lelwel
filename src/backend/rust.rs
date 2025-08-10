@@ -315,7 +315,7 @@ impl RustOutput {
         elision: RuleNodeElision,
     ) -> std::io::Result<()> {
         match elision {
-            RuleNodeElision::None => output.write_all(b"        let m = self.cst.open();\n")?,
+            RuleNodeElision::None => output.write_all(b"        let m = self.open(diags);\n")?,
             RuleNodeElision::Conditional => output.write_all(
                 b"        let start = self.cst.mark();\
                 \n        let mut elide = false;\n",
@@ -347,7 +347,7 @@ impl RustOutput {
             output.write_all(
                 b"        if self.current != Token::EOF {\
                 \n            self.error(diags, err![self, \"<end of file>\"]);\
-                \n            let error_tree = self.cst.open();\
+                \n            let error_tree = self.open(diags);\
                 \n            loop {\
                 \n                match self.tokens.get(self.pos) {\
                 \n                    None => break,\
