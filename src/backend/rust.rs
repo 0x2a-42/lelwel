@@ -345,7 +345,8 @@ impl RustOutput {
         )?;
         if is_start {
             output.write_all(
-                b"        if self.current != Token::EOF {\
+                b"        self.close_error_node(diags);\
+                \n        if self.current != Token::EOF {\
                 \n            self.error(diags, err![self, \"<end of file>\"]);\
                 \n            let error_tree = self.open(diags);\
                 \n            loop {\

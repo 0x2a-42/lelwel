@@ -661,6 +661,7 @@ impl<'a> Parser<'a> {
                 }
             }
         }
+        self.close_error_node(diags);
         if self.current != Token::EOF {
             self.error(diags, err![self, "<end of file>"]);
             let error_tree = self.open(diags);
