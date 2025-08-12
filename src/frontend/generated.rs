@@ -56,7 +56,6 @@ pub enum Rule {
     Optional,
     OrderedChoice,
     Paren,
-    Part,
     PartDecl,
     Plus,
     Postfix,
@@ -378,7 +377,6 @@ impl std::fmt::Debug for Rule {
             Rule::Optional => write!(f, "optional"),
             Rule::OrderedChoice => write!(f, "ordered_choice"),
             Rule::Paren => write!(f, "paren"),
-            Rule::Part => write!(f, "part"),
             Rule::PartDecl => write!(f, "part_decl"),
             Rule::Plus => write!(f, "plus"),
             Rule::Postfix => write!(f, "postfix"),
@@ -595,7 +593,6 @@ impl<'a> Parser<'a> {
             Rule::Optional => self.create_node_optional(node_ref, diags),
             Rule::OrderedChoice => self.create_node_ordered_choice(node_ref, diags),
             Rule::Paren => self.create_node_paren(node_ref, diags),
-            Rule::Part => self.create_node_part(node_ref, diags),
             Rule::PartDecl => self.create_node_part_decl(node_ref, diags),
             Rule::Plus => self.create_node_plus(node_ref, diags),
             Rule::Postfix => self.create_node_postfix(node_ref, diags),
@@ -1499,8 +1496,6 @@ trait ParserCallbacks {
     fn create_node_ordered_choice(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
     /// Called when `paren` node is created.
     fn create_node_paren(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
-    /// Called when `part` node is created.
-    fn create_node_part(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
     /// Called when `part_decl` node is created.
     fn create_node_part_decl(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
     /// Called when `plus` node is created.

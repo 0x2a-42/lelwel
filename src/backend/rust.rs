@@ -1309,10 +1309,10 @@ impl RustOutput {
             token_symbols.insert(name, sym);
         }
         let contains_ordered_choice = !sema.used_in_ordered_choice.is_empty();
-        let mut rule_names = BTreeMap::from_iter([
-            ("error", contains_ordered_choice),
-            ("part", contains_ordered_choice),
-        ]);
+        let mut rule_names = BTreeMap::from_iter([("error", contains_ordered_choice)]);
+        if !sema.parts.is_empty() {
+            rule_names.insert("part", false);
+        }
         for rule in file.rule_decls(cst) {
             let in_choice = sema.used_in_ordered_choice.contains(&rule.syntax());
             rule_names
