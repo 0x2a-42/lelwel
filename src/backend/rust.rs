@@ -6,6 +6,22 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
+pub fn snake_to_pascal_case(name: &str) -> String {
+    let mut res = String::new();
+    let mut upper = true;
+    for c in name.chars() {
+        if upper {
+            res.push(c.to_ascii_uppercase());
+            upper = false;
+        } else if c == '_' {
+            upper = true;
+        } else {
+            res.push(c);
+        }
+    }
+    res
+}
+
 fn escape(sym: &str) -> String {
     sym.replace(r"\\", r"\")
         .replace(r"\'", "'")
@@ -54,7 +70,11 @@ impl Generator for std::collections::BTreeSet<TokenName<'_>> {
         if !self.is_empty() {
             let symbols: Vec<_> = self
                 .iter()
-                .map(|s| format!("\"{}\"", escape(token_symbols[s.0])))
+                .filter_map(|s| {
+                    token_symbols
+                        .get(s.0.as_ref())
+                        .map(|sym| format!("\"{}\"", escape(sym)))
+                })
                 .collect();
             symbols.join(&format!(",\n{}", "    ".repeat(level)))
         } else {
@@ -257,7 +277,7 @@ impl RustOutput {
                 format!(
                     "{}node_kind = Rule::{};\n",
                     if is_decl { "let mut " } else { "" },
-                    Self::snake_to_pascal_case(name),
+                    snake_to_pascal_case(name),
                 )
                 .indent(level)
                 .as_bytes(),
@@ -293,7 +313,7 @@ impl RustOutput {
                     "let closed = {parser_name}.cst.{close}(m, Rule::{});\
                    \n{parser_name}.create_node_{name}(NodeRef(closed.0), diags);\
                    \n{lhs}\n",
-                    Self::snake_to_pascal_case(name),
+                    snake_to_pascal_case(name),
                 )
                 .indent(level)
                 .as_bytes(),
@@ -314,21 +334,22 @@ impl RustOutput {
         is_start: bool,
         elision: RuleNodeElision,
     ) -> std::io::Result<()> {
-        match elision {
-            RuleNodeElision::None => output.write_all(b"        let m = self.open(diags);\n")?,
-            RuleNodeElision::Conditional => output.write_all(
-                b"        let start = self.mark(diags);\
-                \n        let mut elide = false;\n",
-            )?,
-            RuleNodeElision::Unconditional => {
-                if has_rule_creation {
-                    output.write_all(b"        let start = self.mark(diags);\n")?;
+        if !is_start {
+            match elision {
+                RuleNodeElision::None => {
+                    output.write_all(b"        let m = self.open(diags);\n")?
+                }
+                RuleNodeElision::Conditional => output.write_all(
+                    b"        let start = self.mark(diags);\
+                    \n        let mut elide = false;\n",
+                )?,
+                RuleNodeElision::Unconditional => {
+                    if has_rule_creation {
+                        output.write_all(b"        let start = self.mark(diags);\n")?;
+                    }
                 }
             }
-        }
-        Self::output_node_kind_decl(output, has_rule_rename, name, 2, true)?;
-        if is_start {
-            output.write_all(b"        self.init_skip();\n")?;
+            Self::output_node_kind_decl(output, has_rule_rename, name, 2, true)?;
         }
         Self::output_regex(
             cst,
@@ -343,37 +364,37 @@ impl RustOutput {
             "self",
             has_rule_rename,
         )?;
-        if is_start {
-            output.write_all(
-                b"        self.close_error_node(diags);\
-                \n        if self.current != Token::EOF {\
-                \n            self.error(diags, err![self, \"<end of file>\"]);\
-                \n            let error_tree = self.open(diags);\
-                \n            loop {\
-                \n                match self.tokens.get(self.pos) {\
-                \n                    None => break,\
-                \n                    Some(token) => self.cst.advance(*token, Self::is_skipped(*token)),\
-                \n                }\
-                \n                self.pos += 1;\
-                \n            }\
-                \n            self.cst.close(error_tree, Rule::Error);\
-                \n            self.create_node_error(NodeRef(error_tree.0), diags);\
-                \n        }\n",
-            )?;
-        }
-        match elision {
-            RuleNodeElision::None => {
-                Self::output_cst_close(output, has_rule_rename, name, 2, false, "self", is_start)
+        if !is_start {
+            match elision {
+                RuleNodeElision::None => Self::output_cst_close(
+                    output,
+                    has_rule_rename,
+                    name,
+                    2,
+                    false,
+                    "self",
+                    is_start,
+                ),
+                RuleNodeElision::Conditional => {
+                    output.write_all(
+                        b"        if !elide {\
+                        \n            let m = self.cst.open_before(start);\n",
+                    )?;
+                    Self::output_cst_close(
+                        output,
+                        has_rule_rename,
+                        name,
+                        3,
+                        false,
+                        "self",
+                        is_start,
+                    )?;
+                    output.write_all(b"        }\n")
+                }
+                RuleNodeElision::Unconditional => Ok(()),
             }
-            RuleNodeElision::Conditional => {
-                output.write_all(
-                    b"        if !elide {\
-                   \n            let m = self.cst.open_before(start);\n",
-                )?;
-                Self::output_cst_close(output, has_rule_rename, name, 3, false, "self", is_start)?;
-                output.write_all(b"        }\n")
-            }
-            RuleNodeElision::Unconditional => Ok(()),
+        } else {
+            Ok(())
         }
     }
 
@@ -629,6 +650,25 @@ impl RustOutput {
                 call_rec("self", 0, "lhs")
             )
             .indent(2)
+            .as_bytes(),
+        )
+    }
+
+    fn output_parts(
+        cst: &Cst<'_>,
+        rule: RuleDecl,
+        output: &mut BufWriter<std::fs::File>,
+    ) -> std::io::Result<()> {
+        let name = rule.name(cst).unwrap().0;
+        output.write_all(
+            format!(
+                "    /// Returns the CST for a parse of the {name} rule\
+               \n    pub fn parse_{name}(mut self, diags: &mut Vec<Diagnostic>) -> Cst<'a> {{\
+               \n        self.end_of_input = Token::EOF{};\
+               \n        self.parse_rule(|parser, diags| parser.rule_{name}(diags), diags, Rule::Part)\
+               \n    }}\n",
+               snake_to_pascal_case(name)
+            )
             .as_bytes(),
         )
     }
@@ -1162,7 +1202,7 @@ impl RustOutput {
                 let name = &rename.value(cst).unwrap().0[1..];
                 if !name.is_empty() {
                     output.write_all(
-                        format!("node_kind = Rule::{};\n", Self::snake_to_pascal_case(name))
+                        format!("node_kind = Rule::{};\n", snake_to_pascal_case(name))
                             .indent(level)
                             .as_bytes(),
                     )?;
@@ -1193,7 +1233,7 @@ impl RustOutput {
                         "let open_node = {parser_name}.cst.open_before({mark});\
                        \n{parser_name}.cst.close(open_node, Rule::{});\
                        \n{parser_name}.create_node_{node_name}(NodeRef({mark}.0), diags);\n",
-                        Self::snake_to_pascal_case(node_name)
+                        snake_to_pascal_case(node_name)
                     )
                     .indent(level)
                     .as_bytes(),
@@ -1253,22 +1293,6 @@ impl RustOutput {
         Ok(())
     }
 
-    fn snake_to_pascal_case(name: &str) -> String {
-        let mut res = String::new();
-        let mut upper = true;
-        for c in name.chars() {
-            if upper {
-                res.push(c.to_ascii_uppercase());
-                upper = false;
-            } else if c == '_' {
-                upper = true;
-            } else {
-                res.push(c);
-            }
-        }
-        res
-    }
-
     /// Outputs the Parser struct and impl.
     fn output_generated(
         cst: &Cst<'_>,
@@ -1285,7 +1309,10 @@ impl RustOutput {
             token_symbols.insert(name, sym);
         }
         let contains_ordered_choice = !sema.used_in_ordered_choice.is_empty();
-        let mut rule_names = BTreeMap::from_iter([("error", contains_ordered_choice)]);
+        let mut rule_names = BTreeMap::from_iter([
+            ("error", contains_ordered_choice),
+            ("part", contains_ordered_choice),
+        ]);
         for rule in file.rule_decls(cst) {
             let in_choice = sema.used_in_ordered_choice.contains(&rule.syntax());
             rule_names
@@ -1312,7 +1339,7 @@ impl RustOutput {
         };
         let mut delete_covered = true;
         for (rule_name, in_choice) in rule_names.iter() {
-            let pascal_case_name = &Self::snake_to_pascal_case(rule_name);
+            let pascal_case_name = &snake_to_pascal_case(rule_name);
 
             rules += "\n    ";
             rules += pascal_case_name;
@@ -1352,18 +1379,25 @@ impl RustOutput {
             skip += token.name(cst).unwrap().0;
         }
 
+        let start_rule = sema.start_rule.unwrap().name(cst).unwrap().0;
+        let start_rule_pascal_case = snake_to_pascal_case(start_rule);
+
         output.write_all(
             format!(
                 include_str!("../skeleton/generated.rs"),
                 rules,
                 skip,
-                sema.start_rule.unwrap().name(cst).unwrap().0,
+                start_rule,
+                start_rule_pascal_case,
                 rules_fmt,
                 rules_create,
                 rules_delete,
             )
             .as_bytes(),
         )?;
+        for rule in sema.parts.iter() {
+            Self::output_parts(cst, *rule, output)?;
+        }
         for rule in file.rule_decls(cst) {
             Self::output_rule(cst, sema, rule, output, &token_symbols)?;
         }

@@ -16,7 +16,7 @@ fn main() {
 
     let source = &args[1];
     let mut diags = vec![];
-    let cst = Parser::parse(source, &mut diags);
+    let cst = Parser::new(source, &mut diags).parse(&mut diags);
     println!("{cst}");
 
     let writer = StandardStream::stderr(ColorChoice::Auto);

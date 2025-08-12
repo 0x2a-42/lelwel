@@ -249,6 +249,8 @@ impl Default for Context {
 #[herring(subpattern floatnumber = "(?&pointfloat)(?&exponent)?|[0-9]+(?&exponent)")]
 pub enum Token {
     EOF,
+    EOFSingleInput,
+    EOFEvalInput,
     #[token("<")]
     Lt,
     #[token(">")]

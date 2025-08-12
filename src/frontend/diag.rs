@@ -34,6 +34,8 @@ pub const ACTION_IN_ORDERED_CHOICE: &str = "E029";
 pub const RETURN_IN_START_RULE: &str = "E030";
 pub const MULTIPLE_START_RULES: &str = "E031";
 pub const ELISION_IN_START_RULE: &str = "E032";
+pub const REDEFINE_AS_PART: &str = "E033";
+pub const START_AS_PART: &str = "E034";
 
 pub const UNUSED_RULE: &str = "W001";
 pub const UNUSED_TOKEN: &str = "W002";
@@ -83,6 +85,8 @@ pub trait LanguageErrors {
     fn return_in_start_rule(span: &Span) -> Self;
     fn multiple_start_rules(span: &Span, old_span: &Span) -> Self;
     fn elision_in_start_rule(span: &Span) -> Self;
+    fn redefine_as_part(span: &Span) -> Self;
+    fn start_as_part(span: &Span) -> Self;
 }
 
 impl LanguageErrors for Diagnostic {
@@ -445,6 +449,20 @@ impl LanguageErrors for Diagnostic {
         Diagnostic::error()
             .with_code(ELISION_IN_START_RULE)
             .with_message("start rule node cannot be elided")
+            .with_labels(vec![Label::primary((), span.clone())])
+    }
+
+    fn redefine_as_part(span: &Span) -> Self {
+        Diagnostic::error()
+            .with_code(REDEFINE_AS_PART)
+            .with_message("rule is already defined as part")
+            .with_labels(vec![Label::primary((), span.clone())])
+    }
+
+    fn start_as_part(span: &Span) -> Self {
+        Diagnostic::error()
+            .with_code(START_AS_PART)
+            .with_message("start rule cannot be defined as part")
             .with_labels(vec![Label::primary((), span.clone())])
     }
 }

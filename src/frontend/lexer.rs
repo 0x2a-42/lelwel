@@ -82,6 +82,8 @@ pub enum Token {
     Right,
     #[token("skip")]
     Skip,
+    #[token("part")]
+    Part,
     #[token(":")]
     Colon,
     #[token(";")]

@@ -60,6 +60,7 @@ ast_node!(RuleDecl);
 ast_node!(StartDecl);
 ast_node!(RightDecl);
 ast_node!(SkipDecl);
+ast_node!(PartDecl);
 ast_node!(
     Regex,
     (
@@ -172,6 +173,13 @@ impl File {
     {
         cst.child_node_iter(self.syntax)
     }
+    pub fn part_decls<'a>(
+        &self,
+        cst: &'a Cst<'_>,
+    ) -> std::iter::FilterMap<CstChildren<'a>, impl FnMut(NodeRef) -> Option<PartDecl> + 'a + use<'a>>
+    {
+        cst.child_node_iter(self.syntax)
+    }
 }
 impl Named for TokenDecl {
     fn name<'a>(&self, cst: &'a Cst<'_>) -> Option<(&'a str, Span)> {
@@ -221,6 +229,13 @@ impl SkipDecl {
                 cst.match_token(c, Token::Id)
                     .or_else(|| cst.match_token(c, Token::Str))
             })
+            .for_each(f);
+    }
+}
+impl PartDecl {
+    pub fn rule_names<'a, F: FnMut((&'a str, Span))>(&self, cst: &'a Cst<'_>, f: F) {
+        cst.children(self.syntax)
+            .filter_map(|c| cst.match_token(c, Token::Id))
             .for_each(f);
     }
 }
