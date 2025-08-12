@@ -215,10 +215,10 @@ impl<'a> GeneralCheck<'a> {
                 .for_each(|decl| self.check_right_decl(cst, decl, diags, sema));
             file.skip_decls(cst)
                 .for_each(|decl| self.check_skip_decl(cst, decl, diags, sema));
-            file.part_decls(cst)
-                .for_each(|decl| self.check_part_decl(cst, decl, diags, sema));
             file.start_decls(cst)
                 .for_each(|decl| self.check_start_decl(cst, decl, diags, sema));
+            file.part_decls(cst)
+                .for_each(|decl| self.check_part_decl(cst, decl, diags, sema));
             file.rule_decls(cst)
                 .for_each(|decl| self.check_rule_decl(cst, decl, diags, sema));
         }
