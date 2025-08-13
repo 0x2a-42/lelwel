@@ -1116,18 +1116,22 @@ impl<'a> LL1Validator {
                 .entry(start_rule_regex.syntax())
                 .or_default()
                 .insert(TokenName::EOF);
-        }
-        for part in sema.parts.iter() {
-            if let Some(part_regex) = part.regex(cst)
-                && let Some((name, _)) = part.name(cst)
-            {
-                sema.follow_sets
-                    .entry(part_regex.syntax())
-                    .or_default()
-                    .insert(TokenName(Cow::Owned(format!(
-                        "EOF{}",
-                        snake_to_pascal_case(name)
-                    ))));
+
+            for part in sema.parts.iter() {
+                if let Some(part_regex) = part.regex(cst)
+                    && let Some((name, _)) = part.name(cst)
+                {
+                    let eof_token =
+                        TokenName(Cow::Owned(format!("EOF{}", snake_to_pascal_case(name))));
+                    sema.follow_sets
+                        .entry(start_rule_regex.syntax())
+                        .or_default()
+                        .insert(eof_token.clone());
+                    sema.follow_sets
+                        .entry(part_regex.syntax())
+                        .or_default()
+                        .insert(eof_token);
+                }
             }
         }
         // Iterates until there are no more changes in the follow sets
@@ -1640,20 +1644,16 @@ impl RecoverySetGenerator {
             return;
         };
 
-        // start node dominates itself
-        self.dom.insert(start, HashSet::from_iter([start]));
-
-        // part nodes dominate themselves, if they are unused
+        // part nodes get start node as predecessor if they are unused
         for part in sema.parts.iter() {
             if !sema.used.contains(&part.syntax()) {
                 sema.used.insert(part.syntax());
                 let Some(part_regex) = part.regex(cst) else {
                     continue;
                 };
-                self.dom.insert(part_regex, HashSet::from_iter([part_regex]));
+                self.add_pred(part_regex, start);
             }
         }
-
         for rule in file.rule_decls(cst) {
             if sema.used.contains(&rule.syntax()) {
                 if let Some(regex) = rule.regex(cst) {
@@ -1661,10 +1661,13 @@ impl RecoverySetGenerator {
                 }
             }
         }
+
         let nodes_no_start: HashSet<_> = self.pred.keys().copied().collect();
         let mut nodes = nodes_no_start.clone();
         nodes.insert(start);
 
+        // start node dominates itself
+        self.dom.insert(start, HashSet::from_iter([start]));
         // other nodes are initialized with all nodes as dominators
         for regex in nodes_no_start.iter() {
             self.dom.insert(*regex, nodes.clone());
