@@ -1,7 +1,9 @@
 use crate::frontend::ast::{AstNode, Regex, RuleDecl};
 use crate::frontend::lexer::Token;
+use crate::frontend::sema::TokenName;
 use crate::{Cst, NodeRef, Rule, SemanticData};
 use logos::Span;
+use std::collections::BTreeSet;
 
 use super::lookup::*;
 
@@ -9,29 +11,39 @@ pub fn hover(cst: &Cst<'_>, sema: &SemanticData<'_>, pos: usize) -> Option<(Stri
     let node = lookup_rule_node(cst, NodeRef::ROOT, pos)?;
     let span = cst.span(node);
 
+    fn filter_part_eof<'a>(tokens: &BTreeSet<TokenName<'a>>) -> String {
+        format!(
+            "{:?}",
+            tokens
+                .iter()
+                .filter(|tok| tok.0.as_ref() == "EOF" || !tok.0.as_ref().starts_with("EOF"))
+                .collect::<BTreeSet<_>>()
+        )
+    }
+
     if let Some(regex) = Regex::cast(cst, node) {
         let first = &sema
             .first_sets
             .get(&regex.syntax())
-            .map_or("{}".to_string(), |s| format!("{s:?}"));
+            .map_or("{}".to_string(), filter_part_eof);
         let follow = &sema
             .follow_sets
             .get(&regex.syntax())
-            .map_or("{}".to_string(), |s| format!("{s:?}"));
+            .map_or("{}".to_string(), filter_part_eof);
         let predict = &sema
             .predict_sets
             .get(&regex.syntax())
-            .map_or("{}".to_string(), |s| format!("{s:?}"));
+            .map_or("{}".to_string(), filter_part_eof);
 
         match regex {
             Regex::Star(_) | Regex::Plus(_) | Regex::Optional(_) => {
                 let recovery = &sema
                     .recovery_sets
                     .get(&regex.syntax())
-                    .map_or("{}".to_string(), |s| format!("{s:?}"));
+                    .map_or("{}".to_string(), filter_part_eof);
                 Some((
                     format!(
-                        "**First:** {first}\n**Follow:** {follow}\n**Predict:** {predict}\n**Recovery:** {recovery}\n"
+                        "**First:** {first}\n\n**Follow:** {follow}\n\n**Predict:** {predict}\n\n**Recovery:** {recovery}"
                     ),
                     span,
                 ))
@@ -60,17 +72,17 @@ pub fn hover(cst: &Cst<'_>, sema: &SemanticData<'_>, pos: usize) -> Option<(Stri
                     comment.push_str(val.strip_prefix("///").unwrap().trim_start());
                 }
                 if !comment.is_empty() {
-                    comment.push_str("---\n")
+                    comment.push_str("\n---\n")
                 }
                 Some((
                     format!(
-                        "{comment}**First:** {first}\n**Follow:** {follow}\n**Predict:** {predict}\n"
+                        "{comment}**First:** {first}\n\n**Follow:** {follow}\n\n**Predict:** {predict}"
                     ),
                     span,
                 ))
             }
             _ => Some((
-                format!("**First:** {first}\n**Follow:** {follow}\n**Predict:** {predict}\n"),
+                format!("**First:** {first}\n\n**Follow:** {follow}\n\n**Predict:** {predict}"),
                 span,
             )),
         }
@@ -79,17 +91,17 @@ pub fn hover(cst: &Cst<'_>, sema: &SemanticData<'_>, pos: usize) -> Option<(Stri
         let first = &sema
             .first_sets
             .get(&regex.syntax())
-            .map_or("{}".to_string(), |s| format!("{s:?}"));
+            .map_or("{}".to_string(), filter_part_eof);
         let follow = &sema
             .follow_sets
             .get(&regex.syntax())
-            .map_or("{}".to_string(), |s| format!("{s:?}"));
+            .map_or("{}".to_string(), filter_part_eof);
         let predict = &sema
             .predict_sets
             .get(&regex.syntax())
-            .map_or("{}".to_string(), |s| format!("{s:?}"));
+            .map_or("{}".to_string(), filter_part_eof);
         Some((
-            format!("**First:** {first}\n**Follow:** {follow}\n**Predict:** {predict}\n"),
+            format!("**First:** {first}\n\n**Follow:** {follow}\n\n**Predict:** {predict}"),
             span,
         ))
     } else {
