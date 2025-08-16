@@ -304,6 +304,16 @@ fn redef_node_marker() {
 
 #[test]
 #[rustfmt::skip]
+fn redef_part() {
+    let diags = gen_diags("tests/frontend/redef_part.llw");
+    let mut lines = diags.lines();
+
+    assert_eq!(lines.next(), Some("tests/frontend/redef_part.llw:4:10: error[E033]: rule is already defined as part"));
+    assert_eq!(lines.next(), None);
+}
+
+#[test]
+#[rustfmt::skip]
 fn redundant_elision() {
     let diags = gen_diags("tests/frontend/redundant_elision.llw");
     let mut lines = diags.lines();
@@ -323,6 +333,16 @@ fn return_start() {
     let mut lines = diags.lines();
 
     assert_eq!(lines.next(), Some("tests/frontend/return_start.llw:3:4: error[E030]: return is not allowed in start rule"));
+    assert_eq!(lines.next(), None);
+}
+
+#[test]
+#[rustfmt::skip]
+fn start_as_part() {
+    let diags = gen_diags("tests/frontend/start_as_part.llw");
+    let mut lines = diags.lines();
+
+    assert_eq!(lines.next(), Some("tests/frontend/start_as_part.llw:4:6: error[E034]: start rule cannot be defined as part"));
     assert_eq!(lines.next(), None);
 }
 
@@ -409,6 +429,15 @@ fn unused_node_marker() {
     let mut lines = diags.lines();
 
     assert_eq!(lines.next(), Some("tests/frontend/unused_node_marker.llw:4:7: warning[W003]: unused node marker"));
+    assert_eq!(lines.next(), None);
+}
+
+#[test]
+#[rustfmt::skip]
+fn unused_part() {
+    let diags = gen_diags("tests/frontend/unused_part.llw");
+    let mut lines = diags.lines();
+
     assert_eq!(lines.next(), None);
 }
 
