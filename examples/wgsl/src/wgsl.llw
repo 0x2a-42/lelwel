@@ -54,7 +54,7 @@ attribute:
   | Ident ['(' [expression (?1 ',' expression)* [',']] ')']
   )
 ;
-typed_ident: Ident [':' type_specifier];
+typed_ident: Ident (':' type_specifier | ());
 
 type_specifier: Ident template_list;
 template_list^: [#1 template_args >];

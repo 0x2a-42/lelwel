@@ -68,6 +68,15 @@ fn empty() {
 
 #[test]
 #[rustfmt::skip]
+fn empty_paren() {
+    let diags = gen_diags("tests/frontend/empty_paren.llw");
+    let mut lines = diags.lines();
+
+    assert_eq!(lines.next(), None);
+}
+
+#[test]
+#[rustfmt::skip]
 fn invalid_node_create() {
     let diags = gen_diags("tests/frontend/invalid_node_create.llw");
     let mut lines = diags.lines();

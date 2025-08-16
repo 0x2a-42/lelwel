@@ -39,3 +39,7 @@ fn missing_arrow() {
 fn invalid_for() {
     check!("invalid_for");
 }
+#[test]
+fn incomplete_let() {
+    check!("incomplete_let");
+}

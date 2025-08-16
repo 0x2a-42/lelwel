@@ -39,7 +39,13 @@ impl GraphvizOutput {
 
     fn skip_paren(cst: &Cst<'_>, regex: Regex) -> Regex {
         match regex {
-            Regex::Paren(paren) => Self::skip_paren(cst, paren.inner(cst).unwrap()),
+            Regex::Paren(paren) => {
+                if let Some(inner) = paren.inner(cst) {
+                    Self::skip_paren(cst, inner)
+                } else {
+                    regex
+                }
+            }
             _ => regex,
         }
     }

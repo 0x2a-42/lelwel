@@ -36,7 +36,7 @@ concat^: postfix [postfix+ >];
 postfix:
   postfix '*' @star
 | postfix '+' @plus
-| '(' regex ')' @paren
+| '(' [regex] ')' @paren
 | '[' regex ']' @optional
 | Id @name
 | Str @symbol
