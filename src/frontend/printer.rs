@@ -242,9 +242,10 @@ impl DebugPrinter {
             }
             Regex::Optional(opt) => {
                 println!(
-                    "Optional {} {} {} {}",
+                    "Optional {} {} {} {} {}",
                     set!(first),
                     set!(follow),
+                    set!(recovery),
                     pos!(opt.span(cst)),
                     syntax!(opt.syntax().0),
                 );
