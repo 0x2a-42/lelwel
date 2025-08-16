@@ -766,7 +766,11 @@ impl RustOutput {
                 _ => "".to_string(),
             },
             Regex::Paren(paren) => {
-                Self::get_predicate(cst, rule_name, paren.inner(cst).unwrap(), parser_name)
+                if let Some(inner) = paren.inner(cst) {
+                    Self::get_predicate(cst, rule_name, inner, parser_name)
+                } else {
+                    "".to_string()
+                }
             }
             _ => "".to_string(),
         }
@@ -1160,19 +1164,21 @@ impl RustOutput {
                 )?;
             }
             Regex::Paren(paren) => {
-                Self::output_regex(
-                    cst,
-                    sema,
-                    paren.inner(cst).unwrap(),
-                    output,
-                    level,
-                    token_symbols,
-                    false,
-                    rule_name,
-                    rule_elision,
-                    parser_name,
-                    has_rule_rename,
-                )?;
+                if let Some(inner) = paren.inner(cst) {
+                    Self::output_regex(
+                        cst,
+                        sema,
+                        inner,
+                        output,
+                        level,
+                        token_symbols,
+                        false,
+                        rule_name,
+                        rule_elision,
+                        parser_name,
+                        has_rule_rename,
+                    )?;
+                }
             }
             Regex::Action(action) => {
                 output.write_all(

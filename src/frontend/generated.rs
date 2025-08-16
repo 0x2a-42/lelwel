@@ -1307,7 +1307,83 @@ impl<'a> Parser<'a> {
                 Token::LPar => {
                     let m = parser.cst.open();
                     expect!(LPar, "(", parser, diags);
-                    parser.rule_regex(diags);
+                    loop {
+                        match parser.current {
+                            Token::Action
+                            | Token::And
+                            | Token::Assertion
+                            | Token::Hat
+                            | Token::Id
+                            | Token::LBrak
+                            | Token::LPar
+                            | Token::NodeCreation
+                            | Token::NodeMarker
+                            | Token::NodeRename
+                            | Token::Predicate
+                            | Token::Str
+                            | Token::Tilde => {
+                                parser.rule_regex(diags);
+                                break;
+                            }
+                            Token::RPar => break,
+                            Token::EOF
+                            | Token::Or
+                            | Token::Part
+                            | Token::Plus
+                            | Token::RBrak
+                            | Token::Right
+                            | Token::Semi
+                            | Token::Skip
+                            | Token::Slash
+                            | Token::Star
+                            | Token::Start
+                            | Token::Token => {
+                                parser.error(
+                                    diags,
+                                    err![
+                                        parser,
+                                        "<semantic action>",
+                                        "&",
+                                        "<semantic assertion>",
+                                        "^",
+                                        "<identifier>",
+                                        "[",
+                                        "(",
+                                        "<node creation>",
+                                        "<node marker>",
+                                        "<node rename>",
+                                        "<semantic predicate>",
+                                        ")",
+                                        "<string literal>",
+                                        "~"
+                                    ],
+                                );
+                                break;
+                            }
+                            _ => {
+                                parser.advance_with_error(
+                                    diags,
+                                    err![
+                                        parser,
+                                        "<semantic action>",
+                                        "&",
+                                        "<semantic assertion>",
+                                        "^",
+                                        "<identifier>",
+                                        "[",
+                                        "(",
+                                        "<node creation>",
+                                        "<node marker>",
+                                        "<node rename>",
+                                        "<semantic predicate>",
+                                        ")",
+                                        "<string literal>",
+                                        "~"
+                                    ],
+                                );
+                            }
+                        }
+                    }
                     expect!(RPar, ")", parser, diags);
                     node_kind = Rule::Paren;
                     let closed = parser.cst.close(m, node_kind);

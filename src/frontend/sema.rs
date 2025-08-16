@@ -1092,6 +1092,9 @@ impl<'a> LL1Validator {
                         .get_mut(&regex.syntax())
                         .unwrap()
                         .extend(op_first);
+                } else {
+                    let first = sema.first_sets.get_mut(&paren.syntax()).unwrap();
+                    first.insert(TokenName::EPSILON);
                 }
             }
             Regex::Predicate(_)
