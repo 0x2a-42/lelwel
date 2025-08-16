@@ -1,0 +1,12 @@
+error: invalid syntax, expected one of: ':', '=', ';'
+  ┌─ <input>:3:3
+  │
+3 │   return b;
+  │   ^^^^^^
+
+error: invalid syntax, expected one of: ':', '=', ';'
+  ┌─ <input>:9:1
+  │
+9 │ }
+  │ ^
+
