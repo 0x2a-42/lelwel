@@ -1,5 +1,5 @@
 /// Keyword
-token Token='token' Start='start' Right='right' Skip='skip';
+token Token='token' Start='start' Right='right' Skip='skip' Part='part';
 /// Punctuator
 token Colon=':' Semi=';' Equal='=' LPar='(' RPar=')' LBrak='[' RBrak=']'
       Or='|' Star='*' Plus='+' Hat='^' Slash='/' Tilde='~' And='&';
@@ -19,10 +19,12 @@ decl^:
 | start_decl
 | right_decl
 | skip_decl
+| part_decl
 ;
 start_decl: 'start' Id ';';
 right_decl: 'right' (Id | Str)+ ';';
 skip_decl: 'skip' (Id | Str)+ ';';
+part_decl: 'part' Id+ ';';
 token_list: 'token' token_decl+ ';';
 token_decl: Id ['=' Str];
 rule_decl: Id ['^'] ':' [regex] ';';

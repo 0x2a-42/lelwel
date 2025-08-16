@@ -23,8 +23,14 @@ skip Whitespace Comment;
 right '**';
 
 start file_input;
+part single_input eval_input;
 
+/// a module or sequence of commands read from an input file
 file_input: (Newline | stmt)*;
+/// a single interactive statement
+single_input: Newline | simple_stmts | compound_stmt Newline;
+/// the input for the eval() and input() functions
+eval_input: testlist Newline*;
 
 decorator: '@' dotted_name [ '(' [arglist] ')' ] Newline;
 decorators: decorator+;

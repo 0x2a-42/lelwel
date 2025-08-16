@@ -54,7 +54,7 @@ pub fn compile(
 
     let source = std::fs::read_to_string(input)?;
     let mut diags = vec![];
-    let cst = Parser::parse(&source, &mut diags);
+    let cst = Parser::new(&source, &mut diags).parse(&mut diags);
     let sema = SemanticPass::run(&cst, &mut diags);
 
     if verbose > 1 {
@@ -95,7 +95,7 @@ pub fn generate_syntax_tree(source: &str) -> Vec<String> {
     use codespan_reporting::term::termcolor::NoColor;
 
     let mut diags = vec![];
-    let cst = Parser::parse(source, &mut diags);
+    let cst = Parser::new(source, &mut diags).parse(&mut diags);
     let _sema = SemanticPass::run(&cst, &mut diags);
     let mut writer = NoColor::new(BufWriter::new(Vec::new()));
     let config = Config::default();

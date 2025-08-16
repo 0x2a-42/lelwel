@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use codespan_reporting::diagnostic::Severity;
@@ -5,6 +6,7 @@ use codespan_reporting::diagnostic::Severity;
 use super::ast::*;
 use super::diag::LanguageErrors;
 use super::parser::*;
+use crate::backend::rust::snake_to_pascal_case;
 
 pub struct SemanticPass;
 
@@ -25,8 +27,13 @@ impl SemanticPass {
     }
 }
 
-#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Copy, Default)]
-pub struct TokenName<'a>(pub &'a str);
+#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Default)]
+pub struct TokenName<'a>(pub Cow<'a, str>);
+
+impl TokenName<'_> {
+    const EOF: TokenName<'static> = TokenName(Cow::Borrowed("EOF"));
+    const EPSILON: TokenName<'static> = TokenName(Cow::Borrowed("ɛ"));
+}
 
 impl std::fmt::Debug for TokenName<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -132,6 +139,7 @@ pub struct SemanticData<'a> {
     pub elision: HashMap<NodeRef, RuleNodeElision>,
     pub right_associative: HashSet<&'a str>,
     pub skipped: BTreeSet<TokenDecl>,
+    pub parts: BTreeSet<RuleDecl>,
     pub start_decl: Option<StartDecl>,
     pub start_rule: Option<RuleDecl>,
     pub predicates: BTreeMap<NodeRef, (&'a str, &'a str)>,
@@ -209,6 +217,8 @@ impl<'a> GeneralCheck<'a> {
                 .for_each(|decl| self.check_skip_decl(cst, decl, diags, sema));
             file.start_decls(cst)
                 .for_each(|decl| self.check_start_decl(cst, decl, diags, sema));
+            file.part_decls(cst)
+                .for_each(|decl| self.check_part_decl(cst, decl, diags, sema));
             file.rule_decls(cst)
                 .for_each(|decl| self.check_rule_decl(cst, decl, diags, sema));
         }
@@ -224,7 +234,7 @@ impl<'a> GeneralCheck<'a> {
     }
     fn check_token_decl(&mut self, cst: &'a Cst<'_>, decl: TokenDecl, diags: &mut Vec<Diagnostic>) {
         if let Some((name, name_span)) = decl.name(cst) {
-            if matches!(name, "EOF" | "Error") {
+            if matches!(name, "Error") || name.starts_with("EOF") {
                 diags.push(Diagnostic::predefined_name(&name_span, name));
             }
             self.bind_symbol(cst, name, "token", decl.syntax(), diags);
@@ -355,6 +365,29 @@ impl<'a> GeneralCheck<'a> {
                     }
                 } else {
                     diags.push(Diagnostic::expected_token(&name_span));
+                }
+            }
+        });
+    }
+    fn check_part_decl(
+        &mut self,
+        cst: &'a Cst<'_>,
+        part_decl: PartDecl,
+        diags: &mut Vec<Diagnostic>,
+        sema: &mut SemanticData<'a>,
+    ) {
+        part_decl.rule_names(cst, |(name, name_span)| {
+            if let Some(node) = self.get_symbol_binding(name, true, &name_span, diags, sema) {
+                if let Some(rule_decl) = RuleDecl::cast(cst, node) {
+                    if sema.parts.contains(&rule_decl) {
+                        diags.push(Diagnostic::redefine_as_part(&name_span));
+                    } else if Some(rule_decl) == sema.start_rule {
+                        diags.push(Diagnostic::start_as_part(&name_span));
+                    } else {
+                        sema.parts.insert(rule_decl);
+                    }
+                } else {
+                    diags.push(Diagnostic::expected_rule(&name_span));
                 }
             }
         });
@@ -959,7 +992,7 @@ impl<'a> LL1Validator {
                             .unwrap()
                             .extend(rule_first);
                     } else {
-                        entry.insert(TokenName("ɛ"));
+                        entry.insert(TokenName::EPSILON);
                     }
                 } else if let Some((name, _)) = decl
                     .and_then(|decl| TokenDecl::cast(cst, *decl))
@@ -968,7 +1001,7 @@ impl<'a> LL1Validator {
                     sema.first_sets
                         .get_mut(&regex.syntax())
                         .unwrap()
-                        .insert(TokenName(name));
+                        .insert(TokenName(Cow::Borrowed(name)));
                 }
             }
             Regex::Symbol(sym) => {
@@ -980,7 +1013,7 @@ impl<'a> LL1Validator {
                     sema.first_sets
                         .get_mut(&regex.syntax())
                         .unwrap()
-                        .insert(TokenName(name));
+                        .insert(TokenName(Cow::Borrowed(name)));
                 }
             }
             Regex::Concat(concat) => {
@@ -990,17 +1023,17 @@ impl<'a> LL1Validator {
                     // only add next first set if there was an epsilon
                     if use_next {
                         let op_first = sema.first_sets[&op.syntax()].clone();
-                        use_next = op_first.contains(&TokenName("ɛ"));
+                        use_next = op_first.contains(&TokenName::EPSILON);
                         let first = sema.first_sets.get_mut(&regex.syntax()).unwrap();
                         first.extend(op_first.into_iter());
-                        first.remove(&TokenName("ɛ"));
+                        first.remove(&TokenName::EPSILON);
                     }
                 }
                 if use_next {
                     sema.first_sets
                         .get_mut(&regex.syntax())
                         .unwrap()
-                        .insert(TokenName("ɛ"));
+                        .insert(TokenName::EPSILON);
                 }
             }
             Regex::OrderedChoice(choice) => {
@@ -1029,7 +1062,7 @@ impl<'a> LL1Validator {
                     let op_first = sema.first_sets[&op.syntax()].clone();
                     let first = sema.first_sets.get_mut(&regex.syntax()).unwrap();
                     first.extend(op_first);
-                    first.insert(TokenName("ɛ"));
+                    first.insert(TokenName::EPSILON);
                 }
             }
             Regex::Optional(opt) => {
@@ -1038,7 +1071,7 @@ impl<'a> LL1Validator {
                     let op_first = sema.first_sets[&op.syntax()].clone();
                     let first = sema.first_sets.get_mut(&regex.syntax()).unwrap();
                     first.extend(op_first);
-                    first.insert(TokenName("ɛ"));
+                    first.insert(TokenName::EPSILON);
                 }
             }
             Regex::Plus(plus) => {
@@ -1070,7 +1103,7 @@ impl<'a> LL1Validator {
             | Regex::NodeCreation(_)
             | Regex::Commit(_)
             | Regex::Return(_) => {
-                entry.insert(TokenName("ɛ"));
+                entry.insert(TokenName::EPSILON);
             }
         };
         *change |= sema.first_sets[&regex.syntax()].len() != size;
@@ -1082,7 +1115,24 @@ impl<'a> LL1Validator {
             sema.follow_sets
                 .entry(start_rule_regex.syntax())
                 .or_default()
-                .insert(TokenName("EOF"));
+                .insert(TokenName::EOF);
+
+            for part in sema.parts.iter() {
+                if let Some(part_regex) = part.regex(cst)
+                    && let Some((name, _)) = part.name(cst)
+                {
+                    let eof_token =
+                        TokenName(Cow::Owned(format!("EOF{}", snake_to_pascal_case(name))));
+                    sema.follow_sets
+                        .entry(start_rule_regex.syntax())
+                        .or_default()
+                        .insert(eof_token.clone());
+                    sema.follow_sets
+                        .entry(part_regex.syntax())
+                        .or_default()
+                        .insert(eof_token);
+                }
+            }
         }
         // Iterates until there are no more changes in the follow sets
         let mut change = true;
@@ -1137,11 +1187,11 @@ impl<'a> LL1Validator {
                     sema.follow_sets
                         .entry(op.syntax())
                         .or_default()
-                        .extend(follow.iter());
+                        .extend(follow.clone());
                     let op_first = &sema.first_sets[&op.syntax()];
-                    if op_first.contains(&TokenName("ɛ")) {
-                        follow.extend(op_first.iter());
-                        follow.remove(&TokenName("ɛ"));
+                    if op_first.contains(&TokenName::EPSILON) {
+                        follow.extend(op_first.clone());
+                        follow.remove(&TokenName::EPSILON);
                     } else {
                         follow.clone_from(op_first);
                     }
@@ -1154,7 +1204,7 @@ impl<'a> LL1Validator {
                     sema.follow_sets
                         .entry(op.syntax())
                         .or_default()
-                        .extend(follow.iter());
+                        .extend(follow.clone());
                     Self::calc_follow_regex(cst, sema, op, rule_regex, change);
                 }
             }
@@ -1164,7 +1214,7 @@ impl<'a> LL1Validator {
                     sema.follow_sets
                         .entry(op.syntax())
                         .or_default()
-                        .extend(follow.iter());
+                        .extend(follow.clone());
                     Self::calc_follow_regex(cst, sema, op, rule_regex, change);
                 }
             }
@@ -1173,8 +1223,8 @@ impl<'a> LL1Validator {
                     let follow = sema.follow_sets.entry(regex.syntax()).or_default().clone();
                     let op_first = &sema.first_sets[&op.syntax()];
                     let op_follow = sema.follow_sets.entry(op.syntax()).or_default();
-                    op_follow.extend(op_first.iter());
-                    op_follow.remove(&TokenName("ɛ"));
+                    op_follow.extend(op_first.clone());
+                    op_follow.remove(&TokenName::EPSILON);
                     op_follow.extend(follow);
                     Self::calc_follow_regex(cst, sema, op, rule_regex, change);
                 }
@@ -1184,7 +1234,7 @@ impl<'a> LL1Validator {
                     let first = &sema.first_sets[&regex.syntax()];
                     let follow = sema.follow_sets.entry(regex.syntax()).or_default().clone();
                     let op_follow = sema.follow_sets.entry(op.syntax()).or_default();
-                    op_follow.extend(first.iter());
+                    op_follow.extend(first.clone());
                     op_follow.extend(follow);
                     Self::calc_follow_regex(cst, sema, op, rule_regex, change);
                 }
@@ -1225,9 +1275,9 @@ impl<'a> LL1Validator {
     fn calc_predict(sema: &mut SemanticData<'a>) {
         for (node, first) in sema.first_sets.iter() {
             let mut set = first.clone();
-            if set.contains(&TokenName("ɛ")) {
-                set.remove(&TokenName("ɛ"));
-                set.extend(sema.follow_sets[node].iter());
+            if set.contains(&TokenName::EPSILON) {
+                set.remove(&TokenName::EPSILON);
+                set.extend(sema.follow_sets[node].clone());
             }
             sema.predict_sets.insert(*node, set);
         }
@@ -1287,7 +1337,7 @@ impl<'a> LL1Validator {
             let other_prediction = &sema.predict_sets[&op.syntax()];
             let intersection = prediction
                 .intersection(other_prediction)
-                .copied()
+                .cloned()
                 .collect::<BTreeSet<_>>();
             if !intersection.is_empty() {
                 let set = format!("with token set: {intersection:?}");
@@ -1336,7 +1386,7 @@ impl<'a> LL1Validator {
                         let local_follow = &sema.left_rec_local_follow_sets[&alt.syntax()];
                         let intersection = prediction
                             .intersection(local_follow)
-                            .copied()
+                            .cloned()
                             .collect::<BTreeSet<_>>();
                         if !intersection.is_empty() {
                             let set = format!("with token set: {intersection:?}");
@@ -1397,7 +1447,7 @@ impl<'a> LL1Validator {
                 if let Some(op) = star.operand(cst) {
                     let intersection = sema.follow_sets[&regex.syntax()]
                         .intersection(&sema.predict_sets[&op.syntax()])
-                        .copied()
+                        .cloned()
                         .collect::<BTreeSet<_>>();
                     if !Self::has_predicate(cst, op) && !intersection.is_empty() {
                         let set = format!("with token set: {intersection:?}");
@@ -1410,7 +1460,7 @@ impl<'a> LL1Validator {
                 if let Some(op) = plus.operand(cst) {
                     let intersection = sema.follow_sets[&regex.syntax()]
                         .intersection(&sema.predict_sets[&op.syntax()])
-                        .copied()
+                        .cloned()
                         .collect::<BTreeSet<_>>();
                     if !Self::has_predicate(cst, op) && !intersection.is_empty() {
                         let set = format!("with token set: {intersection:?}");
@@ -1423,7 +1473,7 @@ impl<'a> LL1Validator {
                 if let Some(op) = opt.operand(cst) {
                     let intersection = sema.follow_sets[&regex.syntax()]
                         .intersection(&sema.predict_sets[&op.syntax()])
-                        .copied()
+                        .cloned()
                         .collect::<BTreeSet<_>>();
                     if !Self::has_predicate(cst, op) && !intersection.is_empty() {
                         let set = format!("with token set: {intersection:?}");
@@ -1507,7 +1557,7 @@ impl UsageValidator {
                 change = count != sema.used.len();
             }
             for rule in file.rule_decls(cst) {
-                if !sema.used.contains(&rule.syntax()) {
+                if !sema.used.contains(&rule.syntax()) && !sema.parts.contains(&rule) {
                     diags.push(Diagnostic::unused_rule(&rule.span(cst)));
                 }
             }
@@ -1593,6 +1643,17 @@ impl RecoverySetGenerator {
         } else {
             return;
         };
+
+        // part nodes get start node as predecessor if they are unused
+        for part in sema.parts.iter() {
+            if !sema.used.contains(&part.syntax()) {
+                sema.used.insert(part.syntax());
+                let Some(part_regex) = part.regex(cst) else {
+                    continue;
+                };
+                self.add_pred(part_regex, start);
+            }
+        }
         for rule in file.rule_decls(cst) {
             if sema.used.contains(&rule.syntax()) {
                 if let Some(regex) = rule.regex(cst) {
@@ -1654,7 +1715,7 @@ impl RecoverySetGenerator {
                 sema.recovery_sets
                     .entry(regex.syntax())
                     .or_default()
-                    .extend(dom_follow);
+                    .extend(dom_follow.clone());
             }
             for sym in op_first.iter() {
                 sema.recovery_sets
@@ -1760,7 +1821,7 @@ impl OperatorValidator {
                     let mut left_assoc = false;
                     let mut right_assoc = false;
                     for sym in sema.first_sets[&operand.syntax()].iter() {
-                        if sema.right_associative.contains(sym.0) {
+                        if sema.right_associative.contains(sym.0.as_ref()) {
                             right_assoc = true;
                             recursive
                                 .binding_power

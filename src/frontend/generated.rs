@@ -56,6 +56,7 @@ pub enum Rule {
     Optional,
     OrderedChoice,
     Paren,
+    PartDecl,
     Plus,
     Postfix,
     Predicate,
@@ -376,6 +377,7 @@ impl std::fmt::Debug for Rule {
             Rule::Optional => write!(f, "optional"),
             Rule::OrderedChoice => write!(f, "ordered_choice"),
             Rule::Paren => write!(f, "paren"),
+            Rule::PartDecl => write!(f, "part_decl"),
             Rule::Plus => write!(f, "plus"),
             Rule::Postfix => write!(f, "postfix"),
             Rule::Predicate => write!(f, "predicate"),
@@ -427,6 +429,7 @@ pub struct Parser<'a> {
     tokens: Vec<Token>,
     pos: usize,
     current: Token,
+    end_of_input: Token,
     last_error_span: Span,
     max_offset: usize,
     #[allow(dead_code)]
@@ -470,7 +473,7 @@ impl<'a> Parser<'a> {
                     break;
                 }
                 None => {
-                    self.current = Token::EOF;
+                    self.current = self.end_of_input;
                     break;
                 }
             }
@@ -502,7 +505,7 @@ impl<'a> Parser<'a> {
                     break;
                 }
                 None => {
-                    self.current = Token::EOF;
+                    self.current = self.end_of_input;
                     break;
                 }
             }
@@ -521,7 +524,7 @@ impl<'a> Parser<'a> {
             .skip(self.pos)
             .filter(|token| !Self::is_skipped(**token))
             .nth(lookahead)
-            .map_or(Token::EOF, |it| *it)
+            .map_or(self.end_of_input, |it| *it)
     }
     fn peek_left(&self, lookbehind: usize) -> Token {
         self.tokens
@@ -530,7 +533,7 @@ impl<'a> Parser<'a> {
             .rev()
             .filter(|token| !Self::is_skipped(**token))
             .nth(lookbehind)
-            .map_or(Token::EOF, |it| *it)
+            .map_or(self.end_of_input, |it| *it)
     }
     fn close_error_node(&mut self, diags: &mut Vec<Diagnostic>) {
         if let Some(error_node) = self.error_node {
@@ -590,6 +593,7 @@ impl<'a> Parser<'a> {
             Rule::Optional => self.create_node_optional(node_ref, diags),
             Rule::OrderedChoice => self.create_node_ordered_choice(node_ref, diags),
             Rule::Paren => self.create_node_paren(node_ref, diags),
+            Rule::PartDecl => self.create_node_part_decl(node_ref, diags),
             Rule::Plus => self.create_node_plus(node_ref, diags),
             Rule::Postfix => self.create_node_postfix(node_ref, diags),
             Rule::Predicate => self.create_node_predicate(node_ref, diags),
@@ -606,18 +610,16 @@ impl<'a> Parser<'a> {
         }
     }
     fn delete_node(&mut self, _rule: Rule, _node_ref: NodeRef) {}
-    /// Returns the CST for a parse with the given `source` file and writes diagnostics to `diags`.
-    ///
-    /// The context can be explicitly defined for the parse.
-    pub fn parse_with_context(
+    pub fn new_with_context(
         source: &'a str,
         diags: &mut Vec<Diagnostic>,
         context: Context<'a>,
-    ) -> Cst<'a> {
+    ) -> Parser<'a> {
         let (tokens, spans) = Self::create_tokens(source, diags);
         let max_offset = source.len();
-        let mut parser = Self {
+        Self {
             current: Token::EOF,
+            end_of_input: Token::EOF,
             cst: Cst::new(source, spans),
             tokens,
             pos: 0,
@@ -626,22 +628,53 @@ impl<'a> Parser<'a> {
             context,
             error_node: None,
             in_ordered_choice: false,
-        };
-        parser.rule_file(diags);
-        parser.cst
+        }
     }
-    /// Returns the CST for a parse with the given `source` file and writes diagnostics to `diags`.
-    ///
-    /// The context will be default initialized for the parse.
-    pub fn parse(source: &'a str, diags: &mut Vec<Diagnostic>) -> Cst<'a> {
-        Self::parse_with_context(source, diags, Context::default())
+    pub fn new(source: &'a str, diags: &mut Vec<Diagnostic>) -> Parser<'a> {
+        Self::new_with_context(source, diags, Context::default())
     }
-    fn rule_file(&mut self, diags: &mut Vec<Diagnostic>) {
+    fn parse_rule<RuleParser: Fn(&mut Self, &mut Vec<Diagnostic>)>(
+        mut self,
+        rule: RuleParser,
+        diags: &mut Vec<Diagnostic>,
+        root: Rule,
+    ) -> Cst<'a> {
+        let token_count = self.tokens.len();
         let m = self.open(diags);
         self.init_skip();
+
+        rule(&mut self, diags);
+
+        self.close_error_node(diags);
+        if self.pos != token_count {
+            self.error(diags, err![self, "<end of file>"]);
+            let error_tree = self.open(diags);
+            while self.pos < token_count {
+                let token = self.tokens[self.pos];
+                self.cst.advance(token, Self::is_skipped(token));
+                self.pos += 1;
+            }
+            self.cst.close(error_tree, Rule::Error);
+            self.create_node_error(NodeRef(error_tree.0), diags);
+        }
+
+        let closed = self.cst.close_root(m, root);
+        self.create_node(root, NodeRef(closed.0), diags);
+        self.cst
+    }
+    /// Returns the CST for a parse of the start rule
+    pub fn parse(self, diags: &mut Vec<Diagnostic>) -> Cst<'a> {
+        self.parse_rule(|parser, diags| parser.rule_file(diags), diags, Rule::File)
+    }
+    fn rule_file(&mut self, diags: &mut Vec<Diagnostic>) {
         loop {
             match self.current {
-                Token::Id | Token::Right | Token::Skip | Token::Start | Token::Token => {
+                Token::Id
+                | Token::Part
+                | Token::Right
+                | Token::Skip
+                | Token::Start
+                | Token::Token => {
                     self.rule_decl(diags);
                 }
                 Token::EOF => break,
@@ -652,6 +685,7 @@ impl<'a> Parser<'a> {
                             self,
                             "<end of file>",
                             "<identifier>",
+                            "part",
                             "right",
                             "skip",
                             "start",
@@ -661,22 +695,6 @@ impl<'a> Parser<'a> {
                 }
             }
         }
-        self.close_error_node(diags);
-        if self.current != Token::EOF {
-            self.error(diags, err![self, "<end of file>"]);
-            let error_tree = self.open(diags);
-            loop {
-                match self.tokens.get(self.pos) {
-                    None => break,
-                    Some(token) => self.cst.advance(*token, Self::is_skipped(*token)),
-                }
-                self.pos += 1;
-            }
-            self.cst.close(error_tree, Rule::Error);
-            self.create_node_error(NodeRef(error_tree.0), diags);
-        }
-        let closed = self.cst.close_root(m, Rule::File);
-        self.create_node_file(NodeRef(closed.0), diags);
     }
     fn rule_decl(&mut self, diags: &mut Vec<Diagnostic>) {
         match self.current {
@@ -695,13 +713,24 @@ impl<'a> Parser<'a> {
             Token::Skip => {
                 self.rule_skip_decl(diags);
             }
+            Token::Part => {
+                self.rule_part_decl(diags);
+            }
             Token::Id => {
                 self.advance_with_error(diags, err![self,]);
             }
             _ => {
                 self.error(
                     diags,
-                    err![self, "<identifier>", "right", "skip", "start", "token"],
+                    err![
+                        self,
+                        "<identifier>",
+                        "part",
+                        "right",
+                        "skip",
+                        "start",
+                        "token"
+                    ],
                 );
             }
         }
@@ -742,7 +771,12 @@ impl<'a> Parser<'a> {
                     }
                 },
                 Token::Semi => break,
-                Token::EOF | Token::Right | Token::Skip | Token::Start | Token::Token => {
+                Token::EOF
+                | Token::Part
+                | Token::Right
+                | Token::Skip
+                | Token::Start
+                | Token::Token => {
                     self.error(diags, err![self, "<identifier>", ";", "<string literal>"]);
                     break;
                 }
@@ -786,7 +820,12 @@ impl<'a> Parser<'a> {
                     }
                 },
                 Token::Semi => break,
-                Token::EOF | Token::Right | Token::Skip | Token::Start | Token::Token => {
+                Token::EOF
+                | Token::Part
+                | Token::Right
+                | Token::Skip
+                | Token::Start
+                | Token::Token => {
                     self.error(diags, err![self, "<identifier>", ";", "<string literal>"]);
                     break;
                 }
@@ -802,6 +841,34 @@ impl<'a> Parser<'a> {
         let closed = self.cst.close(m, Rule::SkipDecl);
         self.create_node_skip_decl(NodeRef(closed.0), diags);
     }
+    fn rule_part_decl(&mut self, diags: &mut Vec<Diagnostic>) {
+        let m = self.open(diags);
+        expect!(Part, "part", self, diags);
+        expect!(Id, "<identifier>", self, diags);
+        loop {
+            match self.current {
+                Token::Id => {
+                    expect!(Id, "<identifier>", self, diags);
+                }
+                Token::Semi => break,
+                Token::EOF
+                | Token::Part
+                | Token::Right
+                | Token::Skip
+                | Token::Start
+                | Token::Token => {
+                    self.error(diags, err![self, "<identifier>", ";"]);
+                    break;
+                }
+                _ => {
+                    self.advance_with_error(diags, err![self, "<identifier>", ";"]);
+                }
+            }
+        }
+        expect!(Semi, ";", self, diags);
+        let closed = self.cst.close(m, Rule::PartDecl);
+        self.create_node_part_decl(NodeRef(closed.0), diags);
+    }
     fn rule_token_list(&mut self, diags: &mut Vec<Diagnostic>) {
         let m = self.open(diags);
         expect!(Token, "token", self, diags);
@@ -812,7 +879,12 @@ impl<'a> Parser<'a> {
                     self.rule_token_decl(diags);
                 }
                 Token::Semi => break,
-                Token::EOF | Token::Right | Token::Skip | Token::Start | Token::Token => {
+                Token::EOF
+                | Token::Part
+                | Token::Right
+                | Token::Skip
+                | Token::Start
+                | Token::Token => {
                     self.error(diags, err![self, "<identifier>", ";"]);
                     break;
                 }
@@ -836,7 +908,12 @@ impl<'a> Parser<'a> {
                     break;
                 }
                 Token::Id | Token::Semi => break,
-                Token::EOF | Token::Right | Token::Skip | Token::Start | Token::Token => {
+                Token::EOF
+                | Token::Part
+                | Token::Right
+                | Token::Skip
+                | Token::Start
+                | Token::Token => {
                     self.error(diags, err![self, "=", "<identifier>", ";"]);
                     break;
                 }
@@ -860,6 +937,7 @@ impl<'a> Parser<'a> {
                 Token::Colon => break,
                 Token::EOF
                 | Token::Id
+                | Token::Part
                 | Token::Right
                 | Token::Skip
                 | Token::Start
@@ -892,7 +970,12 @@ impl<'a> Parser<'a> {
                     break;
                 }
                 Token::Semi => break,
-                Token::EOF | Token::Right | Token::Skip | Token::Start | Token::Token => {
+                Token::EOF
+                | Token::Part
+                | Token::Right
+                | Token::Skip
+                | Token::Start
+                | Token::Token => {
                     self.error(
                         diags,
                         err![
@@ -963,6 +1046,7 @@ impl<'a> Parser<'a> {
                             Token::RBrak | Token::RPar | Token::Semi => break,
                             Token::EOF
                             | Token::Id
+                            | Token::Part
                             | Token::Right
                             | Token::Skip
                             | Token::Start
@@ -983,6 +1067,7 @@ impl<'a> Parser<'a> {
                 Token::RBrak | Token::RPar | Token::Semi => break,
                 Token::EOF
                 | Token::Id
+                | Token::Part
                 | Token::Right
                 | Token::Skip
                 | Token::Start
@@ -1013,6 +1098,7 @@ impl<'a> Parser<'a> {
                             Token::Or | Token::RBrak | Token::RPar | Token::Semi => break,
                             Token::EOF
                             | Token::Id
+                            | Token::Part
                             | Token::Right
                             | Token::Skip
                             | Token::Start
@@ -1033,6 +1119,7 @@ impl<'a> Parser<'a> {
                 Token::Or | Token::RBrak | Token::RPar | Token::Semi => break,
                 Token::EOF
                 | Token::Id
+                | Token::Part
                 | Token::Right
                 | Token::Skip
                 | Token::Start
@@ -1086,6 +1173,7 @@ impl<'a> Parser<'a> {
                                 break
                             }
                             Token::EOF
+                            | Token::Part
                             | Token::Right
                             | Token::Skip
                             | Token::Start
@@ -1150,7 +1238,12 @@ impl<'a> Parser<'a> {
                     break;
                 }
                 Token::Or | Token::RBrak | Token::RPar | Token::Semi | Token::Slash => break,
-                Token::EOF | Token::Right | Token::Skip | Token::Start | Token::Token => {
+                Token::EOF
+                | Token::Part
+                | Token::Right
+                | Token::Skip
+                | Token::Start
+                | Token::Token => {
                     self.error(
                         diags,
                         err![
@@ -1403,6 +1496,8 @@ trait ParserCallbacks {
     fn create_node_ordered_choice(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
     /// Called when `paren` node is created.
     fn create_node_paren(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
+    /// Called when `part_decl` node is created.
+    fn create_node_part_decl(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
     /// Called when `plus` node is created.
     fn create_node_plus(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {}
     /// Called when `postfix` node is created.

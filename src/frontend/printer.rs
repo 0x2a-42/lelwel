@@ -92,6 +92,13 @@ impl DebugPrinter {
                 }
             });
             self.branch(false, |s| {
+                println!("{}", member!("part_decls"));
+                let mut it = file.part_decls(cst).peekable();
+                while let Some(decl) = it.next() {
+                    s.branch(it.peek().is_none(), |s| s.print_part_decl(cst, decl));
+                }
+            });
+            self.branch(false, |s| {
                 println!("{}", member!("token_decls"));
                 let mut it = file.token_decls(cst).peekable();
                 while let Some(decl) = it.next() {
@@ -154,6 +161,16 @@ impl DebugPrinter {
         println!(
             "Skip {} {} {}",
             member!(token_names),
+            pos!(decl.span(cst)),
+            syntax!(decl.syntax().0),
+        );
+    }
+    fn print_part_decl(&mut self, cst: &Cst<'_>, decl: PartDecl) {
+        let mut rule_names = vec![];
+        decl.rule_names(cst, |(val, _)| rule_names.push(val));
+        println!(
+            "Part {} {} {}",
+            member!(rule_names),
             pos!(decl.span(cst)),
             syntax!(decl.syntax().0),
         );

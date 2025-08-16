@@ -324,7 +324,7 @@ impl std::fmt::Display for Cst<'_> {{
 }}
 impl std::fmt::Debug for Rule {{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {{
-        match self {{{3}
+        match self {{{4}
         }}
     }}
 }}
@@ -363,6 +363,7 @@ pub struct Parser<'a> {{
     tokens: Vec<Token>,
     pos: usize,
     current: Token,
+    end_of_input: Token,
     last_error_span: Span,
     max_offset: usize,
     #[allow(dead_code)]
@@ -404,7 +405,7 @@ impl<'a> Parser<'a> {{
                     break;
                 }}
                 None => {{
-                    self.current = Token::EOF;
+                    self.current = self.end_of_input;
                     break;
                 }}
             }}
@@ -431,7 +432,7 @@ impl<'a> Parser<'a> {{
                     break;
                 }}
                 None => {{
-                    self.current = Token::EOF;
+                    self.current = self.end_of_input;
                     break;
                 }}
             }}
@@ -450,7 +451,7 @@ impl<'a> Parser<'a> {{
             .skip(self.pos)
             .filter(|token| !Self::is_skipped(**token))
             .nth(lookahead)
-            .map_or(Token::EOF, |it| *it)
+            .map_or(self.end_of_input, |it| *it)
     }}
     fn peek_left(&self, lookbehind: usize) -> Token {{
         self.tokens
@@ -459,7 +460,7 @@ impl<'a> Parser<'a> {{
             .rev()
             .filter(|token| !Self::is_skipped(**token))
             .nth(lookbehind)
-            .map_or(Token::EOF, |it| *it)
+            .map_or(self.end_of_input, |it| *it)
     }}
     fn close_error_node(&mut self, diags: &mut Vec<Diagnostic>) {{
         if let Some(error_node) = self.error_node {{
@@ -501,24 +502,22 @@ impl<'a> Parser<'a> {{
         self.cst.truncate(state.truncation_mark.clone());
     }}
     fn create_node(&mut self, rule: Rule, node_ref: NodeRef, diags: &mut Vec<Diagnostic>) {{
-        match rule {{{4}
+        match rule {{{5}
         }}
     }}
     fn delete_node(&mut self, _rule: Rule, _node_ref: NodeRef) {{
-        {5}
+        {6}
     }}
-    /// Returns the CST for a parse with the given `source` file and writes diagnostics to `diags`.
-    ///
-    /// The context can be explicitly defined for the parse.
-    pub fn parse_with_context(
+    pub fn new_with_context(
         source: &'a str,
         diags: &mut Vec<Diagnostic>,
         context: Context<'a>,
-    ) -> Cst<'a> {{
+    ) -> Parser<'a> {{
         let (tokens, spans) = Self::create_tokens(source, diags);
         let max_offset = source.len();
-        let mut parser = Self {{
+        Self {{
             current: Token::EOF,
+            end_of_input: Token::EOF,
             cst: Cst::new(source, spans),
             tokens,
             pos: 0,
@@ -527,16 +526,41 @@ impl<'a> Parser<'a> {{
             context,
             error_node: None,
             in_ordered_choice: false,
-        }};
-        parser.rule_{2}(diags);
-        parser.cst
+        }}
     }}
-    /// Returns the CST for a parse with the given `source` file and writes diagnostics to `diags`.
-    ///
-    /// The context will be default initialized for the parse.
-    pub fn parse(
-        source: &'a str,
+    pub fn new(source: &'a str, diags: &mut Vec<Diagnostic>) -> Parser<'a> {{
+        Self::new_with_context(source, diags, Context::default())
+    }}
+    fn parse_rule<RuleParser: Fn(&mut Self, &mut Vec<Diagnostic>)>(
+        mut self,
+        rule: RuleParser,
         diags: &mut Vec<Diagnostic>,
+        root: Rule,
     ) -> Cst<'a> {{
-        Self::parse_with_context(source, diags, Context::default())
+        let token_count = self.tokens.len();
+        let m = self.open(diags);
+        self.init_skip();
+
+        rule(&mut self, diags);
+
+        self.close_error_node(diags);
+        if self.pos != token_count {{
+            self.error(diags, err![self, "<end of file>"]);
+            let error_tree = self.open(diags);
+            while self.pos < token_count {{
+                let token = self.tokens[self.pos];
+                self.cst.advance(token, Self::is_skipped(token));
+                self.pos += 1;
+            }}
+            self.cst.close(error_tree, Rule::Error);
+            self.create_node_error(NodeRef(error_tree.0), diags);
+        }}
+
+        let closed = self.cst.close_root(m, root);
+        self.create_node(root, NodeRef(closed.0), diags);
+        self.cst
+    }}
+    /// Returns the CST for a parse of the start rule
+    pub fn parse(self, diags: &mut Vec<Diagnostic>) -> Cst<'a> {{
+        self.parse_rule(|parser, diags| parser.rule_{2}(diags), diags, Rule::{3})
     }}

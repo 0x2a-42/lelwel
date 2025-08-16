@@ -134,7 +134,7 @@ fn analyze(
     let parser_path = path.parent().unwrap().join("parser.rs");
     let mut diags = vec![];
 
-    let cst = Parser::parse(&source, &mut diags);
+    let cst = Parser::new(&source, &mut diags).parse(&mut diags);
     let sema = SemanticPass::run(&cst, &mut diags);
     let file = SimpleFile::new(path.to_str().unwrap(), source.as_str());
 
