@@ -54,30 +54,6 @@ macro_rules! ast_node {
     }
 }
 
-ast_node!(Chunk);
-ast_node!(Block);
-ast_node!(Emptystat);
-ast_node!(Expstat);
-ast_node!(Assignstat);
-ast_node!(Label);
-ast_node!(Breakstat);
-ast_node!(Gotostat);
-ast_node!(Dostat);
-ast_node!(Whilestat);
-ast_node!(Repeatstat);
-ast_node!(Ifstat);
-ast_node!(Forstat);
-ast_node!(Funcstat);
-ast_node!(Localstat);
-ast_node!(Attrib);
-ast_node!(Retstat);
-ast_node!(
-    Stat,
-    (
-        Emptystat, Expstat, Assignstat, Label, Breakstat, Gotostat, Dostat, Whilestat, Repeatstat,
-        Ifstat, Forstat, Funcstat, Localstat, Retstat
-    )
-);
 ast_node!(Binexp);
 ast_node!(Unaryexp);
 ast_node!(Literalexp);
