@@ -314,13 +314,13 @@ impl<'a> GeneralCheck<'a> {
             ));
         } else {
             sema.start_decl = Some(start_decl);
-            if let Some((name, name_span)) = start_decl.rule_name(cst) {
-                if let Some(node) = self.get_symbol_binding(name, true, &name_span, diags, sema) {
-                    if let Some(rule_decl) = RuleDecl::cast(cst, node) {
-                        sema.start_rule = Some(rule_decl);
-                    } else {
-                        diags.push(Diagnostic::expected_rule(&name_span));
-                    }
+            if let Some((name, name_span)) = start_decl.rule_name(cst)
+                && let Some(node) = self.get_symbol_binding(name, true, &name_span, diags, sema)
+            {
+                if let Some(rule_decl) = RuleDecl::cast(cst, node) {
+                    sema.start_rule = Some(rule_decl);
+                } else {
+                    diags.push(Diagnostic::expected_rule(&name_span));
                 }
             }
         }
@@ -460,10 +460,10 @@ impl<'a> GeneralCheck<'a> {
                     if let Some(decl) =
                         self.get_symbol_binding(name, rule_binding, &name_span, diags, sema)
                     {
-                        if let Some(token) = TokenDecl::cast(cst, decl) {
-                            if sema.skipped.contains(&token) {
-                                diags.push(Diagnostic::used_skipped(&name_span));
-                            }
+                        if let Some(token) = TokenDecl::cast(cst, decl)
+                            && sema.skipped.contains(&token)
+                        {
+                            diags.push(Diagnostic::used_skipped(&name_span));
                         }
                         sema.decl_bindings.insert(regex.syntax(), decl);
                     }
@@ -471,17 +471,16 @@ impl<'a> GeneralCheck<'a> {
                 RuleNodeElision::None
             }
             Regex::Symbol(regex) => {
-                if let Some((name, name_span)) = regex.value(cst) {
-                    if let Some(decl) =
+                if let Some((name, name_span)) = regex.value(cst)
+                    && let Some(decl) =
                         self.get_symbol_binding(name, false, &name_span, diags, sema)
+                {
+                    if let Some(token) = TokenDecl::cast(cst, decl)
+                        && sema.skipped.contains(&token)
                     {
-                        if let Some(token) = TokenDecl::cast(cst, decl) {
-                            if sema.skipped.contains(&token) {
-                                diags.push(Diagnostic::used_skipped(&name_span));
-                            }
-                        }
-                        sema.decl_bindings.insert(regex.syntax(), decl);
+                        diags.push(Diagnostic::used_skipped(&name_span));
                     }
+                    sema.decl_bindings.insert(regex.syntax(), decl);
                 }
                 RuleNodeElision::None
             }
@@ -490,30 +489,30 @@ impl<'a> GeneralCheck<'a> {
                     if !in_alt && !in_loop {
                         diags.push(Diagnostic::invalid_predicate_pos(&value_span));
                     }
-                    if !regex.is_true(cst) {
-                        if let Some(rule_name) = rule.name(cst).map(|(name, _)| name) {
-                            sema.predicates
-                                .insert(regex.syntax(), (rule_name, &value[1..]));
-                        }
+                    if !regex.is_true(cst)
+                        && let Some(rule_name) = rule.name(cst).map(|(name, _)| name)
+                    {
+                        sema.predicates
+                            .insert(regex.syntax(), (rule_name, &value[1..]));
                     }
                 }
                 RuleNodeElision::None
             }
             Regex::Action(regex) => {
-                if let Some((value, _)) = regex.value(cst) {
-                    if let Some(rule_name) = rule.name(cst).map(|(name, _)| name) {
-                        sema.actions
-                            .insert(regex.syntax(), (rule_name, &value[1..]));
-                    }
+                if let Some((value, _)) = regex.value(cst)
+                    && let Some(rule_name) = rule.name(cst).map(|(name, _)| name)
+                {
+                    sema.actions
+                        .insert(regex.syntax(), (rule_name, &value[1..]));
                 }
                 RuleNodeElision::None
             }
             Regex::Assertion(regex) => {
-                if let Some((value, _)) = regex.value(cst) {
-                    if let Some(rule_name) = rule.name(cst).map(|(name, _)| name) {
-                        sema.assertions
-                            .insert(regex.syntax(), (rule_name, &value[1..]));
-                    }
+                if let Some((value, _)) = regex.value(cst)
+                    && let Some(rule_name) = rule.name(cst).map(|(name, _)| name)
+                {
+                    sema.assertions
+                        .insert(regex.syntax(), (rule_name, &value[1..]));
                 }
                 RuleNodeElision::None
             }
@@ -543,16 +542,16 @@ impl<'a> GeneralCheck<'a> {
             }
             Regex::NodeMarker(_) => RuleNodeElision::None,
             Regex::NodeCreation(regex) => {
-                if let Some(name) = regex.node_name(cst) {
-                    if !name.is_empty() {
-                        if name.starts_with(|c: char| c.is_uppercase()) {
-                            diags.push(Diagnostic::uppercase_rule(&regex.span(cst), name));
-                        }
-                        sema.rule_bindings
-                            .entry(name)
-                            .and_modify(|val| val.push(regex.syntax()))
-                            .or_insert(vec![regex.syntax()]);
+                if let Some(name) = regex.node_name(cst)
+                    && !name.is_empty()
+                {
+                    if name.starts_with(|c: char| c.is_uppercase()) {
+                        diags.push(Diagnostic::uppercase_rule(&regex.span(cst), name));
                     }
+                    sema.rule_bindings
+                        .entry(name)
+                        .and_modify(|val| val.push(regex.syntax()))
+                        .or_insert(vec![regex.syntax()]);
                 }
                 if regex.whole_rule(cst) {
                     sema.has_rule_creation.insert(rule);
@@ -1551,10 +1550,10 @@ impl UsageValidator {
             while change {
                 let count = sema.used.len();
                 for rule in file.rule_decls(cst) {
-                    if sema.used.contains(&rule.syntax()) {
-                        if let Some(regex) = rule.regex(cst) {
-                            Self::set_regex(cst, sema, regex);
-                        }
+                    if sema.used.contains(&rule.syntax())
+                        && let Some(regex) = rule.regex(cst)
+                    {
+                        Self::set_regex(cst, sema, regex);
                     }
                 }
                 change = count != sema.used.len();
@@ -1658,10 +1657,10 @@ impl RecoverySetGenerator {
             }
         }
         for rule in file.rule_decls(cst) {
-            if sema.used.contains(&rule.syntax()) {
-                if let Some(regex) = rule.regex(cst) {
-                    self.set_regex_pred(cst, sema, regex);
-                }
+            if sema.used.contains(&rule.syntax())
+                && let Some(regex) = rule.regex(cst)
+            {
+                self.set_regex_pred(cst, sema, regex);
             }
         }
 

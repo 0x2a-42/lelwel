@@ -119,14 +119,13 @@ impl RustOutput {
 
         let mut token_enumerators = "{\n    EOF,\n".to_string();
         for token in file.token_decls(cst) {
-            if let Some((symbol, _)) = token.symbol(cst) {
-                if !(symbol.is_empty()
+            if let Some((symbol, _)) = token.symbol(cst)
+                && !(symbol.is_empty()
                     || symbol.starts_with("'<") && symbol.ends_with(">'") && symbol.len() > 4)
-                {
-                    token_enumerators += "    #[token(\"";
-                    token_enumerators += &symbol[1..symbol.len() - 1];
-                    token_enumerators += "\")]\n";
-                }
+            {
+                token_enumerators += "    #[token(\"";
+                token_enumerators += &symbol[1..symbol.len() - 1];
+                token_enumerators += "\")]\n";
             }
             let (name, _) = token.name(cst).unwrap();
             token_enumerators += "    ";
