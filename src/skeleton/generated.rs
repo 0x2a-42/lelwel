@@ -229,6 +229,9 @@ impl<'a> Cst<'a> {{
         self.token_count = mark.token_count;
         self.non_skip_len = mark.non_skip_len;
     }}
+    pub fn source(&self) -> &'a str {{
+        self.source
+    }}
     /// Returns an iterator over the children of the node referenced by `node_ref`.
     pub fn children(&self, node_ref: NodeRef) -> CstChildren<'_> {{
         let iter = if let Node::Rule(_, end_offset) = self.nodes[node_ref.0] {{
@@ -367,7 +370,7 @@ pub struct Parser<'a> {{
     last_error_span: Span,
     max_offset: usize,
     #[allow(dead_code)]
-    context: Context<'a>,
+    context: <Self as ParserCallbacks<'a>>::Context,
     error_node: Option<MarkOpened>,
     #[allow(dead_code)]
     in_ordered_choice: bool,
@@ -377,14 +380,18 @@ impl<'a> Parser<'a> {{
     fn active_error(&self) -> bool {{
         self.error_node.is_some() || self.last_error_span == self.span()
     }}
-    fn error(&mut self, diags: &mut Vec<Diagnostic>, diag: Diagnostic) {{
+    fn error(
+        &mut self,
+        diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>,
+        diag: <Self as ParserCallbacks<'a>>::Diagnostic
+    ) {{
         if self.active_error() {{
             return;
         }}
         self.last_error_span = self.span();
         diags.push(diag);
     }}
-    fn advance(&mut self, error: bool, diags: &mut Vec<Diagnostic>) {{
+    fn advance(&mut self, error: bool, diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>) {{
         if !error {{
             self.close_error_node(diags);
         }}
@@ -438,7 +445,11 @@ impl<'a> Parser<'a> {{
             }}
         }}
     }}
-    fn advance_with_error(&mut self, diags: &mut Vec<Diagnostic>, diag: Diagnostic) {{
+    fn advance_with_error(
+        &mut self,
+        diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>,
+        diag: <Self as ParserCallbacks<'a>>::Diagnostic
+    ) {{
         self.error(diags, diag);
         if self.error_node.is_none() {{
             self.error_node = Some(self.cst.open());
@@ -462,18 +473,18 @@ impl<'a> Parser<'a> {{
             .nth(lookbehind)
             .map_or(self.end_of_input, |it| *it)
     }}
-    fn close_error_node(&mut self, diags: &mut Vec<Diagnostic>) {{
+    fn close_error_node(&mut self, diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>) {{
         if let Some(error_node) = self.error_node {{
             self.cst.close(error_node, Rule::Error);
             self.create_node_error(NodeRef(error_node.0), diags);
             self.error_node = None;
         }}
     }}
-    fn open(&mut self, diags: &mut Vec<Diagnostic>) -> MarkOpened {{
+    fn open(&mut self, diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>) -> MarkOpened {{
         self.close_error_node(diags);
         self.cst.open()
     }}
-    fn mark(&mut self, diags: &mut Vec<Diagnostic>) -> MarkClosed {{
+    fn mark(&mut self, diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>) -> MarkClosed {{
         self.close_error_node(diags);
         self.cst.mark()
     }}
@@ -482,7 +493,7 @@ impl<'a> Parser<'a> {{
             .get(self.pos)
             .map_or(self.max_offset..self.max_offset, |span| span.clone())
     }}
-    fn get_state(&self, diags: &[Diagnostic]) -> ParserState {{
+    fn get_state(&self, diags: &[<Self as ParserCallbacks<'a>>::Diagnostic]) -> ParserState {{
         ParserState {{
             pos: self.pos,
             current: self.current,
@@ -490,7 +501,11 @@ impl<'a> Parser<'a> {{
             diag_count: diags.len(),
         }}
     }}
-    fn set_state(&mut self, state: &ParserState, diags: &mut Vec<Diagnostic>) {{
+    fn set_state(
+        &mut self,
+        state: &ParserState,
+        diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>
+    ) {{
         self.pos = state.pos;
         self.current = state.current;
         diags.truncate(state.diag_count);
@@ -501,7 +516,12 @@ impl<'a> Parser<'a> {{
         }}
         self.cst.truncate(state.truncation_mark.clone());
     }}
-    fn create_node(&mut self, rule: Rule, node_ref: NodeRef, diags: &mut Vec<Diagnostic>) {{
+    fn create_node(
+        &mut self,
+        rule: Rule,
+        node_ref: NodeRef,
+        diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>
+    ) {{
         match rule {{{5}
         }}
     }}
@@ -510,8 +530,8 @@ impl<'a> Parser<'a> {{
     }}
     pub fn new_with_context(
         source: &'a str,
-        diags: &mut Vec<Diagnostic>,
-        context: Context<'a>,
+        diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>,
+        context: <Self as ParserCallbacks<'a>>::Context,
     ) -> Parser<'a> {{
         let (tokens, spans) = Self::create_tokens(source, diags);
         let max_offset = source.len();
@@ -528,13 +548,17 @@ impl<'a> Parser<'a> {{
             in_ordered_choice: false,
         }}
     }}
-    pub fn new(source: &'a str, diags: &mut Vec<Diagnostic>) -> Parser<'a> {{
-        Self::new_with_context(source, diags, Context::default())
+    pub fn new(
+        source: &'a str,
+        diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>,
+    ) -> Parser<'a> {{
+        #[allow(clippy::unit_arg)]
+        Self::new_with_context(source, diags, <Self as ParserCallbacks<'a>>::Context::default())
     }}
-    fn parse_rule<RuleParser: Fn(&mut Self, &mut Vec<Diagnostic>)>(
+    fn parse_rule<RuleParser: Fn(&mut Self, &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>)>(
         mut self,
         rule: RuleParser,
-        diags: &mut Vec<Diagnostic>,
+        diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>,
         root: Rule,
     ) -> Cst<'a> {{
         let token_count = self.tokens.len();
@@ -561,6 +585,6 @@ impl<'a> Parser<'a> {{
         self.cst
     }}
     /// Returns the CST for a parse of the start rule
-    pub fn parse(self, diags: &mut Vec<Diagnostic>) -> Cst<'a> {{
+    pub fn parse(self, diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>) -> Cst<'a> {{
         self.parse_rule(|parser, diags| parser.rule_{2}(diags), diags, Rule::{3})
     }}

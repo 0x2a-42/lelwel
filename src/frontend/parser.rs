@@ -3,18 +3,19 @@ use codespan_reporting::diagnostic::Label;
 
 pub type Diagnostic = codespan_reporting::diagnostic::Diagnostic<()>;
 
-#[derive(Default)]
-pub struct Context<'a> {
-    marker: std::marker::PhantomData<&'a ()>,
-}
-
 include!("./generated.rs");
 
-impl ParserCallbacks for Parser<'_> {
-    fn create_tokens(source: &str, diags: &mut Vec<Diagnostic>) -> (Vec<Token>, Vec<Span>) {
+impl<'a> ParserCallbacks<'a> for Parser<'a> {
+    type Diagnostic = Diagnostic;
+    type Context = ();
+
+    fn create_tokens(
+        source: &'a str,
+        diags: &mut Vec<Self::Diagnostic>,
+    ) -> (Vec<Token>, Vec<Span>) {
         tokenize(source, diags)
     }
-    fn create_diagnostic(&self, span: Span, message: String) -> Diagnostic {
+    fn create_diagnostic(&self, span: Span, message: String) -> Self::Diagnostic {
         Diagnostic::error()
             .with_message(message)
             .with_labels(vec![Label::primary((), span)])

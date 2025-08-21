@@ -104,7 +104,10 @@ impl Parser<'_> {
     }
 }
 
-impl<'a> ParserCallbacks for Parser<'a> {
+impl<'a> ParserCallbacks<'a> for Parser<'a> {
+    type Diagnostic = Diagnostic;
+    type Context = Context<'a>;
+
     fn create_tokens(source: &str, diags: &mut Vec<Diagnostic>) -> (Vec<Token>, Vec<Span>) {
         tokenize(source, diags)
     }

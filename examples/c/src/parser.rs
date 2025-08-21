@@ -143,7 +143,10 @@ impl Parser<'_> {
 }
 
 #[allow(clippy::ptr_arg)]
-impl ParserCallbacks for Parser<'_> {
+impl<'a> ParserCallbacks<'a> for Parser<'a> {
+    type Diagnostic = Diagnostic;
+    type Context = Context<'a>;
+
     fn create_tokens(source: &str, diags: &mut Vec<Diagnostic>) -> (Vec<Token>, Vec<Span>) {
         tokenize(source, diags)
     }
