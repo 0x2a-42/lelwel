@@ -146,22 +146,28 @@ impl RustOutput {
     ) -> std::io::Result<()> {
         output.write_all(if is_trait {
             b"#[allow(clippy::ptr_arg)]\
-            \ntrait ParserCallbacks {\
+            \npub trait ParserCallbacks<'a> {\
+            \n    type Diagnostic;\
+            \n    type Context: Default;\
+            \n\
             \n    /// Called at the start of the parse to generate all tokens and corresponding spans.\
-            \n    fn create_tokens(source: &str, diags: &mut Vec<Diagnostic>) -> (Vec<Token>, Vec<Span>);\
+            \n    fn create_tokens(source: &'a str, diags: &mut Vec<Self::Diagnostic>) -> (Vec<Token>, Vec<Span>);\
             \n    /// Called when diagnostic is created.\
-            \n    fn create_diagnostic(&self, span: Span, message: String) -> Diagnostic;\
+            \n    fn create_diagnostic(&self, span: Span, message: String) -> Self::Diagnostic;\
             \n    /// This predicate can be used to skip normal tokens.\
             \n    fn predicate_skip(&self, _token: Token) -> bool {\
             \n        false\
             \n    }\n\n"
         } else {
-            b"impl<'a> ParserCallbacks for Parser<'a> {\
-            \n    fn create_tokens(source: &str, diags: &mut Vec<Diagnostic>) -> (Vec<Token>, Vec<Span>) {\
+            b"impl<'a> ParserCallbacks<'a> for Parser<'a> {\
+            \n    type Diagnostic = Diagnostic;\
+            \n    type Context = (); // TODO: add context information to the parser if required\
+            \n\
+            \n    fn create_tokens(source: &'a str, diags: &mut Vec<Self::Diagnostic>) -> (Vec<Token>, Vec<Span>) {\
             \n        tokenize(source, diags)\
             \n    }\
-            \n    fn create_diagnostic(&self, span: Span, message: String) -> Diagnostic {\
-            \n        Diagnostic::error()\
+            \n    fn create_diagnostic(&self, span: Span, message: String) -> Self::Diagnostic> {\
+            \n        Self::Diagnostic::error()\
             \n            .with_message(message)\
             \n            .with_label(Label::primary((), span))\
             \n    }\n"
@@ -171,7 +177,7 @@ impl RustOutput {
                 output.write_all(
                     format!(
                         "    /// Called when `{rule_name}` node is created.\
-                       \n    fn create_node_{rule_name}(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Diagnostic>) {{}}\n"
+                       \n    fn create_node_{rule_name}(&mut self, _node_ref: NodeRef, _diags: &mut Vec<Self::Diagnostic>) {{}}\n"
                     ).as_bytes()
                 )?;
             }
@@ -227,7 +233,7 @@ impl RustOutput {
             }
             output.write_all(
                 format!(
-                    "    fn action_{rule}_{num}(&mut self, diags: &mut Vec<Diagnostic>){}\n",
+                    "    fn action_{rule}_{num}(&mut self, diags: &mut Vec<Self::Diagnostic>){}\n",
                     if is_trait {
                         ";"
                     } else {
@@ -251,7 +257,7 @@ impl RustOutput {
             }
             output.write_all(
                 format!(
-                    "    fn assertion_{rule}_{num}(&self) -> Option<Diagnostic>{}\n",
+                    "    fn assertion_{rule}_{num}(&self) -> Option<Self::Diagnostic>{}\n",
                     if is_trait {
                         ";"
                     } else {
@@ -418,9 +424,9 @@ impl RustOutput {
                 .any(|branch| matches!(branch, Recursion::Right(..) | Recursion::LeftRight(..)));
         output.write_all(
             format!(
-                "        fn rec(\
-               \n            parser: &mut Parser<'_>,\
-               \n            diags: &mut Vec<Diagnostic>,{}\
+                "        fn rec<'a>(\
+               \n            parser: &mut Parser<'a>,\
+               \n            diags: &mut Vec<<Parser<'a> as ParserCallbacks<'a>>::Diagnostic>,{}\
                \n            mut lhs: MarkClosed,\
                \n        ) {}{{\n",
                 if requires_bp {
@@ -699,7 +705,7 @@ impl RustOutput {
 
         output.write_all(
             format!(
-                "    {}fn rule_{name}(&mut self, diags: &mut Vec<Diagnostic>) {}{{\n",
+                "    {}fn rule_{name}(&mut self, diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>) {}{{\n",
                 if has_rule_rename {
                     "#[allow(unused_assignments)]\n    "
                 } else {
