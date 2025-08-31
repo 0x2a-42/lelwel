@@ -151,7 +151,7 @@ impl RustOutput {
             \n    type Context: Default;\
             \n\
             \n    /// Called at the start of the parse to generate all tokens and corresponding spans.\
-            \n    fn create_tokens(source: &'a str, diags: &mut Vec<Self::Diagnostic>) -> (Vec<Token>, Vec<Span>);\
+            \n    fn create_tokens(context: &mut Self::Context, source: &'a str, diags: &mut Vec<Self::Diagnostic>) -> (Vec<Token>, Vec<Span>);\
             \n    /// Called when diagnostic is created.\
             \n    fn create_diagnostic(&self, span: Span, message: String) -> Self::Diagnostic;\
             \n    /// This predicate can be used to skip normal tokens.\
@@ -163,7 +163,7 @@ impl RustOutput {
             \n    type Diagnostic = Diagnostic;\
             \n    type Context = (); // TODO: add context information to the parser if required\
             \n\
-            \n    fn create_tokens(source: &'a str, diags: &mut Vec<Self::Diagnostic>) -> (Vec<Token>, Vec<Span>) {\
+            \n    fn create_tokens(_context: &mut Self::Context, source: &'a str, diags: &mut Vec<Self::Diagnostic>) -> (Vec<Token>, Vec<Span>) {\
             \n        tokenize(source, diags)\
             \n    }\
             \n    fn create_diagnostic(&self, span: Span, message: String) -> Self::Diagnostic> {\

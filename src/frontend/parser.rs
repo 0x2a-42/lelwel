@@ -10,6 +10,7 @@ impl<'a> ParserCallbacks<'a> for Parser<'a> {
     type Context = ();
 
     fn create_tokens(
+        _context: &mut Self::Context,
         source: &'a str,
         diags: &mut Vec<Self::Diagnostic>,
     ) -> (Vec<Token>, Vec<Span>) {
