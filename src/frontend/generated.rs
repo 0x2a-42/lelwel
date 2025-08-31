@@ -633,9 +633,9 @@ impl<'a> Parser<'a> {
     pub fn new_with_context(
         source: &'a str,
         diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>,
-        context: <Self as ParserCallbacks<'a>>::Context,
+        mut context: <Self as ParserCallbacks<'a>>::Context,
     ) -> Parser<'a> {
-        let (tokens, spans) = Self::create_tokens(source, diags);
+        let (tokens, spans) = Self::create_tokens(&mut context, source, diags);
         let max_offset = source.len();
         Self {
             current: Token::EOF,
@@ -1569,8 +1569,11 @@ pub trait ParserCallbacks<'a> {
     type Context: Default;
 
     /// Called at the start of the parse to generate all tokens and corresponding spans.
-    fn create_tokens(source: &'a str, diags: &mut Vec<Self::Diagnostic>)
-        -> (Vec<Token>, Vec<Span>);
+    fn create_tokens(
+        context: &mut Self::Context,
+        source: &'a str,
+        diags: &mut Vec<Self::Diagnostic>,
+    ) -> (Vec<Token>, Vec<Span>);
     /// Called when diagnostic is created.
     fn create_diagnostic(&self, span: Span, message: String) -> Self::Diagnostic;
     /// This predicate can be used to skip normal tokens.

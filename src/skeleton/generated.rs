@@ -531,9 +531,9 @@ impl<'a> Parser<'a> {{
     pub fn new_with_context(
         source: &'a str,
         diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>,
-        context: <Self as ParserCallbacks<'a>>::Context,
+        mut context: <Self as ParserCallbacks<'a>>::Context,
     ) -> Parser<'a> {{
-        let (tokens, spans) = Self::create_tokens(source, diags);
+        let (tokens, spans) = Self::create_tokens(&mut context, source, diags);
         let max_offset = source.len();
         Self {{
             current: Token::EOF,
