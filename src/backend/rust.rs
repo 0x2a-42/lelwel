@@ -305,7 +305,7 @@ impl RustOutput {
         if has_rule_rename {
             output.write_all(
                 format!(
-                    "let closed = {parser_name}.cst.{close}(m, node_kind);\
+                    "let closed = {parser_name}.cst.data.{close}(m, node_kind);\
                    \n{parser_name}.create_node(node_kind, NodeRef(closed.0), diags);\
                    \n{lhs}\n"
                 )
@@ -315,7 +315,7 @@ impl RustOutput {
         } else {
             output.write_all(
                 format!(
-                    "let closed = {parser_name}.cst.{close}(m, Rule::{});\
+                    "let closed = {parser_name}.cst.data.{close}(m, Rule::{});\
                    \n{parser_name}.create_node_{name}(NodeRef(closed.0), diags);\
                    \n{lhs}\n",
                     snake_to_pascal_case(name),
@@ -383,7 +383,7 @@ impl RustOutput {
                 RuleNodeElision::Conditional => {
                     output.write_all(
                         b"        if !elide {\
-                        \n            let m = self.cst.open_before(start);\n",
+                        \n            let m = self.cst.data.open_before(start);\n",
                     )?;
                     Self::output_cst_close(
                         output,
@@ -481,7 +481,7 @@ impl RustOutput {
 
             let elision = *sema.elision.get(&alt_op.syntax()).unwrap();
             if elision != RuleNodeElision::Unconditional {
-                output.write_all(b"                    let m = parser.cst.open();\n")?;
+                output.write_all(b"                    let m = parser.cst.data.open();\n")?;
             }
             if let Some(Recursion::Right(_, index)) = branch {
                 let binding_power = recursive.binding_power(alt_op).0;
@@ -603,7 +603,7 @@ impl RustOutput {
                         )?;
                     }
                     output.write_all(
-                        "let m = parser.cst.open_before(lhs);\n"
+                        "let m = parser.cst.data.open_before(lhs);\n"
                             .indent(6)
                             .as_bytes(),
                     )?;
@@ -813,7 +813,7 @@ impl RustOutput {
             output.write_all(
                 format!(
                     "if m.is_none() {{\
-                   \n    m = Some({parser_name}.cst.open_before(lhs));\
+                   \n    m = Some({parser_name}.cst.data.open_before(lhs));\
                    \n}}\n"
                 )
                 .indent(5)
@@ -1241,8 +1241,8 @@ impl RustOutput {
                 };
                 output.write_all(
                     format!(
-                        "let open_node = {parser_name}.cst.open_before({mark});\
-                       \n{parser_name}.cst.close(open_node, Rule::{});\
+                        "let open_node = {parser_name}.cst.data.open_before({mark});\
+                       \n{parser_name}.cst.data.close(open_node, Rule::{});\
                        \n{parser_name}.create_node_{node_name}(NodeRef({mark}.0), diags);\n",
                         snake_to_pascal_case(node_name)
                     )
@@ -1267,7 +1267,7 @@ impl RustOutput {
                     RuleNodeElision::None => {
                         output.write_all(
                             format!(
-                                "let closed = {parser_name}.cst.close(m, Rule::Error);\
+                                "let closed = {parser_name}.cst.data.close(m, Rule::Error);\
                                \n{parser_name}.create_node_error(NodeRef(closed.0), diags);\n"
                             )
                             .indent(level + 1)
@@ -1278,8 +1278,8 @@ impl RustOutput {
                         output.write_all(
                             format!(
                                 "if !elide {{\
-                               \n    let m = {parser_name}.cst.open_before(start);\
-                               \n    let closed = {parser_name}.cst.close(m, Rule::Error);\
+                               \n    let m = {parser_name}.cst.data.open_before(start);\
+                               \n    let closed = {parser_name}.cst.data.close(m, Rule::Error);\
                                \n    {parser_name}.create_node_error(NodeRef(closed.0), diags);\
                                \n}}\n"
                             )

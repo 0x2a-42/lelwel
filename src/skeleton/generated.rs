@@ -138,44 +138,17 @@ impl Iterator for CstChildren<'_> {{
 
 pub type Span = core::ops::Range<usize>;
 
-/// A concrete syntax tree (CST) type.
-///
-/// Nodes are laid out linearly in memory.
-/// Spans for tokens are directly stored in the `spans` vector.
-/// Spans for rule nodes are calculated based on their contained token nodes.
-///
-/// # Example
-/// This syntax tree
-/// ```text
-/// foo
-///   bar
-///     A
-///     B
-///   C
-/// ```
-/// will have the following `nodes` vector.
-/// ```text
-/// [
-///    Node::Rule(Rule::Foo, 4),
-///    Node::Rule(Rule::Bar, 2),
-///    Node::Token(Token::A, 0),
-///    Node::Token(Token::B, 1),
-///    Node::Token(Token::C, 2),
-/// ]
-/// ```
-pub struct Cst<'a> {{
-    source: &'a str,
+pub struct CstData {{
     spans: Vec<Span>,
     nodes: Vec<Node>,
     token_count: usize,
     non_skip_len: usize,
 }}
 #[allow(dead_code)]
-impl<'a> Cst<'a> {{
-    fn new(source: &'a str, spans: Vec<Span>) -> Self {{
+impl CstData {{
+    fn new(spans: Vec<Span>) -> Self {{
         let nodes = Vec::with_capacity(spans.len() * 2);
         Self {{
-            source,
             spans,
             nodes,
             token_count: 0,
@@ -190,12 +163,16 @@ impl<'a> Cst<'a> {{
     }}
     fn close(&mut self, mark: MarkOpened, rule: Rule) -> MarkClosed {{
         let len = self.non_skip_len - 1;
-        self.nodes[mark.0] = Node::Rule(rule, if mark.0 > len {{
-            self.non_skip_len += mark.0 - len;
-            0
-        }} else {{
-            len - mark.0
-        }}.into());
+        self.nodes[mark.0] = Node::Rule(
+            rule,
+            if mark.0 > len {{
+                self.non_skip_len += mark.0 - len;
+                0
+            }} else {{
+                len - mark.0
+            }}
+            .into(),
+        );
         MarkClosed(mark.0)
     }}
     fn close_root(&mut self, mark: MarkOpened, rule: Rule) -> MarkClosed {{
@@ -229,10 +206,6 @@ impl<'a> Cst<'a> {{
         self.token_count = mark.token_count;
         self.non_skip_len = mark.non_skip_len;
     }}
-    pub fn source(&self) -> &'a str {{
-        self.source
-    }}
-    /// Returns an iterator over the children of the node referenced by `node_ref`.
     pub fn children(&self, node_ref: NodeRef) -> CstChildren<'_> {{
         let iter = if let Node::Rule(_, end_offset) = self.nodes[node_ref.0] {{
             self.nodes[node_ref.0 + 1..node_ref.0 + usize::from(end_offset) + 1].iter()
@@ -244,14 +217,9 @@ impl<'a> Cst<'a> {{
             offset: node_ref.0 + 1,
         }}
     }}
-    /// Returns the node referenced by `node_ref`.
     pub fn get(&self, node_ref: NodeRef) -> Node {{
         self.nodes[node_ref.0]
     }}
-    /// Returns the span for the node referenced by `node_ref`.
-    ///
-    /// For rules the span is calculated based on the first and last token.
-    /// If there are no tokens the function returns `None`.
     pub fn span(&self, node_ref: NodeRef) -> Span {{
         fn find_token<'a>(mut iter: impl Iterator<Item = &'a Node>) -> Option<usize> {{
             iter.find_map(|node| match node {{
@@ -275,19 +243,78 @@ impl<'a> Cst<'a> {{
             }}
         }}
     }}
-    /// Returns the slice and span of the node referenced by `node_ref` if it matches `matched_token`.
-    pub fn match_token(&self, node_ref: NodeRef, matched_token: Token) -> Option<(&'a str, Span)> {{
+    pub fn match_token(&self, node_ref: NodeRef, matched_token: Token) -> Option<Span> {{
         match self.nodes[node_ref.0] {{
             Node::Token(token, idx) if token == matched_token => {{
-                let span = &self.spans[usize::from(idx)];
-                Some((&self.source[span.clone()], span.clone()))
+                Some(self.spans[usize::from(idx)].clone())
             }}
             _ => None,
         }}
     }}
-    /// Checks if the node referenced by `node_ref` matches `matched_rule`.
     pub fn match_rule(&self, node_ref: NodeRef, matched_rule: Rule) -> bool {{
         matches!(self.nodes[node_ref.0], Node::Rule(rule, _) if rule == matched_rule)
+    }}
+}}
+
+/// A concrete syntax tree (CST) type.
+///
+/// Nodes are laid out linearly in memory.
+/// Spans for tokens are directly stored in the `spans` vector.
+/// Spans for rule nodes are calculated based on their contained token nodes.
+///
+/// # Example
+/// This syntax tree
+/// ```text
+/// foo
+///   bar
+///     A
+///     B
+///   C
+/// ```
+/// will have the following `nodes` vector.
+/// ```text
+/// [
+///    Node::Rule(Rule::Foo, 4),
+///    Node::Rule(Rule::Bar, 2),
+///    Node::Token(Token::A, 0),
+///    Node::Token(Token::B, 1),
+///    Node::Token(Token::C, 2),
+/// ]
+/// ```
+pub struct Cst<'a> {{
+    source: &'a str,
+    data: CstData,
+}}
+#[allow(dead_code)]
+impl<'a> Cst<'a> {{
+    pub fn source(&self) -> &'a str {{
+        self.source
+    }}
+    pub fn into_data(self) -> CstData {{
+        self.data
+    }}
+    /// Returns an iterator over the children of the node referenced by `node_ref`.
+    pub fn children(&self, node_ref: NodeRef) -> CstChildren<'_> {{
+        self.data.children(node_ref)
+    }}
+    /// Returns the node referenced by `node_ref`.
+    pub fn get(&self, node_ref: NodeRef) -> Node {{
+        self.data.get(node_ref)
+    }}
+    /// Returns the span for the node referenced by `node_ref`.
+    ///
+    /// For rules the span is calculated based on the first and last token.
+    /// If there are no tokens the function returns `None`.
+    pub fn span(&self, node_ref: NodeRef) -> Span {{
+        self.data.span(node_ref)
+    }}
+    /// Returns the slice and span of the node referenced by `node_ref` if it matches `matched_token`.
+    pub fn match_token(&self, node_ref: NodeRef, matched_token: Token) -> Option<(&'a str, Span)> {{
+        self.data.match_token(node_ref, matched_token).map(|span| (&self.source[span.clone()], span))
+    }}
+    /// Checks if the node referenced by `node_ref` matches `matched_rule`.
+    pub fn match_rule(&self, node_ref: NodeRef, matched_rule: Rule) -> bool {{
+        self.data.match_rule(node_ref, matched_rule)
     }}
 }}
 
@@ -310,7 +337,7 @@ impl std::fmt::Display for Cst<'_> {{
                     Ok(())
                 }}
                 Node::Token(token, idx) => {{
-                    let span = &cst.spans[usize::from(idx)];
+                    let span = &cst.data.spans[usize::from(idx)];
                     writeln!(
                         f,
                         "{{}}{{:?}} {{:?}} [{{:?}}]",
@@ -325,6 +352,7 @@ impl std::fmt::Display for Cst<'_> {{
         rec(self, f, NodeRef::ROOT, 0)
     }}
 }}
+
 impl std::fmt::Debug for Rule {{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {{
         match self {{{4}
@@ -395,16 +423,16 @@ impl<'a> Parser<'a> {{
         if !error {{
             self.close_error_node(diags);
         }}
-        self.cst.advance(self.current, false);
+        self.cst.data.advance(self.current, false);
         loop {{
             self.pos += 1;
             match self.tokens.get(self.pos) {{
                 Some(token @ (Token::Error{1})) => {{
-                    self.cst.advance(*token, true);
+                    self.cst.data.advance(*token, true);
                     continue;
                 }}
                 Some(token) if self.predicate_skip(*token) => {{
-                    self.cst.advance(*token, true);
+                    self.cst.data.advance(*token, true);
                     continue;
                 }}
                 Some(token) => {{
@@ -426,12 +454,12 @@ impl<'a> Parser<'a> {{
             match self.tokens.get(self.pos) {{
                 Some(token @ (Token::Error{1})) => {{
                     self.pos += 1;
-                    self.cst.advance(*token, true);
+                    self.cst.data.advance(*token, true);
                     continue;
                 }}
                 Some(token) if self.predicate_skip(*token) => {{
                     self.pos += 1;
-                    self.cst.advance(*token, true);
+                    self.cst.data.advance(*token, true);
                     continue;
                 }}
                 Some(token) => {{
@@ -452,7 +480,7 @@ impl<'a> Parser<'a> {{
     ) {{
         self.error(diags, diag);
         if self.error_node.is_none() {{
-            self.error_node = Some(self.cst.open());
+            self.error_node = Some(self.cst.data.open());
         }}
         self.advance(true, diags);
     }}
@@ -475,21 +503,21 @@ impl<'a> Parser<'a> {{
     }}
     fn close_error_node(&mut self, diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>) {{
         if let Some(error_node) = self.error_node {{
-            self.cst.close(error_node, Rule::Error);
+            self.cst.data.close(error_node, Rule::Error);
             self.create_node_error(NodeRef(error_node.0), diags);
             self.error_node = None;
         }}
     }}
     fn open(&mut self, diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>) -> MarkOpened {{
         self.close_error_node(diags);
-        self.cst.open()
+        self.cst.data.open()
     }}
     fn mark(&mut self, diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>) -> MarkClosed {{
         self.close_error_node(diags);
-        self.cst.mark()
+        self.cst.data.mark()
     }}
     fn span(&self) -> Span {{
-        self.cst.spans
+        self.cst.data.spans
             .get(self.pos)
             .map_or(self.max_offset..self.max_offset, |span| span.clone())
     }}
@@ -497,7 +525,7 @@ impl<'a> Parser<'a> {{
         ParserState {{
             pos: self.pos,
             current: self.current,
-            truncation_mark: self.cst.mark_truncation(),
+            truncation_mark: self.cst.data.mark_truncation(),
             diag_count: diags.len(),
         }}
     }}
@@ -509,12 +537,12 @@ impl<'a> Parser<'a> {{
         self.pos = state.pos;
         self.current = state.current;
         diags.truncate(state.diag_count);
-        for i in state.truncation_mark.node_count..self.cst.nodes.len() {{
-            if let Node::Rule(rule, _) = self.cst.nodes[i] {{
+        for i in state.truncation_mark.node_count..self.cst.data.nodes.len() {{
+            if let Node::Rule(rule, _) = self.cst.data.nodes[i] {{
                 self.delete_node(rule, NodeRef(i));
             }}
         }}
-        self.cst.truncate(state.truncation_mark.clone());
+        self.cst.data.truncate(state.truncation_mark.clone());
     }}
     fn create_node(
         &mut self,
@@ -538,7 +566,7 @@ impl<'a> Parser<'a> {{
         Self {{
             current: Token::EOF,
             end_of_input: Token::EOF,
-            cst: Cst::new(source, spans),
+            cst: Cst {{ data: CstData::new(spans), source }},
             tokens,
             pos: 0,
             last_error_span: Span::default(),
@@ -573,14 +601,14 @@ impl<'a> Parser<'a> {{
             let error_tree = self.open(diags);
             while self.pos < token_count {{
                 let token = self.tokens[self.pos];
-                self.cst.advance(token, Self::is_skipped(token));
+                self.cst.data.advance(token, Self::is_skipped(token));
                 self.pos += 1;
             }}
-            self.cst.close(error_tree, Rule::Error);
+            self.cst.data.close(error_tree, Rule::Error);
             self.create_node_error(NodeRef(error_tree.0), diags);
         }}
 
-        let closed = self.cst.close_root(m, root);
+        let closed = self.cst.data.close_root(m, root);
         self.create_node(root, NodeRef(closed.0), diags);
         self.cst
     }}

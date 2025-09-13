@@ -170,44 +170,17 @@ impl Iterator for CstChildren<'_> {
 
 pub type Span = core::ops::Range<usize>;
 
-/// A concrete syntax tree (CST) type.
-///
-/// Nodes are laid out linearly in memory.
-/// Spans for tokens are directly stored in the `spans` vector.
-/// Spans for rule nodes are calculated based on their contained token nodes.
-///
-/// # Example
-/// This syntax tree
-/// ```text
-/// foo
-///   bar
-///     A
-///     B
-///   C
-/// ```
-/// will have the following `nodes` vector.
-/// ```text
-/// [
-///    Node::Rule(Rule::Foo, 4),
-///    Node::Rule(Rule::Bar, 2),
-///    Node::Token(Token::A, 0),
-///    Node::Token(Token::B, 1),
-///    Node::Token(Token::C, 2),
-/// ]
-/// ```
-pub struct Cst<'a> {
-    source: &'a str,
+pub struct CstData {
     spans: Vec<Span>,
     nodes: Vec<Node>,
     token_count: usize,
     non_skip_len: usize,
 }
 #[allow(dead_code)]
-impl<'a> Cst<'a> {
-    fn new(source: &'a str, spans: Vec<Span>) -> Self {
+impl CstData {
+    fn new(spans: Vec<Span>) -> Self {
         let nodes = Vec::with_capacity(spans.len() * 2);
         Self {
-            source,
             spans,
             nodes,
             token_count: 0,
@@ -265,10 +238,6 @@ impl<'a> Cst<'a> {
         self.token_count = mark.token_count;
         self.non_skip_len = mark.non_skip_len;
     }
-    pub fn source(&self) -> &'a str {
-        self.source
-    }
-    /// Returns an iterator over the children of the node referenced by `node_ref`.
     pub fn children(&self, node_ref: NodeRef) -> CstChildren<'_> {
         let iter = if let Node::Rule(_, end_offset) = self.nodes[node_ref.0] {
             self.nodes[node_ref.0 + 1..node_ref.0 + usize::from(end_offset) + 1].iter()
@@ -280,14 +249,9 @@ impl<'a> Cst<'a> {
             offset: node_ref.0 + 1,
         }
     }
-    /// Returns the node referenced by `node_ref`.
     pub fn get(&self, node_ref: NodeRef) -> Node {
         self.nodes[node_ref.0]
     }
-    /// Returns the span for the node referenced by `node_ref`.
-    ///
-    /// For rules the span is calculated based on the first and last token.
-    /// If there are no tokens the function returns `None`.
     pub fn span(&self, node_ref: NodeRef) -> Span {
         fn find_token<'a>(mut iter: impl Iterator<Item = &'a Node>) -> Option<usize> {
             iter.find_map(|node| match node {
@@ -311,19 +275,80 @@ impl<'a> Cst<'a> {
             }
         }
     }
-    /// Returns the slice and span of the node referenced by `node_ref` if it matches `matched_token`.
-    pub fn match_token(&self, node_ref: NodeRef, matched_token: Token) -> Option<(&'a str, Span)> {
+    pub fn match_token(&self, node_ref: NodeRef, matched_token: Token) -> Option<Span> {
         match self.nodes[node_ref.0] {
             Node::Token(token, idx) if token == matched_token => {
-                let span = &self.spans[usize::from(idx)];
-                Some((&self.source[span.clone()], span.clone()))
+                Some(self.spans[usize::from(idx)].clone())
             }
             _ => None,
         }
     }
-    /// Checks if the node referenced by `node_ref` matches `matched_rule`.
     pub fn match_rule(&self, node_ref: NodeRef, matched_rule: Rule) -> bool {
         matches!(self.nodes[node_ref.0], Node::Rule(rule, _) if rule == matched_rule)
+    }
+}
+
+/// A concrete syntax tree (CST) type.
+///
+/// Nodes are laid out linearly in memory.
+/// Spans for tokens are directly stored in the `spans` vector.
+/// Spans for rule nodes are calculated based on their contained token nodes.
+///
+/// # Example
+/// This syntax tree
+/// ```text
+/// foo
+///   bar
+///     A
+///     B
+///   C
+/// ```
+/// will have the following `nodes` vector.
+/// ```text
+/// [
+///    Node::Rule(Rule::Foo, 4),
+///    Node::Rule(Rule::Bar, 2),
+///    Node::Token(Token::A, 0),
+///    Node::Token(Token::B, 1),
+///    Node::Token(Token::C, 2),
+/// ]
+/// ```
+pub struct Cst<'a> {
+    source: &'a str,
+    data: CstData,
+}
+#[allow(dead_code)]
+impl<'a> Cst<'a> {
+    pub fn source(&self) -> &'a str {
+        self.source
+    }
+    pub fn into_data(self) -> CstData {
+        self.data
+    }
+    /// Returns an iterator over the children of the node referenced by `node_ref`.
+    pub fn children(&self, node_ref: NodeRef) -> CstChildren<'_> {
+        self.data.children(node_ref)
+    }
+    /// Returns the node referenced by `node_ref`.
+    pub fn get(&self, node_ref: NodeRef) -> Node {
+        self.data.get(node_ref)
+    }
+    /// Returns the span for the node referenced by `node_ref`.
+    ///
+    /// For rules the span is calculated based on the first and last token.
+    /// If there are no tokens the function returns `None`.
+    pub fn span(&self, node_ref: NodeRef) -> Span {
+        self.data.span(node_ref)
+    }
+    /// Returns the slice and span of the node referenced by `node_ref` if it matches `matched_token`.
+    pub fn match_token(&self, node_ref: NodeRef, matched_token: Token) -> Option<(&'a str, Span)> {
+        self.data
+            .match_token(node_ref, matched_token)
+            .map(|span| (&self.source[span.clone()], span))
+    }
+    /// Checks if the node referenced by `node_ref` matches `matched_rule`.
+    pub fn match_rule(&self, node_ref: NodeRef, matched_rule: Rule) -> bool {
+        self.data.match_rule(node_ref, matched_rule)
     }
 }
 
@@ -346,7 +371,7 @@ impl std::fmt::Display for Cst<'_> {
                     Ok(())
                 }
                 Node::Token(token, idx) => {
-                    let span = &cst.spans[usize::from(idx)];
+                    let span = &cst.data.spans[usize::from(idx)];
                     writeln!(
                         f,
                         "{}{:?} {:?} [{:?}]",
@@ -361,6 +386,7 @@ impl std::fmt::Display for Cst<'_> {
         rec(self, f, NodeRef::ROOT, 0)
     }
 }
+
 impl std::fmt::Debug for Rule {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -461,18 +487,18 @@ impl<'a> Parser<'a> {
         if !error {
             self.close_error_node(diags);
         }
-        self.cst.advance(self.current, false);
+        self.cst.data.advance(self.current, false);
         loop {
             self.pos += 1;
             match self.tokens.get(self.pos) {
                 Some(
                     token @ (Token::Error | Token::Comment | Token::DocComment | Token::Whitespace),
                 ) => {
-                    self.cst.advance(*token, true);
+                    self.cst.data.advance(*token, true);
                     continue;
                 }
                 Some(token) if self.predicate_skip(*token) => {
-                    self.cst.advance(*token, true);
+                    self.cst.data.advance(*token, true);
                     continue;
                 }
                 Some(token) => {
@@ -499,12 +525,12 @@ impl<'a> Parser<'a> {
                     token @ (Token::Error | Token::Comment | Token::DocComment | Token::Whitespace),
                 ) => {
                     self.pos += 1;
-                    self.cst.advance(*token, true);
+                    self.cst.data.advance(*token, true);
                     continue;
                 }
                 Some(token) if self.predicate_skip(*token) => {
                     self.pos += 1;
-                    self.cst.advance(*token, true);
+                    self.cst.data.advance(*token, true);
                     continue;
                 }
                 Some(token) => {
@@ -525,7 +551,7 @@ impl<'a> Parser<'a> {
     ) {
         self.error(diags, diag);
         if self.error_node.is_none() {
-            self.error_node = Some(self.cst.open());
+            self.error_node = Some(self.cst.data.open());
         }
         self.advance(true, diags);
     }
@@ -548,21 +574,22 @@ impl<'a> Parser<'a> {
     }
     fn close_error_node(&mut self, diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>) {
         if let Some(error_node) = self.error_node {
-            self.cst.close(error_node, Rule::Error);
+            self.cst.data.close(error_node, Rule::Error);
             self.create_node_error(NodeRef(error_node.0), diags);
             self.error_node = None;
         }
     }
     fn open(&mut self, diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>) -> MarkOpened {
         self.close_error_node(diags);
-        self.cst.open()
+        self.cst.data.open()
     }
     fn mark(&mut self, diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>) -> MarkClosed {
         self.close_error_node(diags);
-        self.cst.mark()
+        self.cst.data.mark()
     }
     fn span(&self) -> Span {
         self.cst
+            .data
             .spans
             .get(self.pos)
             .map_or(self.max_offset..self.max_offset, |span| span.clone())
@@ -571,7 +598,7 @@ impl<'a> Parser<'a> {
         ParserState {
             pos: self.pos,
             current: self.current,
-            truncation_mark: self.cst.mark_truncation(),
+            truncation_mark: self.cst.data.mark_truncation(),
             diag_count: diags.len(),
         }
     }
@@ -583,12 +610,12 @@ impl<'a> Parser<'a> {
         self.pos = state.pos;
         self.current = state.current;
         diags.truncate(state.diag_count);
-        for i in state.truncation_mark.node_count..self.cst.nodes.len() {
-            if let Node::Rule(rule, _) = self.cst.nodes[i] {
+        for i in state.truncation_mark.node_count..self.cst.data.nodes.len() {
+            if let Node::Rule(rule, _) = self.cst.data.nodes[i] {
                 self.delete_node(rule, NodeRef(i));
             }
         }
-        self.cst.truncate(state.truncation_mark.clone());
+        self.cst.data.truncate(state.truncation_mark.clone());
     }
     fn create_node(
         &mut self,
@@ -640,7 +667,10 @@ impl<'a> Parser<'a> {
         Self {
             current: Token::EOF,
             end_of_input: Token::EOF,
-            cst: Cst::new(source, spans),
+            cst: Cst {
+                data: CstData::new(spans),
+                source,
+            },
             tokens,
             pos: 0,
             last_error_span: Span::default(),
@@ -681,14 +711,14 @@ impl<'a> Parser<'a> {
             let error_tree = self.open(diags);
             while self.pos < token_count {
                 let token = self.tokens[self.pos];
-                self.cst.advance(token, Self::is_skipped(token));
+                self.cst.data.advance(token, Self::is_skipped(token));
                 self.pos += 1;
             }
-            self.cst.close(error_tree, Rule::Error);
+            self.cst.data.close(error_tree, Rule::Error);
             self.create_node_error(NodeRef(error_tree.0), diags);
         }
 
-        let closed = self.cst.close_root(m, root);
+        let closed = self.cst.data.close_root(m, root);
         self.create_node(root, NodeRef(closed.0), diags);
         self.cst
     }
@@ -770,7 +800,7 @@ impl<'a> Parser<'a> {
         expect!(Start, "start", self, diags);
         expect!(Id, "<identifier>", self, diags);
         expect!(Semi, ";", self, diags);
-        let closed = self.cst.close(m, Rule::StartDecl);
+        let closed = self.cst.data.close(m, Rule::StartDecl);
         self.create_node_start_decl(NodeRef(closed.0), diags);
     }
     fn rule_right_decl(&mut self, diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>) {
@@ -819,7 +849,7 @@ impl<'a> Parser<'a> {
             }
         }
         expect!(Semi, ";", self, diags);
-        let closed = self.cst.close(m, Rule::RightDecl);
+        let closed = self.cst.data.close(m, Rule::RightDecl);
         self.create_node_right_decl(NodeRef(closed.0), diags);
     }
     fn rule_skip_decl(&mut self, diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>) {
@@ -868,7 +898,7 @@ impl<'a> Parser<'a> {
             }
         }
         expect!(Semi, ";", self, diags);
-        let closed = self.cst.close(m, Rule::SkipDecl);
+        let closed = self.cst.data.close(m, Rule::SkipDecl);
         self.create_node_skip_decl(NodeRef(closed.0), diags);
     }
     fn rule_part_decl(&mut self, diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>) {
@@ -896,7 +926,7 @@ impl<'a> Parser<'a> {
             }
         }
         expect!(Semi, ";", self, diags);
-        let closed = self.cst.close(m, Rule::PartDecl);
+        let closed = self.cst.data.close(m, Rule::PartDecl);
         self.create_node_part_decl(NodeRef(closed.0), diags);
     }
     fn rule_token_list(&mut self, diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>) {
@@ -924,7 +954,7 @@ impl<'a> Parser<'a> {
             }
         }
         expect!(Semi, ";", self, diags);
-        let closed = self.cst.close(m, Rule::TokenList);
+        let closed = self.cst.data.close(m, Rule::TokenList);
         self.create_node_token_list(NodeRef(closed.0), diags);
     }
     fn rule_token_decl(&mut self, diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>) {
@@ -952,7 +982,7 @@ impl<'a> Parser<'a> {
                 }
             }
         }
-        let closed = self.cst.close(m, Rule::TokenDecl);
+        let closed = self.cst.data.close(m, Rule::TokenDecl);
         self.create_node_token_decl(NodeRef(closed.0), diags);
     }
     fn rule_rule_decl(&mut self, diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>) {
@@ -1053,7 +1083,7 @@ impl<'a> Parser<'a> {
             }
         }
         expect!(Semi, ";", self, diags);
-        let closed = self.cst.close(m, Rule::RuleDecl);
+        let closed = self.cst.data.close(m, Rule::RuleDecl);
         self.create_node_rule_decl(NodeRef(closed.0), diags);
     }
     fn rule_regex(&mut self, diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>) {
@@ -1089,8 +1119,8 @@ impl<'a> Parser<'a> {
                             }
                         }
                     }
-                    let open_node = self.cst.open_before(start);
-                    self.cst.close(open_node, Rule::Alternation);
+                    let open_node = self.cst.data.open_before(start);
+                    self.cst.data.close(open_node, Rule::Alternation);
                     self.create_node_alternation(NodeRef(start.0), diags);
                     break;
                 }
@@ -1141,8 +1171,8 @@ impl<'a> Parser<'a> {
                             }
                         }
                     }
-                    let open_node = self.cst.open_before(start);
-                    self.cst.close(open_node, Rule::OrderedChoice);
+                    let open_node = self.cst.data.open_before(start);
+                    self.cst.data.close(open_node, Rule::OrderedChoice);
                     self.create_node_ordered_choice(NodeRef(start.0), diags);
                     break;
                 }
@@ -1262,8 +1292,8 @@ impl<'a> Parser<'a> {
                             }
                         }
                     }
-                    let open_node = self.cst.open_before(start);
-                    self.cst.close(open_node, Rule::Concat);
+                    let open_node = self.cst.data.open_before(start);
+                    self.cst.data.close(open_node, Rule::Concat);
                     self.create_node_concat(NodeRef(start.0), diags);
                     break;
                 }
@@ -1339,7 +1369,7 @@ impl<'a> Parser<'a> {
             let mut node_kind = Rule::Postfix;
             match parser.current {
                 Token::LPar => {
-                    let m = parser.cst.open();
+                    let m = parser.cst.data.open();
                     expect!(LPar, "(", parser, diags);
                     loop {
                         match parser.current {
@@ -1420,93 +1450,93 @@ impl<'a> Parser<'a> {
                     }
                     expect!(RPar, ")", parser, diags);
                     node_kind = Rule::Paren;
-                    let closed = parser.cst.close(m, node_kind);
+                    let closed = parser.cst.data.close(m, node_kind);
                     parser.create_node(node_kind, NodeRef(closed.0), diags);
                 }
                 Token::LBrak => {
-                    let m = parser.cst.open();
+                    let m = parser.cst.data.open();
                     expect!(LBrak, "[", parser, diags);
                     parser.rule_regex(diags);
                     expect!(RBrak, "]", parser, diags);
                     node_kind = Rule::Optional;
-                    let closed = parser.cst.close(m, node_kind);
+                    let closed = parser.cst.data.close(m, node_kind);
                     parser.create_node(node_kind, NodeRef(closed.0), diags);
                 }
                 Token::Id => {
-                    let m = parser.cst.open();
+                    let m = parser.cst.data.open();
                     expect!(Id, "<identifier>", parser, diags);
                     node_kind = Rule::Name;
-                    let closed = parser.cst.close(m, node_kind);
+                    let closed = parser.cst.data.close(m, node_kind);
                     parser.create_node(node_kind, NodeRef(closed.0), diags);
                 }
                 Token::Str => {
-                    let m = parser.cst.open();
+                    let m = parser.cst.data.open();
                     expect!(Str, "<string literal>", parser, diags);
                     node_kind = Rule::Symbol;
-                    let closed = parser.cst.close(m, node_kind);
+                    let closed = parser.cst.data.close(m, node_kind);
                     parser.create_node(node_kind, NodeRef(closed.0), diags);
                 }
                 Token::Predicate => {
-                    let m = parser.cst.open();
+                    let m = parser.cst.data.open();
                     expect!(Predicate, "<semantic predicate>", parser, diags);
                     node_kind = Rule::Predicate;
-                    let closed = parser.cst.close(m, node_kind);
+                    let closed = parser.cst.data.close(m, node_kind);
                     parser.create_node(node_kind, NodeRef(closed.0), diags);
                 }
                 Token::Action => {
-                    let m = parser.cst.open();
+                    let m = parser.cst.data.open();
                     expect!(Action, "<semantic action>", parser, diags);
                     node_kind = Rule::Action;
-                    let closed = parser.cst.close(m, node_kind);
+                    let closed = parser.cst.data.close(m, node_kind);
                     parser.create_node(node_kind, NodeRef(closed.0), diags);
                 }
                 Token::Assertion => {
-                    let m = parser.cst.open();
+                    let m = parser.cst.data.open();
                     expect!(Assertion, "<semantic assertion>", parser, diags);
                     node_kind = Rule::Assertion;
-                    let closed = parser.cst.close(m, node_kind);
+                    let closed = parser.cst.data.close(m, node_kind);
                     parser.create_node(node_kind, NodeRef(closed.0), diags);
                 }
                 Token::NodeRename => {
-                    let m = parser.cst.open();
+                    let m = parser.cst.data.open();
                     expect!(NodeRename, "<node rename>", parser, diags);
                     node_kind = Rule::NodeRename;
-                    let closed = parser.cst.close(m, node_kind);
+                    let closed = parser.cst.data.close(m, node_kind);
                     parser.create_node(node_kind, NodeRef(closed.0), diags);
                 }
                 Token::NodeMarker => {
-                    let m = parser.cst.open();
+                    let m = parser.cst.data.open();
                     expect!(NodeMarker, "<node marker>", parser, diags);
                     node_kind = Rule::NodeMarker;
-                    let closed = parser.cst.close(m, node_kind);
+                    let closed = parser.cst.data.close(m, node_kind);
                     parser.create_node(node_kind, NodeRef(closed.0), diags);
                 }
                 Token::NodeCreation => {
-                    let m = parser.cst.open();
+                    let m = parser.cst.data.open();
                     expect!(NodeCreation, "<node creation>", parser, diags);
                     node_kind = Rule::NodeCreation;
-                    let closed = parser.cst.close(m, node_kind);
+                    let closed = parser.cst.data.close(m, node_kind);
                     parser.create_node(node_kind, NodeRef(closed.0), diags);
                 }
                 Token::Hat => {
-                    let m = parser.cst.open();
+                    let m = parser.cst.data.open();
                     expect!(Hat, "^", parser, diags);
                     node_kind = Rule::NodeElision;
-                    let closed = parser.cst.close(m, node_kind);
+                    let closed = parser.cst.data.close(m, node_kind);
                     parser.create_node(node_kind, NodeRef(closed.0), diags);
                 }
                 Token::Tilde => {
-                    let m = parser.cst.open();
+                    let m = parser.cst.data.open();
                     expect!(Tilde, "~", parser, diags);
                     node_kind = Rule::Commit;
-                    let closed = parser.cst.close(m, node_kind);
+                    let closed = parser.cst.data.close(m, node_kind);
                     parser.create_node(node_kind, NodeRef(closed.0), diags);
                 }
                 Token::And => {
-                    let m = parser.cst.open();
+                    let m = parser.cst.data.open();
                     expect!(And, "&", parser, diags);
                     node_kind = Rule::Return;
-                    let closed = parser.cst.close(m, node_kind);
+                    let closed = parser.cst.data.close(m, node_kind);
                     parser.create_node(node_kind, NodeRef(closed.0), diags);
                 }
                 _ => {
@@ -1535,19 +1565,19 @@ impl<'a> Parser<'a> {
                 node_kind = Rule::Postfix;
                 match parser.current {
                     Token::Star => {
-                        let m = parser.cst.open_before(lhs);
+                        let m = parser.cst.data.open_before(lhs);
                         expect!(Star, "*", parser, diags);
                         node_kind = Rule::Star;
-                        let closed = parser.cst.close(m, node_kind);
+                        let closed = parser.cst.data.close(m, node_kind);
                         parser.create_node(node_kind, NodeRef(closed.0), diags);
                         lhs = closed;
                         continue;
                     }
                     Token::Plus => {
-                        let m = parser.cst.open_before(lhs);
+                        let m = parser.cst.data.open_before(lhs);
                         expect!(Plus, "+", parser, diags);
                         node_kind = Rule::Plus;
-                        let closed = parser.cst.close(m, node_kind);
+                        let closed = parser.cst.data.close(m, node_kind);
                         parser.create_node(node_kind, NodeRef(closed.0), diags);
                         lhs = closed;
                         continue;

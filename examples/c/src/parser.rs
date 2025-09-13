@@ -84,7 +84,7 @@ impl Parser<'_> {
     }
 
     fn is_type_name(&self, pos: usize) -> bool {
-        let name = &self.cst.source[self.cst.spans[pos].clone()];
+        let name = &self.cst.source[self.cst.data.spans[pos].clone()];
         for scopes in self.context.scopes.iter().rev() {
             if let Some(is_type) = scopes.declared_names.get(name) {
                 return *is_type;
