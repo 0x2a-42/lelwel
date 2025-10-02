@@ -683,7 +683,10 @@ impl<'a> Parser<'a> {
     pub fn new(
         source: &'a str,
         diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>,
-    ) -> Parser<'a> {
+    ) -> Parser<'a>
+    where
+        <Self as ParserCallbacks<'a>>::Context: Default,
+    {
         #[allow(clippy::unit_arg)]
         Self::new_with_context(
             source,
@@ -1596,7 +1599,7 @@ impl<'a> Parser<'a> {
 #[allow(clippy::ptr_arg)]
 pub trait ParserCallbacks<'a> {
     type Diagnostic;
-    type Context: Default;
+    type Context;
 
     /// Called at the start of the parse to generate all tokens and corresponding spans.
     fn create_tokens(
