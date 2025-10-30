@@ -579,7 +579,10 @@ impl<'a> Parser<'a> {{
     pub fn new(
         source: &'a str,
         diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>,
-    ) -> Parser<'a> {{
+    ) -> Parser<'a>
+    where
+        <Self as ParserCallbacks<'a>>::Context: Default,
+    {{
         #[allow(clippy::unit_arg)]
         Self::new_with_context(source, diags, <Self as ParserCallbacks<'a>>::Context::default())
     }}

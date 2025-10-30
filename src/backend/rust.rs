@@ -148,7 +148,7 @@ impl RustOutput {
             b"#[allow(clippy::ptr_arg)]\
             \npub trait ParserCallbacks<'a> {\
             \n    type Diagnostic;\
-            \n    type Context: Default;\
+            \n    type Context;\
             \n\
             \n    /// Called at the start of the parse to generate all tokens and corresponding spans.\
             \n    fn create_tokens(context: &mut Self::Context, source: &'a str, diags: &mut Vec<Self::Diagnostic>) -> (Vec<Token>, Vec<Span>);\
