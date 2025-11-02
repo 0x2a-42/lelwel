@@ -366,6 +366,10 @@ impl<'a> Cst<'a> {
     pub fn match_rule(&self, node_ref: NodeRef, matched_rule: Rule) -> bool {
         self.data.match_rule(node_ref, matched_rule)
     }
+    /// Returns the source text corresponding to the span index
+    pub fn span_text(&self, span_idx: CstIndex) -> &'a str {
+        &self.source[self.data.spans[usize::from(span_idx)].clone()]
+    }
 }
 
 impl std::fmt::Display for Cst<'_> {
