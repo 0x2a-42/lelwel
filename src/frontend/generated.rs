@@ -81,12 +81,26 @@ impl NodeRef {
 }
 
 #[cfg(target_pointer_width = "64")]
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone)]
 pub struct CstIndex([u8; 6]);
 
 #[cfg(any(target_pointer_width = "16", target_pointer_width = "32"))]
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone)]
 pub struct CstIndex(usize);
+
+#[cfg(target_pointer_width = "64")]
+impl std::fmt::Debug for CstIndex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        usize::from(*self).fmt(f)
+    }
+}
+
+#[cfg(any(target_pointer_width = "16", target_pointer_width = "32"))]
+impl std::fmt::Debug for CstIndex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        self.0.fmt(f)
+    }
+}
 
 impl From<CstIndex> for usize {
     #[cfg(target_pointer_width = "64")]
@@ -170,6 +184,7 @@ impl Iterator for CstChildren<'_> {
 
 pub type Span = core::ops::Range<usize>;
 
+#[derive(Debug)]
 pub struct CstData {
     spans: Vec<Span>,
     nodes: Vec<Node>,
@@ -313,6 +328,7 @@ impl CstData {
 ///    Node::Token(Token::C, 2),
 /// ]
 /// ```
+#[derive(Debug)]
 pub struct Cst<'a> {
     source: &'a str,
     data: CstData,
