@@ -583,6 +583,14 @@ impl<'a> Parser<'a> {
         self.close_error_node(diags);
         self.cst.data.open()
     }
+    fn open_before(
+        &mut self,
+        mark: MarkClosed,
+        diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>,
+    ) -> MarkOpened {
+        self.close_error_node(diags);
+        self.cst.data.open_before(mark)
+    }
     fn mark(&mut self, diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>) -> MarkClosed {
         self.close_error_node(diags);
         self.cst.data.mark()
@@ -1122,7 +1130,7 @@ impl<'a> Parser<'a> {
                             }
                         }
                     }
-                    let open_node = self.cst.data.open_before(start);
+                    let open_node = self.open_before(start, diags);
                     self.cst.data.close(open_node, Rule::Alternation);
                     self.create_node_alternation(NodeRef(start.0), diags);
                     break;
@@ -1174,7 +1182,7 @@ impl<'a> Parser<'a> {
                             }
                         }
                     }
-                    let open_node = self.cst.data.open_before(start);
+                    let open_node = self.open_before(start, diags);
                     self.cst.data.close(open_node, Rule::OrderedChoice);
                     self.create_node_ordered_choice(NodeRef(start.0), diags);
                     break;
@@ -1295,7 +1303,7 @@ impl<'a> Parser<'a> {
                             }
                         }
                     }
-                    let open_node = self.cst.data.open_before(start);
+                    let open_node = self.open_before(start, diags);
                     self.cst.data.close(open_node, Rule::Concat);
                     self.create_node_concat(NodeRef(start.0), diags);
                     break;
@@ -1568,7 +1576,7 @@ impl<'a> Parser<'a> {
                 node_kind = Rule::Postfix;
                 match parser.current {
                     Token::Star => {
-                        let m = parser.cst.data.open_before(lhs);
+                        let m = parser.open_before(lhs, diags);
                         expect!(Star, "*", parser, diags);
                         node_kind = Rule::Star;
                         let closed = parser.cst.data.close(m, node_kind);
@@ -1577,7 +1585,7 @@ impl<'a> Parser<'a> {
                         continue;
                     }
                     Token::Plus => {
-                        let m = parser.cst.data.open_before(lhs);
+                        let m = parser.open_before(lhs, diags);
                         expect!(Plus, "+", parser, diags);
                         node_kind = Rule::Plus;
                         let closed = parser.cst.data.close(m, node_kind);
