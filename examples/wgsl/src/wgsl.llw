@@ -36,6 +36,7 @@ global_decl:
     function_header compound_statement @function_decl
   | variable_decl ';' @global_variable_decl
   | override_decl ';' @global_value_decl
+  | let_decl ';' @global_let_decl
   )
 | const_decl ';' @global_value_decl
 | 'alias' Ident '=' Ident template_list ';' @type_alias_decl
@@ -55,6 +56,8 @@ attribute:
   )
 ;
 typed_ident: Ident (':' type_specifier | ());
+// extra rule for better error message
+typed_ident_init: Ident (':' type_specifier | ()) @typed_ident;
 
 type_specifier: Ident template_list;
 template_list^: [#1 template_args >];
@@ -132,8 +135,8 @@ func_call: Ident template_list argument_expression_list;
 
 variable_or_value^: variable_decl | let_decl | const_decl;
 variable_decl: 'var' template_list typed_ident ['=' expression];
-let_decl: 'let' typed_ident '=' expression;
-const_decl: 'const' typed_ident '=' expression;
+let_decl: 'let' typed_ident_init '=' #1 expression;
+const_decl: 'const' typed_ident_init '=' #1 expression;
 override_decl: 'override' typed_ident ['=' expression];
 
 // duplicated so it can be used in `for` statement without semicolon

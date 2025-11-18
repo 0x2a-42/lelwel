@@ -191,4 +191,35 @@ impl<'a> ParserCallbacks<'a> for Parser<'a> {
     fn predicate_lhs_expression_1(&self) -> bool {
         self.is_swizzle_name()
     }
+
+    fn action_let_decl_1(&mut self, diags: &mut Vec<Self::Diagnostic>) {
+        if self.active_error() && self.current == Token::Semi {
+            diags
+                .last_mut()
+                .unwrap()
+                .notes
+                .push("note: let declaration requires initializer".to_string());
+        }
+    }
+    fn action_const_decl_1(&mut self, diags: &mut Vec<Self::Diagnostic>) {
+        if self.active_error() && self.current == Token::Semi {
+            diags
+                .last_mut()
+                .unwrap()
+                .notes
+                .push("note: const declaration requires initializer".to_string());
+        }
+    }
+
+    fn create_node_global_let_decl(
+        &mut self,
+        node_ref: NodeRef,
+        diags: &mut Vec<Self::Diagnostic>,
+    ) {
+        diags.push(
+            Diagnostic::error()
+                .with_message("global let declarations are not allowed")
+                .with_label(Label::primary((), self.cst.span(node_ref))),
+        );
+    }
 }

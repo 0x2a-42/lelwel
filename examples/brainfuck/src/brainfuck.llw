@@ -1,6 +1,3 @@
-// Each token is a Brainfuck instruction
-// Other characters will be ignored by lexer
-
 token Plus='+' Minus='-' Lt='<' Gt='>' Dot='.' Comma=',' LBrack='[' RBrack=']';
 token Comment;
 
