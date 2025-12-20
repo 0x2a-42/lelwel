@@ -166,7 +166,7 @@ impl RustOutput {
             \n    fn create_tokens(_context: &mut Self::Context, source: &'a str, diags: &mut Vec<Self::Diagnostic>) -> (Vec<Token>, Vec<Span>) {\
             \n        tokenize(source, diags)\
             \n    }\
-            \n    fn create_diagnostic(&self, span: Span, message: String) -> Self::Diagnostic> {\
+            \n    fn create_diagnostic(&self, span: Span, message: String) -> Self::Diagnostic {\
             \n        Self::Diagnostic::error()\
             \n            .with_message(message)\
             \n            .with_label(Label::primary((), span))\
