@@ -963,13 +963,23 @@ impl RustOutput {
                 }
                 let ops = choice.operands(cst).collect::<Vec<_>>();
                 for op in &ops[..ops.len() - 1] {
-                    output.write_all("if (|| {\n".indent(level + 1).as_bytes())?;
+                    let predict = &sema.predict_sets[&op.syntax()];
+                    output.write_all(
+                        format!(
+                            "if matches!({parser_name}.current, {}) {{\n",
+                            predict.pattern(1)
+                        )
+                        .indent(level + 1)
+                        .as_bytes(),
+                    )?;
+
+                    output.write_all("if (|| {\n".indent(level + 2).as_bytes())?;
                     Self::output_regex(
                         cst,
                         sema,
                         *op,
                         output,
-                        level + 2,
+                        level + 3,
                         token_symbols,
                         false,
                         rule_name,
@@ -982,37 +992,49 @@ impl RustOutput {
                        \n})().is_some() {\
                        \n    break 'ordered_choice;\
                        \n}\n"
-                            .indent(level + 1)
+                            .indent(level + 2)
                             .as_bytes(),
                     )?;
                     output.write_all(
                         format!("{parser_name}.set_state(&state, diags);\n")
-                            .indent(level + 1)
+                            .indent(level + 2)
                             .as_bytes(),
                     )?;
                     if rule_elision == RuleNodeElision::Conditional {
                         output
-                            .write_all("elide = elision_state;\n".indent(level + 1).as_bytes())?;
+                            .write_all("elide = elision_state;\n".indent(level + 2).as_bytes())?;
                     }
                     if has_rule_rename {
                         output.write_all(
                             "node_kind = node_kind_state;\n"
-                                .indent(level + 1)
+                                .indent(level + 2)
                                 .as_bytes(),
                         )?;
                     }
+                    output.write_all("}\n".indent(level + 1).as_bytes())?;
                 }
                 output.write_all(
                     format!("{parser_name}.in_ordered_choice = false;\n")
                         .indent(level + 1)
                         .as_bytes(),
                 )?;
+
+                let op = *ops.last().unwrap();
+                let predict = &sema.predict_sets[&op.syntax()];
+                output.write_all(
+                    format!(
+                        "if matches!({parser_name}.current, {}) {{\n",
+                        predict.pattern(1)
+                    )
+                    .indent(level + 1)
+                    .as_bytes(),
+                )?;
                 Self::output_regex(
                     cst,
                     sema,
-                    *ops.last().unwrap(),
+                    op,
                     output,
-                    level + 1,
+                    level + 2,
                     token_symbols,
                     false,
                     rule_name,
@@ -1020,6 +1042,13 @@ impl RustOutput {
                     parser_name,
                     has_rule_rename,
                 )?;
+                output.write_all("} else {\n".indent(level + 1).as_bytes())?;
+                output.write_all(
+                    format!("{parser_name}.advance_with_error(diags, err![{parser_name},]);\n")
+                        .indent(level + 2)
+                        .as_bytes(),
+                )?;
+                output.write_all("}\n".indent(level + 1).as_bytes())?;
                 output.write_all("}\n".indent(level).as_bytes())?;
             }
             Regex::Concat(concat) => {
