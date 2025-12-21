@@ -434,8 +434,12 @@ gnu_attribute:
 attribute_list:
   attrib (',' attrib)*
 ;
+// extra rule for better error recovery
+attrib_argument_expression_list:
+  assignment_expr (',' assignment_expr)* @argument_expression_list
+;
 attrib:
-  [attrib_name ['(' [?1 Identifier [',' constant_expr (',' constant_expr)*] | argument_expression_list] ')']]
+  [attrib_name ['(' [?1 Identifier [',' constant_expr (',' constant_expr)*] | attrib_argument_expression_list] ')']]
 ;
 attrib_name:
   Identifier

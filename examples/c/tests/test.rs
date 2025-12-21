@@ -19,3 +19,8 @@ macro_rules! check {
 fn incomplete() {
     check!("incomplete");
 }
+
+#[test]
+fn incomplete_call() {
+    check!("incomplete_call");
+}

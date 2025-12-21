@@ -1,0 +1,6 @@
+error: invalid syntax, expected one of: '_Alignof', '&', '&&', <character constant>, '!', '__extension__', <floating constant>, '_Generic', <identifier>, '__imag__', <integer literal>, '(', '-', '--', '__builtin_offsetof', '+', '++', '__real__', 'sizeof', '*', <string literal>, '~', '__builtin_types_compatible_p', '__builtin_va_arg'
+  ┌─ <input>:3:1
+  │
+3 │ }
+  │ ^
+
