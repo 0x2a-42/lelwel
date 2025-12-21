@@ -905,7 +905,7 @@ impl RustOutput {
                     output.write_all(
                         format!(
                             "{parser_name}.rule_{name}(diags){};\n",
-                            if rule_in_choice { "?" } else { "" }
+                            if rule_in_choice && in_choice { "?" } else { "" }
                         )
                         .indent(level)
                         .as_bytes(),
