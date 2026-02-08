@@ -12,7 +12,7 @@ fn print_diags(path: &str, source: &str, diags: Vec<Diagnostic>) {
     let config = Config::default();
     let file = SimpleFile::new(path, &source);
     for diag in diags {
-        term::emit(&mut writer.lock(), &config, &file, &diag).unwrap();
+        term::emit_to_write_style(&mut writer.lock(), &config, &file, &diag).unwrap();
     }
 }
 

@@ -21,7 +21,7 @@ fn gen_diags(input: &str) -> String {
     };
     let file = SimpleFile::new(input, &source);
     for diag in diags {
-        term::emit(&mut writer, &config, &file, &diag).unwrap();
+        term::emit_to_write_style(&mut writer, &config, &file, &diag).unwrap();
     }
     std::str::from_utf8(writer.get_ref().buffer())
         .unwrap()

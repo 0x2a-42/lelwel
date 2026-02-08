@@ -80,7 +80,7 @@ pub fn compile(
         config.display_style = DisplayStyle::Short;
     }
     for diag in diags {
-        term::emit(&mut writer.lock(), &config, &file, &diag).unwrap();
+        term::emit_to_write_style(&mut writer.lock(), &config, &file, &diag).unwrap();
         success &= diag.severity != Severity::Error;
     }
     Ok(success)
@@ -101,7 +101,7 @@ pub fn generate_syntax_tree(source: &str) -> Vec<String> {
     let config = Config::default();
     let file = SimpleFile::new("<input>", source);
     for diag in diags.iter() {
-        term::emit(&mut writer, &config, &file, diag).unwrap();
+        term::emit_to_write_style(&mut writer, &config, &file, diag).unwrap();
     }
     vec![
         format!("{cst}"),

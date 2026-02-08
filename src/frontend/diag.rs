@@ -94,17 +94,15 @@ impl LanguageErrors for Diagnostic {
         Diagnostic::error()
             .with_code(INVALID_BINDING_POS)
             .with_message("invalid binding position")
-            .with_labels(vec![Label::primary((), span.clone())])
-            .with_notes(vec![
-                "note: bindings may appear at the end of a concatenation".to_string(),
-            ])
+            .with_label(Label::primary((), span.clone()))
+            .with_note("note: bindings may appear at the end of a concatenation")
     }
 
     fn invalid_predicate_pos(span: &Span) -> Self {
         Diagnostic::error()
             .with_code(INVALID_PREDICATE_POS)
             .with_message("invalid predicate position")
-            .with_labels(vec![Label::primary((), span.clone())])
+            .with_label(Label::primary((), span.clone()))
             .with_notes(vec![
                 "note: predicates may appear at the start of an alternation branch".to_string(),
                 "note: predicates may appear at the start of a `*`, `+`, or `[]` regex".to_string(),
@@ -115,14 +113,14 @@ impl LanguageErrors for Diagnostic {
         Diagnostic::error()
             .with_code(UNDEFINED_RULE)
             .with_message(format!("use of undefined rule `{name}`"))
-            .with_labels(vec![Label::primary((), span.clone())])
+            .with_label(Label::primary((), span.clone()))
     }
 
     fn undefined_token(span: &Span, name: &str) -> Self {
         Diagnostic::error()
             .with_code(UNDEFINED_TOKEN)
             .with_message(format!("use of undefined token `{name}`"))
-            .with_labels(vec![Label::primary((), span.clone())])
+            .with_label(Label::primary((), span.clone()))
     }
 
     fn redefinition(span: &Span, binding: &str, old_span: &Span) -> Self {
@@ -139,48 +137,38 @@ impl LanguageErrors for Diagnostic {
         Diagnostic::error()
             .with_code(UPPERCASE_RULE)
             .with_message("rule name starts with upper case letter")
-            .with_labels(vec![Label::primary((), span.clone()).with_message(
-                format!(
-                    "rename to `{}{}`",
-                    name.chars().next().unwrap().to_lowercase(),
-                    name.chars().skip(1).collect::<String>()
-                ),
-            )])
-            .with_notes(vec![
-                "note: rule names must start with a lower case letter".to_string(),
-            ])
+            .with_label(Label::primary((), span.clone()).with_message(format!(
+                "rename to `{}{}`",
+                name.chars().next().unwrap().to_lowercase(),
+                name.chars().skip(1).collect::<String>()
+            )))
+            .with_note("note: rule names must start with a lower case letter")
     }
 
     fn lowercase_token(span: &Span, name: &str) -> Self {
         Diagnostic::error()
             .with_code(LOWERCASE_TOKEN)
             .with_message("token name starts with lower case letter")
-            .with_labels(vec![Label::primary((), span.clone()).with_message(
-                format!(
-                    "rename to `{}{}`",
-                    name.chars().next().unwrap().to_uppercase(),
-                    name.chars().skip(1).collect::<String>()
-                ),
-            )])
-            .with_notes(vec![
-                "note: token names must start with an upper case letter".to_string(),
-            ])
+            .with_label(Label::primary((), span.clone()).with_message(format!(
+                "rename to `{}{}`",
+                name.chars().next().unwrap().to_uppercase(),
+                name.chars().skip(1).collect::<String>()
+            )))
+            .with_note("note: token names must start with an upper case letter")
     }
 
     fn missing_start_rule() -> Self {
         Diagnostic::error()
             .with_code(MISSING_START_RULE)
             .with_message("missing start rule")
-            .with_notes(vec![
-                "help: specify the start rule with\n\nstart rule_name;".to_string(),
-            ])
+            .with_note("help: specify the start rule with\n\nstart rule_name;")
     }
 
     fn reference_start_rule(span: &Span) -> Self {
         Diagnostic::error()
             .with_code(REFERENCE_START_RULE)
             .with_message("cannot reference start rule in regex")
-            .with_labels(vec![Label::primary((), span.clone())])
+            .with_label(Label::primary((), span.clone()))
     }
 
     fn predefined_name(span: &Span, name: &str) -> Self {
@@ -196,7 +184,7 @@ impl LanguageErrors for Diagnostic {
         Diagnostic::error()
             .with_code(PREDEFINED_NAME)
             .with_message(format!("use of predefined {kind} name"))
-            .with_labels(vec![Label::primary((), span.clone())])
+            .with_label(Label::primary((), span.clone()))
             .with_notes(notes)
     }
 
@@ -211,9 +199,7 @@ impl LanguageErrors for Diagnostic {
             .with_code(LL1_CONFLICT_ALT)
             .with_message("LL(1) conflict in alternation")
             .with_labels(labels)
-            .with_notes(vec![
-                "note: transform the grammar or add a predicate to the first branch".to_string(),
-            ])
+            .with_note("note: transform the grammar or add a predicate to the first branch")
     }
 
     fn ll1_conflict_left_rec(span: &Span, conflicting: Vec<(Span, String)>) -> Self {
@@ -233,92 +219,82 @@ impl LanguageErrors for Diagnostic {
         Diagnostic::error()
             .with_code(LL1_CONFLICT_REP)
             .with_message("LL(1) conflict in repetition")
-            .with_labels(vec![
-                Label::primary((), span.clone()).with_message(conflicting),
-            ])
-            .with_notes(vec![
-                "note: transform the grammar or add a predicate to the start of the repetition"
-                    .to_string(),
-            ])
+            .with_label(Label::primary((), span.clone()).with_message(conflicting))
+            .with_note(
+                "note: transform the grammar or add a predicate to the start of the repetition",
+            )
     }
 
     fn ll1_conflict_opt(span: &Span, conflicting: String) -> Self {
         Diagnostic::error()
             .with_code(LL1_CONFLICT_OPT)
             .with_message("LL(1) conflict in option")
-            .with_labels(vec![
-                Label::primary((), span.clone()).with_message(conflicting),
-            ])
-            .with_notes(vec![
-                "note: transform the grammar or add a predicate to the start of the option"
-                    .to_string(),
-            ])
+            .with_label(Label::primary((), span.clone()).with_message(conflicting))
+            .with_note("note: transform the grammar or add a predicate to the start of the option")
     }
 
     fn consume_tokens(span: &Span) -> Self {
         Diagnostic::error()
             .with_code(CONSUME_TOKENS)
             .with_message("no tokens consumed")
-            .with_labels(vec![Label::primary((), span.clone())])
-            .with_notes(vec![
-                "note: such a rule would cause a stack overflow".to_string(),
-            ])
+            .with_label(Label::primary((), span.clone()))
+            .with_note("note: such a rule would cause a stack overflow")
     }
 
     fn redefine_as_skipped(span: &Span) -> Self {
         Diagnostic::error()
             .with_code(REDEFINE_AS_SKIPPED)
             .with_message("token is already skipped")
-            .with_labels(vec![Label::primary((), span.clone())])
+            .with_label(Label::primary((), span.clone()))
     }
 
     fn used_skipped(span: &Span) -> Self {
         Diagnostic::error()
             .with_code(USED_SKIPPED)
             .with_message("skipped token cannot be used in regex")
-            .with_labels(vec![Label::primary((), span.clone())])
+            .with_label(Label::primary((), span.clone()))
     }
 
     fn expected_token(span: &Span) -> Self {
         Diagnostic::error()
             .with_code(EXPECTED_TOKEN)
             .with_message("expected token")
-            .with_labels(vec![Label::primary((), span.clone())])
+            .with_label(Label::primary((), span.clone()))
     }
 
     fn redefine_as_right(span: &Span) -> Self {
         Diagnostic::error()
             .with_code(REDEFINE_AS_RIGHT)
             .with_message("token is already right associative")
-            .with_labels(vec![Label::primary((), span.clone())])
+            .with_label(Label::primary((), span.clone()))
     }
 
     fn unused_rule(span: &Span) -> Self {
         Diagnostic::warning()
             .with_code(UNUSED_RULE)
             .with_message("unused rule")
-            .with_labels(vec![Label::primary((), span.clone())])
+            .with_label(Label::primary((), span.clone()))
     }
 
     fn unused_token(span: &Span) -> Self {
         Diagnostic::warning()
             .with_code(UNUSED_TOKEN)
             .with_message("unused token")
-            .with_labels(vec![Label::primary((), span.clone())])
+            .with_label(Label::primary((), span.clone()))
     }
 
     fn mixed_assoc(span: &Span) -> Self {
         Diagnostic::error()
             .with_code(MIXED_ASSOC)
             .with_message("mixed associativity in infix operator branch")
-            .with_labels(vec![Label::primary((), span.clone())])
+            .with_label(Label::primary((), span.clone()))
     }
 
     fn elide_left_rec(span: &Span) -> Self {
         Diagnostic::error()
             .with_code(ELIDE_LEFT_REC)
             .with_message("left recursive rule branch cannot be elided")
-            .with_labels(vec![Label::primary((), span.clone())])
+            .with_label(Label::primary((), span.clone()))
     }
 
     fn redefine_node_marker(span: &Span, old_span: &Span) -> Self {
@@ -329,16 +305,14 @@ impl LanguageErrors for Diagnostic {
                 Label::primary((), span.clone()),
                 Label::secondary((), old_span.clone()).with_message("previous definition"),
             ])
-            .with_notes(vec![
-                "note: the index of a node marker must be unique inside a rule".to_string(),
-            ])
+            .with_note("note: the index of a node marker must be unique inside a rule")
     }
 
     fn undefined_create_node(span: &Span) -> Self {
         Diagnostic::error()
             .with_code(UNDEF_CLOSE_NODE)
             .with_message("node creation with undefined node marker")
-            .with_labels(vec![Label::primary((), span.clone())])
+            .with_label(Label::primary((), span.clone()))
     }
 
     fn invalid_create_node(span: &Span, open_span: &Span) -> Self {
@@ -355,81 +329,80 @@ impl LanguageErrors for Diagnostic {
         Diagnostic::error()
             .with_code(CREATE_RULE_NODE_LEFT_REC)
             .with_message("node creation without index is not allowed in left recursive rules")
-            .with_labels(vec![Label::primary((), span.clone())])
+            .with_label(Label::primary((), span.clone()))
     }
 
     fn unused_node_marker(span: &Span) -> Self {
         Diagnostic::warning()
             .with_code(UNUSED_OPEN_NODE)
             .with_message("unused node marker")
-            .with_labels(vec![Label::primary((), span.clone())])
+            .with_label(Label::primary((), span.clone()))
     }
 
     fn redundant_elision(span: &Span) -> Self {
         Diagnostic::warning()
             .with_code(REDUNDANT_ELISION)
             .with_message("node elision is redundant")
-            .with_labels(vec![Label::primary((), span.clone())])
+            .with_label(Label::primary((), span.clone()))
     }
 
     fn expected_rule(span: &Span) -> Self {
         Diagnostic::error()
             .with_code(EXPECTED_RULE)
             .with_message("expected rule")
-            .with_labels(vec![Label::primary((), span.clone())])
+            .with_label(Label::primary((), span.clone()))
     }
 
     fn missing_node_name(span: &Span) -> Self {
         Diagnostic::error()
             .with_code(MISSING_NODE_NAME)
             .with_message("missing node name")
-            .with_labels(vec![Label::primary((), span.clone())])
+            .with_label(Label::primary((), span.clone()))
     }
 
     fn empty_rule(span: &Span) -> Self {
         Diagnostic::warning()
             .with_code(EMPTY_RULE)
             .with_message("empty rule")
-            .with_labels(vec![Label::primary((), span.clone())])
+            .with_label(Label::primary((), span.clone()))
     }
 
     fn nested_ordered_choice(span: &Span) -> Self {
         Diagnostic::error()
             .with_code(NESTED_ORDERED_CHOICE)
             .with_message("nested ordered choice")
-            .with_labels(vec![Label::primary((), span.clone())])
+            .with_label(Label::primary((), span.clone()))
     }
 
     fn useless_commit(span: &Span) -> Self {
         Diagnostic::warning()
             .with_code(USELESS_COMMIT)
             .with_message("commit is never used in ordered choice")
-            .with_labels(vec![Label::primary((), span.clone())])
+            .with_label(Label::primary((), span.clone()))
     }
 
     fn replaceable_ordered_choice(span: &Span) -> Self {
         Diagnostic::warning()
             .with_code(REPLACEABLE_ORDERED_CHOICE)
             .with_message("ordered choice branch could be moved to alternation")
-            .with_labels(vec![Label::primary((), span.clone())])
+            .with_label(Label::primary((), span.clone()))
     }
 
     fn action_in_ordered_choice(span: &Span) -> Self {
         Diagnostic::error()
             .with_code(ACTION_IN_ORDERED_CHOICE)
             .with_message("semantic action could be used inside of ordered choice")
-            .with_labels(vec![Label::primary((), span.clone())])
-            .with_notes(vec![
-                "note: this is not allowed to prevent side effects where backtracking is possible"
-                    .to_string(),
-            ])
+            .with_label(Label::primary((), span.clone()))
+            .with_note(
+                "note: this is not allowed to prevent side effects where backtracking is possible",
+            )
     }
 
     fn return_in_start_rule(span: &Span) -> Self {
         Diagnostic::error()
             .with_code(RETURN_IN_START_RULE)
             .with_message("return is not allowed in start rule")
-            .with_labels(vec![Label::primary((), span.clone())])
+            .with_label(Label::primary((), span.clone()))
     }
 
     fn multiple_start_rules(span: &Span, old_span: &Span) -> Self {
@@ -440,29 +413,27 @@ impl LanguageErrors for Diagnostic {
                 Label::primary((), span.clone()),
                 Label::secondary((), old_span.clone()).with_message("previous definition"),
             ])
-            .with_notes(vec![
-                "note: a grammar must have exactly one start rule".to_string(),
-            ])
+            .with_note("note: a grammar must have exactly one start rule")
     }
 
     fn elision_in_start_rule(span: &Span) -> Self {
         Diagnostic::error()
             .with_code(ELISION_IN_START_RULE)
             .with_message("start rule node cannot be elided")
-            .with_labels(vec![Label::primary((), span.clone())])
+            .with_label(Label::primary((), span.clone()))
     }
 
     fn redefine_as_part(span: &Span) -> Self {
         Diagnostic::error()
             .with_code(REDEFINE_AS_PART)
             .with_message("rule is already defined as part")
-            .with_labels(vec![Label::primary((), span.clone())])
+            .with_label(Label::primary((), span.clone()))
     }
 
     fn start_as_part(span: &Span) -> Self {
         Diagnostic::error()
             .with_code(START_AS_PART)
             .with_message("start rule cannot be defined as part")
-            .with_labels(vec![Label::primary((), span.clone())])
+            .with_label(Label::primary((), span.clone()))
     }
 }

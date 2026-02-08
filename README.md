@@ -191,8 +191,8 @@ arg_list: '(' [expr (?1 ',' expr)* [',']] ')';
 1. Add the following to your `Cargo.toml` and  `build.rs` files.
    ```toml
    [dependencies]
-   logos = "0.15"
-   codespan-reporting = "0.12"
+   logos = "0.16"
+   codespan-reporting = "0.13"
 
    [build-dependencies]
    lelwel = "0.10"
@@ -230,7 +230,7 @@ arg_list: '(' [expr (?1 ',' expr)* [',']] ')';
        let config = Config::default();
        let file = SimpleFile::new(&args[1], &source);
        for diag in diags.iter() {
-           term::emit(&mut writer.lock(), &config, &file, diag).unwrap();
+           term::emit_to_write_style(&mut writer.lock(), &config, &file, diag).unwrap();
        }
        Ok(())
    }

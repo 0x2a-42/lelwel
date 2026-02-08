@@ -19,7 +19,7 @@ pub fn generate_syntax_tree(source: &str) -> Vec<String> {
     let config = Config::default();
     let file = SimpleFile::new("<input>", source);
     for diag in diags.iter() {
-        term::emit(&mut writer, &config, &file, diag).unwrap();
+        term::emit_to_write_style(&mut writer, &config, &file, diag).unwrap();
     }
 
     vec![

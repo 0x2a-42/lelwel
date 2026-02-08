@@ -22,6 +22,6 @@ fn main() {
     let config = Config::default();
     let file = SimpleFile::new(&args[1], &source);
     for diag in diags.iter() {
-        term::emit(&mut writer.lock(), &config, &file, diag).unwrap();
+        term::emit_to_write_style(&mut writer.lock(), &config, &file, diag).unwrap();
     }
 }
