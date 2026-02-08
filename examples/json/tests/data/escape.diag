@@ -1,0 +1,6 @@
+error: invalid escape sequence
+  ┌─ <input>:2:14
+  │
+2 │   "foo": "äää\x"
+  │              ^^
+

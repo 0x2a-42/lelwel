@@ -23,3 +23,7 @@ fn incomplete() {
 fn wrong_key() {
     check!("wrong_key");
 }
+#[test]
+fn escape() {
+    check!("escape");
+}
