@@ -228,7 +228,7 @@ fn check_escape(
     }
 }
 fn check_string(value: &str, span: &Span, diags: &mut Vec<Diagnostic>, is_ml: bool, is_lit: bool) {
-    let mut it = value.chars().enumerate();
+    let mut it = value.char_indices();
     while let Some((i, c)) = it.next() {
         match c {
             '\\' if !is_lit => check_escape(&mut it, value, span, diags, is_ml),

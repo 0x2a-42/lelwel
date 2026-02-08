@@ -132,7 +132,7 @@ pub enum Token {
 }
 
 fn check_string(value: &str, span: &Span, diags: &mut Vec<Diagnostic>) {
-    let mut it = value.chars().enumerate();
+    let mut it = value.char_indices();
     while let Some((_, c)) = it.next() {
         if c == '\\' {
             match it.next() {
