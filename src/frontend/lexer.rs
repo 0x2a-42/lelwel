@@ -67,10 +67,10 @@ fn parse_block_comment(lexer: &mut Lexer<'_, Token>) -> Result<(), LexerError> {
 #[logos(error = LexerError)]
 pub enum Token {
     EOF,
-    #[regex(r"//[^\n]*\n")]
+    #[regex(r"//[^\n]*\n", allow_greedy = true)]
     #[regex(r"/\*", parse_block_comment)]
     Comment,
-    #[regex(r"///[^\n]*\n")]
+    #[regex(r"///[^\n]*\n", allow_greedy = true)]
     DocComment,
     #[regex(r"[ \t\r\n\f]+")]
     Whitespace,

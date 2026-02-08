@@ -9,7 +9,7 @@ edition = "2024"
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
-logos = "0.15"
+logos = "0.16"
 codespan-reporting = "0.12"
 wasm-bindgen = "0.2"
 
