@@ -19,7 +19,7 @@ impl<'a> ParserCallbacks<'a> for Parser<'a> {
     fn create_diagnostic(&self, span: Span, message: String) -> Self::Diagnostic {
         Diagnostic::error()
             .with_message(message)
-            .with_labels(vec![Label::primary((), span)])
+            .with_label(Label::primary((), span))
     }
     fn predicate_decl_1(&self) -> bool {
         let peek = self.peek(1);

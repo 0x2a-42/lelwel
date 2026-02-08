@@ -15,13 +15,13 @@ impl LexerError {
         match self {
             LexerError::Invalid => Diagnostic::error()
                 .with_message("invalid token")
-                .with_labels(vec![Label::primary((), span)]),
+                .with_label(Label::primary((), span)),
             LexerError::UnterminatedString => Diagnostic::error()
                 .with_message("unterminated string literal")
-                .with_labels(vec![Label::primary((), span)]),
+                .with_label(Label::primary((), span)),
             LexerError::UnterminatedComment => Diagnostic::error()
                 .with_message("unterminated comment")
-                .with_labels(vec![Label::primary((), span)]),
+                .with_label(Label::primary((), span)),
         }
     }
 }
@@ -141,10 +141,7 @@ fn check_string(value: &str, span: &Span, diags: &mut Vec<Diagnostic>) {
                     diags.push(
                         Diagnostic::error()
                             .with_message("invalid escape sequence")
-                            .with_labels(vec![Label::primary(
-                                (),
-                                span.start + i - 1..span.start + i + 1,
-                            )]),
+                            .with_label(Label::primary((), span.start + i - 1..span.start + i + 1)),
                     );
                 }
                 _ => unreachable!(),
