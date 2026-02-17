@@ -2,7 +2,8 @@ use crate::VERSION;
 use crate::frontend::ast::*;
 use crate::frontend::parser::{Cst, NodeRef};
 use crate::frontend::sema::*;
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use rustc_hash::{FxHashMap, FxHashSet};
+use std::collections::{BTreeMap, BTreeSet};
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
@@ -58,7 +59,7 @@ impl Indent for String {
 
 trait Generator {
     fn pattern(&self, level: usize) -> String;
-    fn error(&self, level: usize, token_symbols: &HashMap<&str, &str>) -> String;
+    fn error(&self, level: usize, token_symbols: &FxHashMap<&str, &str>) -> String;
 }
 
 impl Generator for std::collections::BTreeSet<TokenName<'_>> {
@@ -66,7 +67,7 @@ impl Generator for std::collections::BTreeSet<TokenName<'_>> {
         let symbols: Vec<_> = self.iter().map(|s| format!("Token::{}", s.0)).collect();
         symbols.join(&format!("\n{}| ", "    ".repeat(level)))
     }
-    fn error(&self, level: usize, token_symbols: &HashMap<&str, &str>) -> String {
+    fn error(&self, level: usize, token_symbols: &FxHashMap<&str, &str>) -> String {
         if !self.is_empty() {
             let symbols: Vec<_> = self
                 .iter()
@@ -195,7 +196,7 @@ impl RustOutput {
             }
             output.write_all(b"\n")?;
         }
-        let mut predicates = HashSet::new();
+        let mut predicates = FxHashSet::default();
         for (rule, num) in sema.predicates.values() {
             if predicates.contains(&(rule, num)) {
                 continue;
@@ -219,7 +220,7 @@ impl RustOutput {
                 .as_bytes(),
             )?;
         }
-        let mut actions = HashSet::new();
+        let mut actions = FxHashSet::default();
         for (rule, num) in sema.actions.values() {
             if actions.contains(&(rule, num)) {
                 continue;
@@ -243,7 +244,7 @@ impl RustOutput {
                 .as_bytes(),
             )?;
         }
-        let mut assertions = HashSet::new();
+        let mut assertions = FxHashSet::default();
         for (rule, num) in sema.assertions.values() {
             if assertions.contains(&(rule, num)) {
                 continue;
@@ -331,7 +332,7 @@ impl RustOutput {
         cst: &Cst<'_>,
         sema: &SemanticData<'_>,
         output: &mut BufWriter<std::fs::File>,
-        token_symbols: &HashMap<&str, &str>,
+        token_symbols: &FxHashMap<&str, &str>,
         has_rule_rename: bool,
         has_rule_creation: bool,
         name: &str,
@@ -408,7 +409,7 @@ impl RustOutput {
         cst: &Cst<'_>,
         sema: &SemanticData<'_>,
         output: &mut BufWriter<std::fs::File>,
-        token_symbols: &HashMap<&str, &str>,
+        token_symbols: &FxHashMap<&str, &str>,
         has_rule_rename: bool,
         name: &str,
         regex: Regex,
@@ -683,7 +684,7 @@ impl RustOutput {
         sema: &SemanticData<'_>,
         rule: RuleDecl,
         output: &mut BufWriter<std::fs::File>,
-        token_symbols: &HashMap<&str, &str>,
+        token_symbols: &FxHashMap<&str, &str>,
     ) -> std::io::Result<()> {
         if !sema.used.contains(&rule.syntax()) {
             // don't generate code for unused rules
@@ -788,7 +789,7 @@ impl RustOutput {
         regex: Regex,
         output: &mut BufWriter<std::fs::File>,
         level: usize,
-        token_symbols: &HashMap<&str, &str>,
+        token_symbols: &FxHashMap<&str, &str>,
         open_before: bool,
         rule_name: &str,
         rule_elision: RuleNodeElision,
@@ -878,7 +879,7 @@ impl RustOutput {
         regex: Regex,
         output: &mut BufWriter<std::fs::File>,
         level: usize,
-        token_symbols: &HashMap<&str, &str>,
+        token_symbols: &FxHashMap<&str, &str>,
         open_before: bool,
         rule_name: &str,
         rule_elision: RuleNodeElision,
@@ -1340,7 +1341,7 @@ impl RustOutput {
         file: File,
         output: &mut BufWriter<std::fs::File>,
     ) -> std::io::Result<()> {
-        let mut token_symbols = HashMap::from([("EOF", "<end of file>")]);
+        let mut token_symbols = FxHashMap::from_iter([("EOF", "<end of file>")]);
         for token in file.token_decls(cst) {
             let name = token.name(cst).unwrap().0;
             let sym = token

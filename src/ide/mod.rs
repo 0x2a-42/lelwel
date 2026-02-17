@@ -4,7 +4,7 @@ use crate::{Parser, SemanticPass, Span};
 use codespan_reporting::diagnostic::{LabelStyle, Severity};
 use codespan_reporting::files::SimpleFile;
 use lsp_types::*;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::sync::mpsc;
 use std::thread::JoinHandle;
 
@@ -24,7 +24,7 @@ struct Analyzer {
 
 #[derive(Default)]
 pub struct Cache {
-    analyzers: HashMap<Url, Analyzer>,
+    analyzers: FxHashMap<Url, Analyzer>,
 }
 
 impl Cache {

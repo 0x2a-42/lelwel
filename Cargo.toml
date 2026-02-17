@@ -15,6 +15,7 @@ rust-2018-idioms = { level = "deny" }
 [dependencies]
 logos = "0.16"
 codespan-reporting = "0.13"
+rustc-hash = "2.1"
 codespan-lsp = { version = "0.13", optional = true }
 clap = { version = "4.5", features = ["cargo"], optional = true }
 lsp-types = { version = "0.95", optional = true }

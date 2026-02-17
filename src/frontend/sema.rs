@@ -1,7 +1,7 @@
-use std::borrow::Cow;
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-
 use codespan_reporting::diagnostic::Severity;
+use rustc_hash::{FxHashMap, FxHashSet};
+use std::borrow::Cow;
+use std::collections::{BTreeMap, BTreeSet};
 
 use super::ast::*;
 use super::diag::LanguageErrors;
@@ -95,13 +95,13 @@ impl Recursion {
 #[derive(Default)]
 pub struct RecursiveBranches {
     branches: Vec<Recursion>,
-    binding_power: HashMap<NodeRef, (usize, usize)>,
-    regex_map: HashMap<NodeRef, usize>,
+    binding_power: FxHashMap<NodeRef, (usize, usize)>,
+    regex_map: FxHashMap<NodeRef, usize>,
 }
 impl RecursiveBranches {
     fn new(branches: Vec<Recursion>) -> Self {
-        let mut binding_power = HashMap::new();
-        let mut regex_map = HashMap::new();
+        let mut binding_power = FxHashMap::default();
+        let mut regex_map = FxHashMap::default();
         let max_bp = branches.len() * 2;
         for (i, branch) in branches.iter().enumerate() {
             regex_map.insert(branch.regex().syntax(), i);
@@ -134,10 +134,10 @@ impl RecursiveBranches {
 
 #[derive(Default)]
 pub struct SemanticData<'a> {
-    pub decl_bindings: HashMap<NodeRef, NodeRef>,
+    pub decl_bindings: FxHashMap<NodeRef, NodeRef>,
     pub recursive: BTreeMap<RuleDecl, RecursiveBranches>,
-    pub elision: HashMap<NodeRef, RuleNodeElision>,
-    pub right_associative: HashSet<&'a str>,
+    pub elision: FxHashMap<NodeRef, RuleNodeElision>,
+    pub right_associative: FxHashSet<&'a str>,
     pub skipped: BTreeSet<TokenDecl>,
     pub parts: BTreeSet<RuleDecl>,
     pub start_decl: Option<StartDecl>,
@@ -146,22 +146,22 @@ pub struct SemanticData<'a> {
     pub actions: BTreeMap<NodeRef, (&'a str, &'a str)>,
     pub assertions: BTreeMap<NodeRef, (&'a str, &'a str)>,
     pub rule_bindings: BTreeMap<&'a str, Vec<NodeRef>>,
-    pub first_sets: HashMap<NodeRef, BTreeSet<TokenName<'a>>>,
-    pub follow_sets: HashMap<NodeRef, BTreeSet<TokenName<'a>>>,
-    pub predict_sets: HashMap<NodeRef, BTreeSet<TokenName<'a>>>,
-    pub recovery_sets: HashMap<NodeRef, BTreeSet<TokenName<'a>>>,
-    pub left_rec_local_follow_sets: HashMap<NodeRef, BTreeSet<TokenName<'a>>>,
-    pub used: HashSet<NodeRef>,
-    pub has_rule_rename: HashSet<RuleDecl>,
-    pub has_rule_creation: HashSet<RuleDecl>,
+    pub first_sets: FxHashMap<NodeRef, BTreeSet<TokenName<'a>>>,
+    pub follow_sets: FxHashMap<NodeRef, BTreeSet<TokenName<'a>>>,
+    pub predict_sets: FxHashMap<NodeRef, BTreeSet<TokenName<'a>>>,
+    pub recovery_sets: FxHashMap<NodeRef, BTreeSet<TokenName<'a>>>,
+    pub left_rec_local_follow_sets: FxHashMap<NodeRef, BTreeSet<TokenName<'a>>>,
+    pub used: FxHashSet<NodeRef>,
+    pub has_rule_rename: FxHashSet<RuleDecl>,
+    pub has_rule_creation: FxHashSet<RuleDecl>,
     pub undefined_rules: BTreeSet<&'a str>,
     pub undefined_tokens: BTreeSet<&'a str>,
-    pub used_in_ordered_choice: HashSet<NodeRef>,
+    pub used_in_ordered_choice: FxHashSet<NodeRef>,
 }
 
 #[derive(Default)]
 struct GeneralCheck<'a> {
-    symbol_table: std::collections::HashMap<&'a str, NodeRef>,
+    symbol_table: FxHashMap<&'a str, NodeRef>,
 }
 
 impl<'a> GeneralCheck<'a> {
@@ -276,9 +276,9 @@ impl<'a> GeneralCheck<'a> {
         }
         self.check_recursive(cst, sema, rule, diags);
         if let Some(regex) = rule.regex(cst) {
-            let mut open = HashSet::new();
-            let mut created = HashMap::new();
-            let mut used = HashSet::new();
+            let mut open = FxHashSet::default();
+            let mut created = FxHashMap::default();
+            let mut used = FxHashSet::default();
             let left_rec = sema.recursive.get(&rule).is_some_and(|rec| {
                 rec.branches()
                     .iter()
@@ -644,9 +644,9 @@ impl<'a> GeneralCheck<'a> {
         cst: &'a Cst<'_>,
         regex: Regex,
         diags: &mut Vec<Diagnostic>,
-        open: &mut HashSet<&'a str>,
-        created: &mut HashMap<&'a str, Span>,
-        used: &mut HashSet<&'a str>,
+        open: &mut FxHashSet<&'a str>,
+        created: &mut FxHashMap<&'a str, Span>,
+        used: &mut FxHashSet<&'a str>,
         left_rec: bool,
     ) {
         match regex {
@@ -1626,8 +1626,8 @@ impl UsageValidator {
 
 #[derive(Default)]
 struct RecoverySetGenerator {
-    dom: HashMap<Regex, HashSet<Regex>>,
-    pred: HashMap<Regex, HashSet<Regex>>,
+    dom: FxHashMap<Regex, FxHashSet<Regex>>,
+    pred: FxHashMap<Regex, FxHashSet<Regex>>,
 }
 impl RecoverySetGenerator {
     fn new() -> Self {
@@ -1664,12 +1664,12 @@ impl RecoverySetGenerator {
             }
         }
 
-        let nodes_no_start: HashSet<_> = self.pred.keys().copied().collect();
+        let nodes_no_start: FxHashSet<_> = self.pred.keys().copied().collect();
         let mut nodes = nodes_no_start.clone();
         nodes.insert(start);
 
         // start node dominates itself
-        self.dom.insert(start, HashSet::from_iter([start]));
+        self.dom.insert(start, FxHashSet::from_iter([start]));
         // other nodes are initialized with all nodes as dominators
         for regex in nodes_no_start.iter() {
             self.dom.insert(*regex, nodes.clone());
@@ -1691,7 +1691,7 @@ impl RecoverySetGenerator {
                         self.dom.insert(*regex, dom);
                     }
                 } else {
-                    self.dom.insert(*regex, HashSet::from_iter([*regex]));
+                    self.dom.insert(*regex, FxHashSet::from_iter([*regex]));
                 }
             }
         }
@@ -1738,7 +1738,7 @@ impl RecoverySetGenerator {
         if let Some(pred) = self.pred.get_mut(&r) {
             pred.insert(p);
         } else {
-            self.pred.insert(r, HashSet::from_iter([p]));
+            self.pred.insert(r, FxHashSet::from_iter([p]));
         }
     }
 

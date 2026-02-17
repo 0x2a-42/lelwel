@@ -1,13 +1,13 @@
 use super::lexer::{Token, tokenize};
 use codespan_reporting::diagnostic::Label;
-use std::collections::HashSet;
+use rustc_hash::FxHashSet;
 
 pub type Diagnostic = codespan_reporting::diagnostic::Diagnostic<()>;
 
 #[derive(Default)]
 pub struct Context<'a> {
-    template_start: HashSet<usize>,
-    template_end: HashSet<usize>,
+    template_start: FxHashSet<usize>,
+    template_end: FxHashSet<usize>,
     marker: std::marker::PhantomData<&'a ()>,
 }
 

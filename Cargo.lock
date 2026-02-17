@@ -330,6 +330,7 @@ dependencies = [
  "lsp-server",
  "lsp-types 0.91.1",
  "lsp-types 0.95.1",
+ "rustc-hash",
  "serde",
  "serde_json",
  "wasm-bindgen",
@@ -352,6 +353,7 @@ dependencies = [
  "codespan-reporting",
  "lelwel",
  "logos",
+ "rustc-hash",
  "wasm-bindgen",
 ]
 
@@ -431,6 +433,7 @@ dependencies = [
  "codespan-reporting",
  "lelwel",
  "logos",
+ "rustc-hash",
  "wasm-bindgen",
 ]
 
@@ -584,6 +587,12 @@ name = "regex-syntax"
 version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a96887878f22d7bad8a3b6dc5b7440e0ada9a245242924394987b21cf2210a4c"
+
+[[package]]
+name = "rustc-hash"
+version = "2.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "357703d41365b4b27c590e3ed91eabb1b663f07c4c084095e60cbed4362dff0d"
 
 [[package]]
 name = "rustversion"
