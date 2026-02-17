@@ -1,11 +1,12 @@
 use crate::ast::*;
 use crate::lexer::{Token, tokenize};
 use codespan_reporting::diagnostic::Label;
+use rustc_hash::FxHashMap;
 
 pub type Diagnostic = codespan_reporting::diagnostic::Diagnostic<()>;
 
 struct Scope<'a> {
-    declared_names: std::collections::HashMap<&'a str, bool>,
+    declared_names: FxHashMap<&'a str, bool>,
     allows_typedef: bool,
 }
 impl Scope<'_> {
@@ -29,7 +30,7 @@ pub struct Context<'a> {
 impl Default for Context<'_> {
     fn default() -> Self {
         let global_scope = Scope {
-            declared_names: std::collections::HashMap::from_iter([
+            declared_names: FxHashMap::from_iter([
                 ("__builtin_va_list", true),
                 ("_Float16", true),
                 ("__fp16", true),
