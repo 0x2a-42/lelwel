@@ -1,8 +1,8 @@
 /// Keyword
 token Token='token' Start='start' Right='right' Skip='skip' Part='part';
 /// Punctuator
-token Colon=':' Semi=';' Equal='=' LPar='(' RPar=')' LBrak='[' RBrak=']'
-      Or='|' Star='*' Plus='+' Hat='^' Slash='/' Tilde='~' And='&';
+token Colon=':' Semi=';' Equal='=' LPar='(' RPar=')' LBrak='[' RBrak=']' Or='|' Star='*' Plus='+'
+      Hat='^' Slash='/' Tilde='~' And='&';
 /// Identifier for rules and tokens
 token Id='<identifier>' Str='<string literal>';
 token Predicate='<semantic predicate>' Action='<semantic action>' Assertion='<semantic assertion>';

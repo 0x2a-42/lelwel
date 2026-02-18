@@ -1,6 +1,6 @@
 token Identifier='<identifier>';
-token IntConst='<integer literal>' FloatConst='<floating constant>'
-      CharConst='<character constant>' StringLiteral='<string literal>';
+token IntConst='<integer literal>' FloatConst='<floating constant>' CharConst='<character constant>'
+      StringLiteral='<string literal>';
 token Void='void' Char='char' Short='short' Int='int' Int128='__int128' Long='long';
 token Signed='signed' Unsigned='unsigned' Struct='struct' Union='union' Enum='enum';
 token Float='float' Double='double' Bool='_Bool' Complex='_Complex' Imaginary='_Imaginary';
@@ -10,21 +10,22 @@ token Extern='extern' ThreadLocal='_Thread_local';
 token Inline='inline' Noreturn='_Noreturn';
 token Alignas='_Alignas' Generic='_Generic' StaticAssert='_Static_assert';
 token Default='default' Case='case' Sizeof='sizeof' Alignof='_Alignof';
-token For='for' While='while' Do='do' If='if' Else='else' Switch='switch'
-      Goto='goto' Continue='continue' Break='break' Return='return';
+token For='for' While='while' Do='do' If='if' Else='else' Switch='switch' Goto='goto'
+      Continue='continue' Break='break' Return='return';
 token LPar='(' RPar=')' Comma=',' Semi=';' LBrace='{' RBrace='}' LBrak='[' RBrak=']';
 token Eq='==' Lt='<' Gt='>' Leq='<=' Geq='>=' Neq='!=';
 token Assign='=' StarAssign='*=' SlashAssign='/=' PercentAssign='%=' PlusAssign='+='
       MinusAssign='-=' LtLtAssign='<<=' GtGtAssign='>>=' AndAssign='&=' HatAssign='^='
       PipeAssign='|=';
 token Plus='+' Minus='-' Star='*' Slash='/' Percent='%' Dot='.' Arrow='->' Tilde='~' Excl='!';
-token PlusPlus='++' MinusMinus='--' And='&' Pipe='|' Colon=':' LtLt='<<' GtGt='>>'
-      Hat='^' AndAnd='&&' PipePipe='||' Quest='?';
+token PlusPlus='++' MinusMinus='--' And='&' Pipe='|' Colon=':' LtLt='<<' GtGt='>>' Hat='^'
+      AndAnd='&&' PipePipe='||' Quest='?';
 token Ellipsis='...';
 /// Tokens for GNU extensions
 token Attribute='__attribute__' Asm='asm' Extension='__extension__' VaArg='__builtin_va_arg'
-      OffsetOf='__builtin_offsetof' TypeOf='__typeof__' TypesCompatible='__builtin_types_compatible_p'
-      Real='__real__' Imag='__imag__' AutoType='__auto_type';
+      OffsetOf='__builtin_offsetof' TypeOf='__typeof__'
+      TypesCompatible='__builtin_types_compatible_p' Real='__real__' Imag='__imag__'
+      AutoType='__auto_type';
 token Comment Whitespace;
 
 skip Comment Whitespace;
@@ -45,20 +46,16 @@ primary_expr:
   ) ')'
 | '_Generic' '(' assignment_expr ',' generic_assoc_list ')' @generic_selection_expr
 | '__builtin_va_arg' '(' assignment_expr ',' type_name ')' @va_arg_expr // GNU extension
-| '__builtin_offsetof' '(' type_name ',' offsetof_member_designator ')' @offsetof_expr // GNU extension
-| '__builtin_types_compatible_p' '(' type_name ',' type_name ')' @types_compatible_expr // GNU extension
+| '__builtin_offsetof' '(' type_name ',' offsetof_member_designator ')'
+  @offsetof_expr // GNU extension
+| '__builtin_types_compatible_p' '(' type_name ',' type_name ')'
+  @types_compatible_expr // GNU extension
 ;
-string_literal:
-  StringLiteral+
-;
+string_literal: StringLiteral+;
 /// 6.5.1.1
-generic_assoc_list:
-  generic_association (',' generic_association)*
-;
+generic_assoc_list: generic_association (',' generic_association)*;
 /// 6.5.1.1
-generic_association:
-  (type_name | 'default') ':' assignment_expr
-;
+generic_association: (type_name | 'default') ':' assignment_expr;
 /// 6.5.2
 postfix_expr:
   postfix_expr (
@@ -73,9 +70,7 @@ postfix_expr:
 | primary_expr ^
 ;
 /// 6.5.2
-argument_expression_list:
-  assignment_expr (',' assignment_expr)*
-;
+argument_expression_list: assignment_expr (',' assignment_expr)*;
 /// 6.5.3
 unary_expr:
   postfix_expr ^
@@ -83,10 +78,8 @@ unary_expr:
 | '--' unary_expr @pre_dec_expr
 | '__extension__' cast_expr @extension_expr // GNU extension
 | (
-    '+' | '-' | '*' | '&' | '~' | '!' |
-     '__real__' | '__imag__' | '&&' // GNU extension
-  )
-  cast_expr
+    '+' | '-' | '*' | '&' | '~' | '!' | '__real__' | '__imag__' | '&&' // GNU extension
+  ) cast_expr
 | 'sizeof' (?1 '(' type_name ')' | unary_expr) @sizeof_expr
 | '_Alignof' '(' type_name ')' @alignof_expr
 ;
@@ -110,26 +103,21 @@ bin_expr:
 | cast_expr ^
 ;
 /// 6.5.15 (empty second argument is GNU extension)
-conditional_expr^:
-  bin_expr ['?' [expr] ':' conditional_expr >]
-;
+conditional_expr^: bin_expr ['?' [expr] ':' conditional_expr >];
 /// 6.5.16
 assignment_expr^:
-  conditional_expr [('=' | '*=' | '/=' | '%=' | '+=' | '-=' | '<<=' | '>>=' | '&=' | '^=' | '|=') assignment_expr >]
+  conditional_expr
+  [('=' | '*=' | '/=' | '%=' | '+=' | '-=' | '<<=' | '>>=' | '&=' | '^=' | '|=') assignment_expr >]
 ;
 /// 6.5.17
-expr^:
-  comma_expr
-;
+expr^: comma_expr;
 /// 6.5.17
 comma_expr:
   comma_expr ',' assignment_expr
 | assignment_expr ^
 ;
 /// 6.6
-constant_expr^:
-  conditional_expr
-;
+constant_expr^: conditional_expr;
 
 
 // A.2.2 Declarations
@@ -141,24 +129,40 @@ declaration:
 ;
 /// 6.7
 declaration_specifiers:
-  (?1 (?2 type_specifier #1 | type_qualifier | storage_class_specifier | function_specifier | alignment_specifier | gnu_attribute))+ #2
+  (
+    ?1 (
+      ?2 type_specifier #1
+    | type_qualifier
+    | storage_class_specifier
+    | function_specifier
+    | alignment_specifier
+    | gnu_attribute
+    )
+  )+ #2
 ;
 /// 6.7
-init_declarator_list:
-  init_declarator (',' gnu_attributes init_declarator)*
-;
+init_declarator_list: init_declarator (',' gnu_attributes init_declarator)*;
 /// 6.7
-init_declarator:
-  declarator [gnu_asm] gnu_attributes ['=' initializer]
-;
+init_declarator: declarator [gnu_asm] gnu_attributes ['=' initializer];
 /// 6.7.1
 storage_class_specifier:
   #1 'typedef' | 'auto' | 'register' | 'static' | 'extern' | '_Thread_local' | '__auto_type'
 ;
 /// 6.7.2
 type_specifier:
-  'void'  | 'char' | 'short' | 'int' | '__int128' | 'long' | 'signed' | 'unsigned'
-| 'float' | 'double' | '_Bool' | '_Complex' | '_Imaginary'
+  'void'
+| 'char'
+| 'short'
+| 'int'
+| '__int128'
+| 'long'
+| 'signed'
+| 'unsigned'
+| 'float'
+| 'double'
+| '_Bool'
+| '_Complex'
+| '_Imaginary'
 | atomic_type_specifier
 | struct_or_union_specifier
 | enum_specifier
@@ -182,9 +186,7 @@ specifier_qualifier_list:
   (?1 (?2 type_specifier #1 | type_qualifier | alignment_specifier | gnu_attribute))+ #2
 ;
 /// 6.7.2.1
-struct_declarator_list:
-  struct_declarator (',' gnu_attributes struct_declarator)*
-;
+struct_declarator_list: struct_declarator (',' gnu_attributes struct_declarator)*;
 /// 6.7.2.1
 struct_declarator:
   declarator [':' constant_expr] gnu_attributes
@@ -197,37 +199,21 @@ enum_specifier:
   | '{' enumerator_list [','] '}'
   )
 ;
-typeof_specifier:
-  '__typeof__' '(' (?1 type_name | expr) ')'
-;
+typeof_specifier: '__typeof__' '(' (?1 type_name | expr) ')';
 /// 6.7.2.2
-enumerator_list:
-  enumerator (?1 ',' enumerator)*
-;
+enumerator_list: enumerator (?1 ',' enumerator)*;
 /// 6.7.2.2
-enumerator:
-  Identifier gnu_attributes ['=' constant_expr]
-;
+enumerator: Identifier gnu_attributes ['=' constant_expr];
 /// 6.7.2.4
-atomic_type_specifier:
-  '_Atomic' '(' type_name ')'
-;
+atomic_type_specifier: '_Atomic' '(' type_name ')';
 /// 6.7.3
-type_qualifier:
-  'const' | 'volatile' | 'restrict' | '_Atomic'
-;
+type_qualifier: 'const' | 'volatile' | 'restrict' | '_Atomic';
 /// 6.7.4
-function_specifier:
-  'inline' | '_Noreturn'
-;
+function_specifier: 'inline' | '_Noreturn';
 /// 6.7.5
-alignment_specifier:
-  '_Alignas' '(' (?1 type_name | constant_expr) ')'
-;
+alignment_specifier: '_Alignas' '(' (?1 type_name | constant_expr) ')';
 /// 6.7.6
-declarator:
-  [pointer] direct_declarator
-;
+declarator: [pointer] direct_declarator;
 /// 6.7.6
 direct_declarator:
   direct_declarator '(' [?1 identifier_list | #1 parameter_type_list #2] ')' @function_declarator
@@ -241,29 +227,17 @@ direct_declarator:
 | Identifier @ident_declarator
 ;
 /// 6.7.6
-pointer:
-  '*' (?t (type_qualifier | gnu_attribute))* [pointer]
-;
+pointer: '*' (?t (type_qualifier | gnu_attribute))* [pointer];
 /// 6.7.6
-parameter_type_list:
-  parameter_list [',' '...']
-;
+parameter_type_list: parameter_list [',' '...'];
 /// 6.7.6
-parameter_list:
-  parameter_declaration (?1 ',' parameter_declaration)*
-;
+parameter_list: parameter_declaration (?1 ',' parameter_declaration)*;
 /// 6.7.6
-parameter_declaration:
-  declaration_specifiers [?1 declarator | abstract_declarator] gnu_attributes
-;
+parameter_declaration: declaration_specifiers [?1 declarator | abstract_declarator] gnu_attributes;
 /// 6.7.6
-identifier_list:
-  Identifier (',' Identifier)*
-;
+identifier_list: Identifier (',' Identifier)*;
 /// 6.7.7
-type_name:
-  specifier_qualifier_list [abstract_declarator]
-;
+type_name: specifier_qualifier_list [abstract_declarator];
 /// 6.7.7
 abstract_declarator:
   pointer [direct_abstract_declarator]
@@ -295,22 +269,16 @@ initializer:
 | '{' [initializer_list [',']] '}'
 ;
 /// 6.7.9
-initializer_list:
-  [designation] initializer (?1 ',' [designation] initializer)*
-;
+initializer_list: [designation] initializer (?1 ',' [designation] initializer)*;
 /// 6.7.9
-designation:
-  designator+ '='
-;
+designation: designator+ '=';
 /// 6.7.9
 designator:
   '[' constant_expr ']'
 | '.' Identifier
 ;
 /// 6.7.10
-static_assert_declaration:
-  '_Static_assert' '(' constant_expr ',' string_literal ')' ';'
-;
+static_assert_declaration: '_Static_assert' '(' constant_expr ',' string_literal ')' ';';
 
 
 // A.2.3 Statements
@@ -340,33 +308,21 @@ labeled_statement:
   ) [?t statement /* label at end of compound statement is GNU extension */]
 ;
 /// 6.8.2
-compound_statement:
-  '{' #1 block_item* #2 '}'
-;
+compound_statement: '{' #1 block_item* #2 '}';
 /// 6.8.2
-block_item^:
-  ?1 declaration | statement
-;
+block_item^: ?1 declaration | statement;
 /// 6.8.3
-expression_statement:
-  [expr] ';'
-;
+expression_statement: [expr] ';';
 /// 6.8.4
 if_statement:
   'if' '(' #1 expr ')' statement #2 [?t 'else' statement] // resolve dangling-else ambiguity
 ;
 /// 6.8.4
-switch_statement:
-  'switch' '(' #1 expr ')' statement #2
-;
+switch_statement: 'switch' '(' #1 expr ')' statement #2;
 /// 6.8.5
-while_statement:
-  'while' '(' #1 expr ')' statement #2
-;
+while_statement: 'while' '(' #1 expr ')' statement #2;
 /// 6.8.5
-do_statement:
-  'do' statement 'while' '(' #1 expr #2 ')' ';'
-;
+do_statement: 'do' statement 'while' '(' #1 expr #2 ')' ';';
 /// 6.8.5
 for_statement:
   'for' '(' #1 (?1 declaration [expr] ';' [expr] | [expr] ';' [expr] ';' [expr]) ')' statement #2
@@ -379,103 +335,94 @@ goto_statement:
   ) ';'
 ;
 /// 6.8.6
-continue_statement:
-  'continue' ';'
-;
+continue_statement: 'continue' ';';
 /// 6.8.6
-break_statement:
-  'break' ';'
-;
+break_statement: 'break' ';';
 /// 6.8.6
-return_statement:
-  'return' [expr] ';'
-;
-asm_statement:
-  gnu_asm ';'
-;
+return_statement: 'return' [expr] ';';
+asm_statement: gnu_asm ';';
 
 
 // A.2.4 External definitions
 
 /// 6.9
-translation_unit:
-  external_declaration*
-;
+translation_unit: external_declaration*;
 /// 6.9
 external_declaration:
   ['__extension__'] #1 [?1 declaration_specifiers /* when missing implicit int */] (
     <1 declarator #2 (
-      gnu_asm gnu_attributes ['=' initializer] 1>init_declarator (',' gnu_attributes init_declarator)* 1>init_declarator_list ';' @declaration
+      gnu_asm gnu_attributes ['=' initializer] 1>init_declarator
+      (',' gnu_attributes init_declarator)* 1>init_declarator_list ';' @declaration
     | gnu_attributes (
         ?2 #3 [declaration_list] #4 function_body @function_definition
-      | ['=' initializer] 1>init_declarator (',' gnu_attributes init_declarator)* 1>init_declarator_list ';' @declaration
+      | ['=' initializer] 1>init_declarator (',' gnu_attributes init_declarator)*
+        1>init_declarator_list ';' @declaration
       )
     )
   | ';' @declaration
   ) #5
 | static_assert_declaration @declaration
 ;
-function_body:
-  '{' block_item* #1 '}' @compound_statement
-;
+function_body: '{' block_item* #1 '}' @compound_statement;
 /// 6.9.1
-declaration_list:
-  declaration+
-;
+declaration_list: declaration+;
 
 
 // GNU attribute extension
-gnu_attributes^:
-  [?t (?t gnu_attribute)+ >]
-;
-gnu_attribute:
-  '__attribute__' '(' '(' attribute_list ')' ')'
-;
-attribute_list:
-  attrib (',' attrib)*
-;
+gnu_attributes^: [?t (?t gnu_attribute)+ >];
+gnu_attribute: '__attribute__' '(' '(' attribute_list ')' ')';
+attribute_list: attrib (',' attrib)*;
 // extra rule for better error recovery
-attrib_argument_expression_list:
-  assignment_expr (',' assignment_expr)* @argument_expression_list
-;
+attrib_argument_expression_list: assignment_expr (',' assignment_expr)* @argument_expression_list;
 attrib:
-  [attrib_name ['(' [?1 Identifier [',' constant_expr (',' constant_expr)*] | attrib_argument_expression_list] ')']]
+  [
+    attrib_name [
+      '(' [?1 Identifier [',' constant_expr (',' constant_expr)*] | attrib_argument_expression_list]
+      ')'
+    ]
+  ]
 ;
 attrib_name:
   Identifier
-| 'const' | 'volatile' | 'restrict' | '_Atomic'
-| 'typedef' | 'auto' | 'register' | 'static' | 'extern' | '_Thread_local'
-| 'void' | 'char' | 'short' | 'int' | 'long' | 'signed' | 'unsigned'
-| 'float' | 'double' | '_Bool' | '_Complex' | '_Imaginary'
-| 'enum' | 'union' | 'struct'
+| 'const'
+| 'volatile'
+| 'restrict'
+| '_Atomic'
+| 'typedef'
+| 'auto'
+| 'register'
+| 'static'
+| 'extern'
+| '_Thread_local'
+| 'void'
+| 'char'
+| 'short'
+| 'int'
+| 'long'
+| 'signed'
+| 'unsigned'
+| 'float'
+| 'double'
+| '_Bool'
+| '_Complex'
+| '_Imaginary'
+| 'enum'
+| 'union'
+| 'struct'
 ;
 
 // GNU asm extension
 gnu_asm:
-  'asm' asm_qualifier*
-  '(' string_literal [':' output_operands [':' input_operands [':' clobbers [':' goto_labels]]]] ')'
+  'asm' asm_qualifier* '(' string_literal
+  [':' output_operands [':' input_operands [':' clobbers [':' goto_labels]]]] ')'
 ;
-asm_qualifier:
-  'volatile' | 'goto' | 'inline'
-;
-output_operands:
-  [output_operand (',' output_operand)*]
-;
-output_operand:
-  string_literal '(' expr ')'
-;
-input_operands:
-  [input_operand (',' input_operand)*]
-;
-input_operand:
-  string_literal '(' constant_expr ')'
-;
-clobbers:
-  [string_literal (',' string_literal)*]
-;
-goto_labels:
-  [Identifier (',' Identifier)*]
-;
+asm_qualifier: 'volatile' | 'goto' | 'inline';
+output_operands: [output_operand (',' output_operand)*];
+output_operand: string_literal '(' expr ')';
+input_operands: [input_operand (',' input_operand)*];
+input_operand: string_literal '(' constant_expr ')';
+clobbers: [string_literal (',' string_literal)*];
+goto_labels: [Identifier (',' Identifier)*];
 
 // GNU offset_of extension
 offsetof_member_designator:

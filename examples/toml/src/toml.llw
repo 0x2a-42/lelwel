@@ -1,11 +1,10 @@
 token Dot='.' Eq='=' LBrak='[' RBrak=']' Comma=',' LBrace='{' RBrace='}';
 token True='true' False='false';
 token BasicString='<basic string>' LiteralString='<literal string>'
-      MlBasicString='<multi-line basic string>'
-      MlLiteralString='<multi-line literal string>'
+      MlBasicString='<multi-line basic string>' MlLiteralString='<multi-line literal string>'
       Integer='<integer>' Float='<float>' OffsetDateTime='<offset date-time>'
-      LocalDateTime='<local date-time>' LocalDate='<local date>'
-      LocalTime='<local time>' UnquotedKey='<bare key>';
+      LocalDateTime='<local date-time>' LocalDate='<local date>' LocalTime='<local time>'
+      UnquotedKey='<bare key>';
 token Newline Whitespace Comment;
 
 skip Whitespace Comment;

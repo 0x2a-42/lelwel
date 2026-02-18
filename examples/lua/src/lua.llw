@@ -1,16 +1,15 @@
 // Based on https://www.lua.org/manual/5.4/manual.html#9
 
-token BreakKw='break' ReturnKw='return' FunctionKw='function' EndKw='end' GotoKw='goto'
-      DoKw='do' WhileKw='while' RepeatKw='repeat' IfKw='if' ThenKw='then' UntilKw='until'
-      ElseifKw='elseif' ElseKw='else' ForKw='for' InKw='in' LocalKw='local' AndKw='and'
-      OrKw='or' NotKw='not' NilKw='nil' FalseKw='false' TrueKw='true';
-token Semi=';' ColonColon='::' Colon=':' Dot='.' Comma=',' Ellipsis='...'
-      Equal='=' Plus='+' Minus='-' Star='*' Slash='/' SlashSlash='//' Hat='^' Percent='%'
-      And='&' Tilde='~' Pipe='|' GtGt='>>' LtLt='<<' DotDot='..' Less='<' LessEqual='<='
-      Greater='>' GreaterEqual='>=' EqualEqual='==' TildeEqual='~=' Hash='#';
+token BreakKw='break' ReturnKw='return' FunctionKw='function' EndKw='end' GotoKw='goto' DoKw='do'
+      WhileKw='while' RepeatKw='repeat' IfKw='if' ThenKw='then' UntilKw='until' ElseifKw='elseif'
+      ElseKw='else' ForKw='for' InKw='in' LocalKw='local' AndKw='and' OrKw='or' NotKw='not'
+      NilKw='nil' FalseKw='false' TrueKw='true';
+token Semi=';' ColonColon='::' Colon=':' Dot='.' Comma=',' Ellipsis='...' Equal='=' Plus='+'
+      Minus='-' Star='*' Slash='/' SlashSlash='//' Hat='^' Percent='%' And='&' Tilde='~' Pipe='|'
+      GtGt='>>' LtLt='<<' DotDot='..' Less='<' LessEqual='<=' Greater='>' GreaterEqual='>='
+      EqualEqual='==' TildeEqual='~=' Hash='#';
 token LBrak='[' RBrak=']' LParen='(' RParen=')' LBrace='{' RBrace='}';
-token Name='<name>' LiteralString='<string>'
-      Numeral='<numeral>';
+token Name='<name>' LiteralString='<string>' Numeral='<numeral>';
 token Comment FirstLineComment Whitespace;
 
 skip Comment FirstLineComment Whitespace;
@@ -44,15 +43,12 @@ gotostat: 'goto' Name;
 dostat: 'do' block 'end';
 whilestat: 'while' exp 'do' block 'end';
 repeatstat: 'repeat' block 'until' exp;
-ifstat:
-  'if' exp 'then' block
-  ('elseif' exp 'then' block)*
-  ['else' block] 'end'
-;
+ifstat: 'if' exp 'then' block ('elseif' exp 'then' block)* ['else' block] 'end';
 forstat:
   'for' (
-    ?1 Name '=' exp ',' exp [',' exp] 'do' block 'end' // resolve LL(1) conflict with extra lookahead
-  | namelist 'in' explist 'do' block 'end')
+    ?1 Name '=' exp ',' exp [',' exp] 'do' block 'end' // resolve LL(1) conflict
+  | namelist 'in' explist 'do' block 'end'
+  )
 ;
 funcstat: 'function' funcname pars funcbody;
 localstat:
@@ -111,12 +107,12 @@ args^:
 ;
 stringarg: LiteralString;
 functiondef: 'function' pars funcbody;
-pars: '(' [Name (?1 ',' Name)* [',' '...'] | '...'] ')'; // resolve LL(1) conflict with extra lookahead
+pars: '(' [Name (?1 ',' Name)* [',' '...'] | '...'] ')'; // resolve LL(1) conflict
 funcbody: block 'end';
 tableconstructor: '{' fieldlist '}';
-fieldlist: [field (?1 (',' | ';') field)* [',' | ';']]; // resolve LL(1) conflict with extra lookahead
+fieldlist: [field (?1 (',' | ';') field)* [',' | ';']]; // resolve LL(1) conflict
 field:
   '[' exp ']' '=' exp
-| ?1 Name '=' exp // resolve LL(1) conflict with extra lookahead
+| ?1 Name '=' exp // resolve LL(1) conflict
 | exp
 ;

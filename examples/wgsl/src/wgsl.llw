@@ -3,13 +3,13 @@
 token Enable='enable' Requires='requires' Fn='fn' Alias='alias' Struct='struct' Var='var'
       ConstAssert='const_assert' If='if' For='for' Else='else' Loop='loop' Break='break'
       While='while' Return='return' Switch='switch' Discard='discard' Continuing='continuing'
-      Const='const' Case='case' Default='default' Override='override' Continue='continue'
-      Let='let' True='true' False='false' Diagnostic='diagnostic';
+      Const='const' Case='case' Default='default' Override='override' Continue='continue' Let='let'
+      True='true' False='false' Diagnostic='diagnostic';
 token Semi=';' LPar='(' RPar=')' Comma=',' Eq='=' Colon=':' LBrace='{' RBrace='}' MinusGt='->'
-      Lt='<' Gt='>' Dot='.' At='@' LBrak='[' RBrak=']' And='&' Excl='!' Star='*' Minus='-'
-      Tilde='~' Plus='+' Eq2='==' Pipe='|' And2='&&' Slash='/' Caret='^' Pipe2='||' ExclEq='!='
-      Percent='%' Underscore='_' AndEq='&=' StarEq='*=' PlusEq='+=' PipeEq='|=' MinusEq='-='
-      SlashEq='/=' CaretEq='^=' PercentEq='%=' Plus2='++' Minus2='--';
+      Lt='<' Gt='>' Dot='.' At='@' LBrak='[' RBrak=']' And='&' Excl='!' Star='*' Minus='-' Tilde='~'
+      Plus='+' Eq2='==' Pipe='|' And2='&&' Slash='/' Caret='^' Pipe2='||' ExclEq='!=' Percent='%'
+      Underscore='_' AndEq='&=' StarEq='*=' PlusEq='+=' PipeEq='|=' MinusEq='-=' SlashEq='/='
+      CaretEq='^=' PercentEq='%=' Plus2='++' Minus2='--';
 token Ident='<identifier>' FloatLiteral='<floating point literal>' IntLiteral='<integer literal>';
 token Whitespace Comment;
 
@@ -71,13 +71,15 @@ expression:
 | expression ('*' | '/' | '%') expression @binary_expression // §8.7
 | expression ('+' | '-') expression @binary_expression // §8.7
 | ?2 expression ('<' '<' | '>' '>') expression @binary_expression // §8.9
-| ?3 expression (?4 '<' | ?4 '>' | '<' '=' | '>' '=' | '==' | '!=') expression @binary_expression // §8.8
+| ?3 expression (?4 '<' | ?4 '>' | '<' '=' | '>' '=' | '==' | '!=') expression
+  @binary_expression // §8.8
 | expression '&' expression @binary_expression // §8.9
 | expression '^' expression @binary_expression // §8.9
 | expression '|' expression @binary_expression // §8.9
 | expression '&&' expression @binary_expression // §8.6
 | expression '||' expression @binary_expression // §8.6
-| Ident expr_template_list @ident_expression [argument_expression_list_expr @call_expression] // §8.10, §8.11
+| Ident expr_template_list @ident_expression
+  [argument_expression_list_expr @call_expression] // §8.10, §8.11
 | '(' expression ')' @paren_expression // §8.4
 | IntLiteral @int_expression // §8.3
 | FloatLiteral @float_expression // §8.3
@@ -86,14 +88,17 @@ expression:
 ;
 argument_expression_list: '(' [expression (?1 ',' expression)* [',']] ')';
 // extra rule for better error handling
-argument_expression_list_expr: '(' [expression (?1 ',' expression)* [',']] ')' @argument_expression_list;
+argument_expression_list_expr:
+  '(' [expression (?1 ',' expression)* [',']] ')' @argument_expression_list
+;
 
 statement:
   attribute* (
     if_clause (?1 else_if_clause)* [else_clause] @if_statement // §9.4.1
-  | 'switch' expression attribute* '{' switch_clause * '}' @switch_statement // §9.4.2
+  | 'switch' expression attribute* '{' switch_clause* '}' @switch_statement // §9.4.2
   | 'loop' attribute* '{' statement* [continuing_statement] '}' @loop_statement // §9.4.3
-  | 'for' '(' [for_init] ';' [expression] ';' [for_update] ')' compound_statement @for_statement // §9.4.4
+  | 'for' '(' [for_init] ';' [expression] ';' [for_update] ')' compound_statement
+    @for_statement // §9.4.4
   | 'while' expression compound_statement @while_statement // §9.4.5
   | '{' statement* '}' @compound_statement // §9.1
   )
@@ -113,7 +118,9 @@ statement:
 | 'discard' ';' @discard_statement // §9.4.11
 | 'return' [expression] ';' @return_statement // §9.4.10
 ;
-continuing_statement: 'continuing' attribute* '{' (?1 statement)* [break_if_statement] '}'; // §9.4.9
+continuing_statement:
+  'continuing' attribute* '{' (?1 statement)* [break_if_statement] '}'
+; // §9.4.9
 break_if_statement: 'break' 'if' expression ';'; // §9.4.7
 for_init:
   ?1 func_call

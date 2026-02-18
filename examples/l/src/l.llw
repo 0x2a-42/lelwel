@@ -1,6 +1,6 @@
 token Fn='fn' Let='let' Return='return' True='true' False='false';
-token Arrow='->' LPar='(' RPar=')' Comma=',' Colon=':' LBrace='{' RBrace='}'
-      Semi=';' Asn='=' Plus='+' Minus='-' Star='*' Slash='/';
+token Arrow='->' LPar='(' RPar=')' Comma=',' Colon=':' LBrace='{' RBrace='}' Semi=';' Asn='='
+      Plus='+' Minus='-' Star='*' Slash='/';
 token Name='<name>' Int='<int>';
 token Whitespace;
 

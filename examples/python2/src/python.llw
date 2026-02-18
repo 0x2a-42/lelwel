@@ -1,21 +1,16 @@
-// Based on https://docs.python.org/2.7/reference/grammar.html
-// with some modifications.
+// Based on https://docs.python.org/2.7/reference/grammar.html with some modifications.
 
-token Lt='<' Gt='>' Eq='=' At='@' And='&' Dot='.' LPar='(' RPar=')'
-      Star='*' Plus='+' Semi=';' Lt2='<<' Eq2='==' Gt2='>>' Pipe='|'
-      Comma=',' Minus='-' Slash='/' Colon=':' LtEq='<=' LtGt='<>'
-      GtEq='>=' LBrak='[' RBrak=']' Caret='^' BTick='`' Tilde='~'
-      AndEq='&=' Star2='**' LBrace='{' RBrace='}' ExclEq='!='
-      Percent='%' StarEq='*=' PlusEq='+=' Slash2='//' Lt2Eq='<<='
-      Gt2Eq='>>=' PipeEq='|=' MinusEq='-=' SlashEq='/=' CaretEq='^='
-      Star2Eq='**=' PercentEq='%=' Slash2Eq='//=';
-token As='as' If='if' In='in' Is='is' Or='or' AndKw='and' Def='def'
-      Del='del' For='for' Not='not' Try='try' Else='else' Exec='exec'
-      From='from' Pass='pass' Elif='elif' With='with' Break='break'
-      Class='class' Print='print' Raise='raise' While='while'
-      Assert='assert' Except='except' Global='global' Import='import'
-      Lambda='lambda' Return='return' Finally='finally' Continue='continue'
-      Yield='yield';
+token Lt='<' Gt='>' Eq='=' At='@' And='&' Dot='.' LPar='(' RPar=')' Star='*' Plus='+' Semi=';'
+      Lt2='<<' Eq2='==' Gt2='>>' Pipe='|' Comma=',' Minus='-' Slash='/' Colon=':' LtEq='<='
+      LtGt='<>' GtEq='>=' LBrak='[' RBrak=']' Caret='^' BTick='`' Tilde='~' AndEq='&=' Star2='**'
+      LBrace='{' RBrace='}' ExclEq='!=' Percent='%' StarEq='*=' PlusEq='+=' Slash2='//' Lt2Eq='<<='
+      Gt2Eq='>>=' PipeEq='|=' MinusEq='-=' SlashEq='/=' CaretEq='^=' Star2Eq='**=' PercentEq='%='
+      Slash2Eq='//=';
+token As='as' If='if' In='in' Is='is' Or='or' AndKw='and' Def='def' Del='del' For='for' Not='not'
+      Try='try' Else='else' Exec='exec' From='from' Pass='pass' Elif='elif' With='with'
+      Break='break' Class='class' Print='print' Raise='raise' While='while' Assert='assert'
+      Except='except' Global='global' Import='import' Lambda='lambda' Return='return'
+      Finally='finally' Continue='continue' Yield='yield';
 token Newline Name Dedent Indent Int Float Imaginary String;
 token Whitespace Comment;
 
@@ -32,7 +27,7 @@ single_input: Newline | simple_stmts | compound_stmt Newline;
 /// the input for the eval() and input() functions
 eval_input: testlist Newline*;
 
-decorator: '@' dotted_name [ '(' [arglist] ')' ] Newline;
+decorator: '@' dotted_name ['(' [arglist] ')'] Newline;
 decorators: decorator+;
 decorated: decorators (classdef | funcdef);
 funcdef: 'def' Name parameters ':' suite;
@@ -64,13 +59,11 @@ expr_stmt:
   | ('=' (yield_expr | testlist))* @assign_stmt
   )
 ;
-augassign^:
-  '+=' | '-=' | '*=' | '/=' | '%=' | '&=' | '|=' | '^=' | '<<=' | '>>=' | '**=' | '//='
-;
+augassign^: '+=' | '-=' | '*=' | '/=' | '%=' | '&=' | '|=' | '^=' | '<<=' | '>>=' | '**=' | '//=';
 print_stmt:
   'print' (
-    [ test (?1 ',' test)* [','] ]
-  | '>>' test [ (?1 ',' test)+ [','] ]
+    [test (?1 ',' test)* [',']]
+  | '>>' test [(?1 ',' test)+ [',']]
   )
 ;
 del_stmt: 'del' exprlist;
@@ -84,8 +77,8 @@ raise_stmt: 'raise' [test [',' test [',' test]]];
 import_stmt: import_name | import_from;
 import_name: 'import' dotted_as_names;
 import_from:
-  'from' ('.'+ [dotted_name] | dotted_name)
-  'import' ('*' | '(' import_as_names ')' | import_as_names)
+  'from' ('.'+ [dotted_name] | dotted_name) 'import'
+  ('*' | '(' import_as_names ')' | import_as_names)
 ;
 import_as_name: Name ['as' Name];
 dotted_as_name: dotted_name ['as' Name];
@@ -115,7 +108,7 @@ try_stmt:
   | 'finally' ':' suite
   )
 ;
-with_stmt: 'with' with_item (',' with_item)*  ':' suite;
+with_stmt: 'with' with_item (',' with_item)* ':' suite;
 with_item: test ['as' expr];
 except_clause: 'except' [test [('as' | ',') test]];
 suite: simple_stmts | Newline Indent stmt+ Dedent;
@@ -126,7 +119,8 @@ old_lambdef: 'lambda' [varargslist] ':' old_test;
 
 test^:
   or_test ['if' or_test 'else' test >if_expr]
-| lambda_expr;
+| lambda_expr
+;
 or_test:
   'not' or_test @unary_expr
 | or_test 'and' or_test @bool_expr
@@ -139,7 +133,7 @@ expr:
 | expr '(' [arglist] ')' @call_expr
 | expr '[' subscriptlist ']' @subscript_expr
 | expr '.' Name @field_expr
-| ('+'|'-'|'~') expr @unary_expr
+| ('+' | '-' | '~') expr @unary_expr
 | expr ('*' | '/' | '%' | '//') expr @binary_expr
 | expr ('+' | '-') expr @binary_expr
 | expr ('<<' | '>>') expr @binary_expr
