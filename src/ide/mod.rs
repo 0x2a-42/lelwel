@@ -1,6 +1,6 @@
 #![cfg(feature = "lsp")]
 
-use crate::{Parser, SemanticPass, Span};
+use crate::{NodeRef, Parser, SemanticPass, Span, backend::format::format};
 use codespan_reporting::diagnostic::{LabelStyle, Severity};
 use codespan_reporting::files::SimpleFile;
 use lsp_types::*;
@@ -105,6 +105,16 @@ impl Cache {
             None
         }
     }
+    pub fn formatting(&mut self, params: DocumentFormattingParams) -> Option<Vec<TextEdit>> {
+        let analyzer = self.analyzers.get_mut(&params.text_document.uri).unwrap();
+        assert!(!analyzer.handle.is_finished());
+        analyzer.req_tx.send(Request::Formatting(params)).unwrap();
+        if let Ok(Notification::Formatting(resp)) = analyzer.noti_rx.recv() {
+            resp
+        } else {
+            None
+        }
+    }
 }
 
 enum Request {
@@ -113,6 +123,7 @@ enum Request {
     GotoDefinition(Position),
     References(Position, bool),
     Completion(CompletionParams),
+    Formatting(DocumentFormattingParams),
     Cancel,
 }
 
@@ -122,6 +133,7 @@ enum Notification {
     GotoDefinition(Option<Location>),
     References(Vec<Location>),
     Completion(Option<CompletionResponse>),
+    Formatting(Option<Vec<TextEdit>>),
 }
 
 fn analyze(
@@ -175,6 +187,14 @@ fn analyze(
                     compat::position_to_offset(&file, &params.text_document_position.position);
                 noti.send(Notification::Completion(completion(&cst, pos, &sema)))
                     .unwrap();
+            }
+            Request::Formatting(_params) => {
+                let formatted_source = format(&cst);
+                noti.send(Notification::Formatting(Some(vec![TextEdit::new(
+                    compat::span_to_range(&file, &cst.span(NodeRef::ROOT)),
+                    formatted_source,
+                )])))
+                .unwrap();
             }
             Request::Cancel => {
                 return;

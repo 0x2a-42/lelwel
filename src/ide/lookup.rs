@@ -20,7 +20,10 @@ pub fn inside_comment(cst: &Cst<'_>, node: NodeRef, pos: usize) -> bool {
         .filter(|node| {
             matches!(
                 cst.get(*node),
-                Node::Token(Token::Comment | Token::DocComment, _)
+                Node::Token(
+                    Token::LineComment | Token::BlockComment | Token::DocComment,
+                    _
+                )
             )
         })
         .any(|node| contains(&cst.span(node), pos))

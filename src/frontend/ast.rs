@@ -55,6 +55,12 @@ macro_rules! ast_node {
 }
 
 ast_node!(File);
+ast_node!(
+    Decl,
+    (
+        TokenDecl, RuleDecl, StartDecl, RightDecl, SkipDecl, PartDecl
+    )
+);
 ast_node!(TokenDecl);
 ast_node!(RuleDecl);
 ast_node!(StartDecl);

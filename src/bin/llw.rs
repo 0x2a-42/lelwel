@@ -8,6 +8,7 @@ fn main() {
         .version(crate_version!())
         .about("Generates recursive descent parsers for Rust using LL(1) grammars.")
         .arg(arg!(-c --check "Only check the file for errors"))
+        .arg(arg!(-f --format "format the grammar file"))
         .arg(arg!(-g --graph "Output a graphviz file for the grammar"))
         .arg(arg!(-s --short "Use short diagnostics"))
         .arg(arg!(-v --verbose "Sets the level of verbosity").action(ArgAction::Count))
@@ -27,6 +28,7 @@ fn main() {
         input,
         output,
         matches.get_flag("check"),
+        matches.get_flag("format"),
         matches.get_count("verbose"),
         matches.get_flag("graph"),
         matches.get_flag("short"),

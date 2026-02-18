@@ -11,7 +11,7 @@ use lsp_types::{
     notification::{
         DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, PublishDiagnostics,
     },
-    request::{Completion, GotoDefinition, HoverRequest, References},
+    request::{Completion, Formatting, GotoDefinition, HoverRequest, References},
 };
 
 macro_rules! request_match {
@@ -80,6 +80,7 @@ fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
         definition_provider: Some(OneOf::Left(true)),
         references_provider: Some(OneOf::Left(true)),
         hover_provider: Some(HoverProviderCapability::Simple(true)),
+        document_formatting_provider: Some(OneOf::Left(true)),
         ..Default::default()
     })
     .unwrap();
@@ -107,6 +108,7 @@ fn main_loop(
                 request_match!(GotoDefinition, cache, connection, req.clone());
                 request_match!(References, cache, connection, req.clone());
                 request_match!(Completion, cache, connection, req.clone());
+                request_match!(Formatting, cache, connection, req.clone());
             }
             Message::Response(_resp) => {}
             Message::Notification(noti) => {
@@ -160,6 +162,12 @@ impl RequestHandler for References {
 impl RequestHandler for Completion {
     fn handle(cache: &mut Cache, params: Self::Params) -> Self::Result {
         cache.completion(params)
+    }
+}
+
+impl RequestHandler for Formatting {
+    fn handle(cache: &mut Cache, params: Self::Params) -> Self::Result {
+        cache.formatting(params)
     }
 }
 

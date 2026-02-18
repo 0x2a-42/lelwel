@@ -504,7 +504,11 @@ impl<'a> Parser<'a> {
             self.pos += 1;
             match self.tokens.get(self.pos) {
                 Some(
-                    token @ (Token::Error | Token::Comment | Token::DocComment | Token::Whitespace),
+                    token @ (Token::Error
+                    | Token::LineComment
+                    | Token::BlockComment
+                    | Token::DocComment
+                    | Token::Whitespace),
                 ) => {
                     self.cst.data.advance(*token, true);
                     continue;
@@ -527,14 +531,22 @@ impl<'a> Parser<'a> {
     fn is_skipped(token: Token) -> bool {
         matches!(
             token,
-            Token::Error | Token::Comment | Token::DocComment | Token::Whitespace
+            Token::Error
+                | Token::LineComment
+                | Token::BlockComment
+                | Token::DocComment
+                | Token::Whitespace
         )
     }
     fn init_skip(&mut self) {
         loop {
             match self.tokens.get(self.pos) {
                 Some(
-                    token @ (Token::Error | Token::Comment | Token::DocComment | Token::Whitespace),
+                    token @ (Token::Error
+                    | Token::LineComment
+                    | Token::BlockComment
+                    | Token::DocComment
+                    | Token::Whitespace),
                 ) => {
                     self.pos += 1;
                     self.cst.data.advance(*token, true);

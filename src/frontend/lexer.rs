@@ -68,8 +68,9 @@ fn parse_block_comment(lexer: &mut Lexer<'_, Token>) -> Result<(), LexerError> {
 pub enum Token {
     EOF,
     #[regex(r"//[^\n]*\n", allow_greedy = true)]
+    LineComment,
     #[regex(r"/\*", parse_block_comment)]
-    Comment,
+    BlockComment,
     #[regex(r"///[^\n]*\n", allow_greedy = true)]
     DocComment,
     #[regex(r"[ \t\r\n\f]+")]
@@ -166,7 +167,7 @@ pub fn tokenize(source: &str, diags: &mut Vec<Diagnostic>) -> (Vec<Token>, Vec<S
             }
             Err(LexerError::UnterminatedComment) => {
                 diags.push(LexerError::UnterminatedComment.into_diagnostic(span.clone()));
-                tokens.push(Token::Comment);
+                tokens.push(Token::BlockComment);
             }
             Err(err) => {
                 diags.push(err.into_diagnostic(span.clone()));

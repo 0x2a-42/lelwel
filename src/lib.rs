@@ -25,6 +25,7 @@ pub fn build(path: &str) {
         path,
         &std::env::var("OUT_DIR").unwrap(),
         false,
+        false,
         0,
         false,
         false,
@@ -45,6 +46,7 @@ pub fn compile(
     input: &str,
     output: &str,
     check: bool,
+    _format: bool,
     verbose: u8,
     graph: bool,
     short: bool,
@@ -55,6 +57,13 @@ pub fn compile(
     let source = std::fs::read_to_string(input)?;
     let mut diags = vec![];
     let cst = Parser::new(&source, &mut diags).parse(&mut diags);
+
+    #[cfg(any(feature = "lsp", feature = "cli"))]
+    if _format {
+        std::fs::write(input, backend::format::format(&cst))?;
+        return Ok(true);
+    }
+
     let sema = SemanticPass::run(&cst, &mut diags);
 
     if verbose > 1 {
