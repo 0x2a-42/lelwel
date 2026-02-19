@@ -60,7 +60,11 @@ pub fn compile(
 
     #[cfg(any(feature = "lsp", feature = "cli"))]
     if _format {
-        std::fs::write(input, backend::format::format(&cst))?;
+        let formatted_source = backend::format::format(&cst);
+        if check {
+            return Ok(source == formatted_source);
+        }
+        std::fs::write(input, &formatted_source)?;
         return Ok(true);
     }
 
