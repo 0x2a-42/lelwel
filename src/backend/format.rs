@@ -66,12 +66,12 @@ fn gen_node(cst: &Cst<'_>, node_ref: NodeRef, items: &mut PrintItems) {
             let txt = cst.span_text(idx);
             match token {
                 Token::LineComment | Token::DocComment => {
-                    space_before_comment(cst, &span, items);
+                    space_before_comment(cst, &span, items, false);
                     items.push_string(txt[..txt.len() - 1].to_string());
                     items.push_signal(Signal::ExpectNewLine);
                 }
                 Token::BlockComment => {
-                    space_before_comment(cst, &span, items);
+                    space_before_comment(cst, &span, items, false);
                     items.push_string(txt.to_string());
                 }
                 Token::Whitespace => {}
@@ -93,9 +93,21 @@ fn dedent(width: usize, items: &mut PrintItems) {
     }
 }
 
-fn space_before_comment(cst: &Cst<'_>, span: &Span, items: &mut PrintItems) {
-    if span.start != 0 && &cst.source()[span.start.saturating_sub(1)..span.start] != "\n" {
-        items.push_space();
+fn space_before_comment(cst: &Cst<'_>, span: &Span, items: &mut PrintItems, global: bool) {
+    for c in cst.source()[..span.start].bytes().rev() {
+        match c {
+            b' ' => {}
+            b'\n' => {
+                if !global {
+                    items.push_signal(Signal::NewLine);
+                }
+                return;
+            }
+            _ => {
+                items.push_space();
+                return;
+            }
+        }
     }
 }
 
@@ -237,10 +249,20 @@ fn gen_file(cst: &Cst<'_>, node_ref: NodeRef, items: &mut PrintItems) {
     let mut line_start = true;
     for child_node_ref in cst.children(node_ref) {
         match cst.get(child_node_ref) {
-            Node::Token(Token::LineComment | Token::DocComment, _) => {
-                gen_node(cst, child_node_ref, items);
+            Node::Token(Token::LineComment | Token::DocComment, idx) => {
+                let span = cst.span(child_node_ref);
+                let txt = cst.span_text(idx);
+                space_before_comment(cst, &span, items, true);
+                items.push_string(txt[..txt.len() - 1].to_string());
                 items.push_signal(Signal::NewLine);
                 line_start = true;
+            }
+            Node::Token(Token::BlockComment, idx) => {
+                let span = cst.span(child_node_ref);
+                let txt = cst.span_text(idx);
+                space_before_comment(cst, &span, items, true);
+                items.push_string(txt.to_string());
+                items.push_signal(Signal::SpaceIfNotTrailing);
             }
             Node::Token(Token::Whitespace, idx) => {
                 let txt = cst.span_text(idx);
