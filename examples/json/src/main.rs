@@ -23,7 +23,11 @@ impl Cst<'_> {
     pub fn to_value(&self, node_ref: NodeRef) -> Option<Value> {
         match self.get(node_ref) {
             Node::Rule(rule, _) => match rule {
-                Rule::File | Rule::Literal => self.to_value(self.children(node_ref).next()?),
+                Rule::File => self
+                    .children(node_ref)
+                    .filter_map(|child_node_ref| self.to_value(child_node_ref))
+                    .next(),
+                Rule::Literal => self.to_value(self.children(node_ref).next()?),
                 Rule::Array => Some(Value::Array(
                     self.children(node_ref)
                         .filter_map(|child_node_ref| self.to_value(child_node_ref))
