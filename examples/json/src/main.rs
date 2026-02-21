@@ -25,8 +25,7 @@ impl Cst<'_> {
             Node::Rule(rule, _) => match rule {
                 Rule::File => self
                     .children(node_ref)
-                    .filter_map(|child_node_ref| self.to_value(child_node_ref))
-                    .next(),
+                    .find_map(|child_node_ref| self.to_value(child_node_ref)),
                 Rule::Literal => self.to_value(self.children(node_ref).next()?),
                 Rule::Array => Some(Value::Array(
                     self.children(node_ref)
