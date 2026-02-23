@@ -327,6 +327,85 @@ impl RustOutput {
         }
     }
 
+    fn output_elision_init(
+        output: &mut BufWriter<std::fs::File>,
+        level: usize,
+        has_rule_creation: bool,
+        parser_name: &str,
+        is_start: bool,
+        elision: RuleNodeElision,
+    ) -> std::io::Result<()> {
+        if !is_start {
+            match elision {
+                RuleNodeElision::None => output.write_all(
+                    format!("let m = {parser_name}.open(diags);\n")
+                        .indent(level)
+                        .as_bytes(),
+                )?,
+                RuleNodeElision::Conditional => output.write_all(
+                    format!("let start = {parser_name}.mark(diags);\nlet mut elide = false;\n")
+                        .indent(level)
+                        .as_bytes(),
+                )?,
+                RuleNodeElision::Unconditional => {
+                    if has_rule_creation {
+                        output.write_all(
+                            format!("let start = {parser_name}.mark(diags);\n")
+                                .indent(level)
+                                .as_bytes(),
+                        )?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn output_elision_check(
+        output: &mut BufWriter<std::fs::File>,
+        level: usize,
+        has_rule_rename: bool,
+        name: &str,
+        parser_name: &str,
+        is_start: bool,
+        elision: RuleNodeElision,
+    ) -> std::io::Result<()> {
+        if !is_start {
+            match elision {
+                RuleNodeElision::None => {
+                    Self::output_cst_close(
+                        output,
+                        has_rule_rename,
+                        name,
+                        level,
+                        false,
+                        parser_name,
+                        is_start,
+                    )?;
+                }
+                RuleNodeElision::Conditional => {
+                    output.write_all(
+                        format!("if !elide {{\nlet m = {parser_name}.open_before(start, diags);\n")
+                            .indent(level)
+                            .as_bytes(),
+                    )?;
+                    Self::output_cst_close(
+                        output,
+                        has_rule_rename,
+                        name,
+                        level + 1,
+                        false,
+                        parser_name,
+                        is_start,
+                    )?;
+                    output.write_all("}\n".indent(level).as_bytes())?;
+                }
+                RuleNodeElision::Unconditional => {}
+            }
+        }
+        Ok(())
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn output_normal_rule(
         cst: &Cst<'_>,
@@ -340,21 +419,8 @@ impl RustOutput {
         is_start: bool,
         elision: RuleNodeElision,
     ) -> std::io::Result<()> {
+        Self::output_elision_init(output, 2, has_rule_creation, "self", is_start, elision)?;
         if !is_start {
-            match elision {
-                RuleNodeElision::None => {
-                    output.write_all(b"        let m = self.open(diags);\n")?
-                }
-                RuleNodeElision::Conditional => output.write_all(
-                    b"        let start = self.mark(diags);\
-                    \n        let mut elide = false;\n",
-                )?,
-                RuleNodeElision::Unconditional => {
-                    if has_rule_creation {
-                        output.write_all(b"        let start = self.mark(diags);\n")?;
-                    }
-                }
-            }
             Self::output_node_kind_decl(output, has_rule_rename, name, 2, true)?;
         }
         Self::output_regex(
@@ -370,38 +436,7 @@ impl RustOutput {
             "self",
             has_rule_rename,
         )?;
-        if !is_start {
-            match elision {
-                RuleNodeElision::None => Self::output_cst_close(
-                    output,
-                    has_rule_rename,
-                    name,
-                    2,
-                    false,
-                    "self",
-                    is_start,
-                ),
-                RuleNodeElision::Conditional => {
-                    output.write_all(
-                        b"        if !elide {\
-                        \n            let m = self.open_before(start, diags);\n",
-                    )?;
-                    Self::output_cst_close(
-                        output,
-                        has_rule_rename,
-                        name,
-                        3,
-                        false,
-                        "self",
-                        is_start,
-                    )?;
-                    output.write_all(b"        }\n")
-                }
-                RuleNodeElision::Unconditional => Ok(()),
-            }
-        } else {
-            Ok(())
-        }
+        Self::output_elision_check(output, 2, has_rule_rename, name, "self", is_start, elision)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -481,9 +516,8 @@ impl RustOutput {
             )?;
 
             let elision = *sema.elision.get(&alt_op.syntax()).unwrap();
-            if elision != RuleNodeElision::Unconditional {
-                output.write_all(b"                    let m = parser.cst.data.open();\n")?;
-            }
+            Self::output_elision_init(output, 5, false, "parser", false, elision)?;
+
             if let Some(Recursion::Right(_, index)) = branch {
                 let binding_power = recursive.binding_power(alt_op).0;
                 let Regex::Concat(concat) = alt_op else {
@@ -530,9 +564,8 @@ impl RustOutput {
                     has_rule_rename,
                 )?;
             }
-            if elision != RuleNodeElision::Unconditional {
-                Self::output_cst_close(output, has_rule_rename, name, 5, false, "parser", false)?;
-            }
+
+            Self::output_elision_check(output, 5, has_rule_rename, name, "parser", false, elision)?;
             output.write_all("}\n".indent(4).as_bytes())?;
         }
         if !advance_error_set.is_empty() {
