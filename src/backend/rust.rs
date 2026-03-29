@@ -59,7 +59,7 @@ impl Indent for String {
 
 trait Generator {
     fn pattern(&self, level: usize) -> String;
-    fn error(&self, level: usize, token_symbols: &FxHashMap<&str, &str>) -> String;
+    fn error(&self, token_symbols: &FxHashMap<&str, &str>) -> String;
 }
 
 impl Generator for std::collections::BTreeSet<TokenName<'_>> {
@@ -67,21 +67,36 @@ impl Generator for std::collections::BTreeSet<TokenName<'_>> {
         let symbols: Vec<_> = self.iter().map(|s| format!("Token::{}", s.0)).collect();
         symbols.join(&format!("\n{}| ", "    ".repeat(level)))
     }
-    fn error(&self, level: usize, token_symbols: &FxHashMap<&str, &str>) -> String {
-        if !self.is_empty() {
-            let symbols: Vec<_> = self
-                .iter()
-                .filter_map(|s| {
-                    token_symbols
-                        .get(s.0.as_ref())
-                        .map(|sym| format!("\"{}\"", escape(sym)))
+    fn error(&self, token_symbols: &FxHashMap<&str, &str>) -> String {
+        let expected = if !self.is_empty() {
+            self.iter()
+                .filter_map(|s| token_symbols.get(s.0.as_ref()))
+                .map(|sym| {
+                    if sym.starts_with('<') && sym.ends_with('>') && sym.len() > 2 {
+                        sym.to_string()
+                    } else {
+                        format!("'{}'", sym)
+                    }
                 })
-                .collect();
-            symbols.join(&format!(",\n{}", "    ".repeat(level)))
+                .collect()
         } else {
-            "EOF".to_string()
-        }
+            vec!["'EOF'".to_string()]
+        };
+        syntax_error_message(&expected)
     }
+}
+
+fn syntax_error_message(expected: &[String]) -> String {
+    let mut msg = String::new();
+    if expected.len() == 0 {
+        msg.push_str("invalid syntax");
+    } else if expected.len() == 1 {
+        msg.push_str("invalid syntax, expected: ");
+    } else {
+        msg.push_str("invalid syntax, expected one of: ");
+    }
+    msg.push_str(&expected.join(", "));
+    format!("\"{}\"", escape(&msg))
 }
 
 pub struct RustOutput {}
@@ -572,9 +587,10 @@ impl RustOutput {
             output.write_all(
                 format!(
                     "    {} => {{\
-                   \n        parser.advance_with_error(diags, err![parser,]);\
+                   \n        parser.advance_with_error(diags, err![parser, {}]);\
                    \n    }}\n",
-                    advance_error_set.pattern(0)
+                    advance_error_set.pattern(0),
+                    syntax_error_message(&[])
                 )
                 .indent(3)
                 .as_bytes(),
@@ -586,7 +602,7 @@ impl RustOutput {
                \n        parser.error(diags, err![parser, {}]);\
                \n    }}\
                \n}}\n",
-                sema.predict_sets[&regex.syntax()].error(5, token_symbols)
+                sema.predict_sets[&regex.syntax()].error(token_symbols)
             )
             .indent(3)
             .as_bytes(),
@@ -871,9 +887,9 @@ impl RustOutput {
         let ordered_choice_return = ordered_choice_return.indent(3);
         let follow = sema.follow_sets[&regex.syntax()].pattern(2);
         let expected = if is_loop {
-            sema.follow_sets[&op.syntax()].error(5, token_symbols)
+            sema.follow_sets[&op.syntax()].error(token_symbols)
         } else {
-            sema.predict_sets[&regex.syntax()].error(5, token_symbols)
+            sema.predict_sets[&regex.syntax()].error(token_symbols)
         };
         let recovery = &sema.recovery_sets[&regex.syntax()];
         let recovery = if recovery.is_empty() {
@@ -951,8 +967,8 @@ impl RustOutput {
                         .map_or(name, |(sym, _)| &sym[1..sym.len() - 1]);
                     output.write_all(
                         format!(
-                            "{expect_macro}({name}, \"{}\", {parser_name}, diags);\n",
-                            escape(sym)
+                            "{expect_macro}({name}, {}, {parser_name}, diags);\n",
+                            syntax_error_message(&[sym.to_string()])
                         )
                         .indent(level)
                         .as_bytes(),
@@ -964,11 +980,13 @@ impl RustOutput {
                 if let Some(token) = TokenDecl::cast(cst, decl) {
                     let name = token.name(cst).unwrap().0;
                     let sym = token.symbol(cst).unwrap().0;
-                    let sym = escape(&sym[1..sym.len() - 1]);
                     output.write_all(
-                        format!("{expect_macro}({name}, \"{sym}\", {parser_name}, diags);\n",)
-                            .indent(level)
-                            .as_bytes(),
+                        format!(
+                            "{expect_macro}({name}, {}, {parser_name}, diags);\n",
+                            syntax_error_message(&[sym.to_string()])
+                        )
+                        .indent(level)
+                        .as_bytes(),
                     )?;
                 }
             }
@@ -1078,9 +1096,12 @@ impl RustOutput {
                 )?;
                 output.write_all("} else {\n".indent(level + 1).as_bytes())?;
                 output.write_all(
-                    format!("{parser_name}.advance_with_error(diags, err![{parser_name},]);\n")
-                        .indent(level + 2)
-                        .as_bytes(),
+                    format!(
+                        "{parser_name}.advance_with_error(diags, err![{parser_name}, {}]);\n",
+                        syntax_error_message(&[])
+                    )
+                    .indent(level + 2)
+                    .as_bytes(),
                 )?;
                 output.write_all("}\n".indent(level + 1).as_bytes())?;
                 output.write_all("}\n".indent(level).as_bytes())?;
@@ -1141,10 +1162,11 @@ impl RustOutput {
                     output.write_all(
                         format!(
                             "    {} => {{{}\
-                           \n        {parser_name}.advance_with_error(diags, err![{parser_name},]);\
+                           \n        {parser_name}.advance_with_error(diags, err![{parser_name}, {}]);\
                            \n    }}\n",
                             advance_error_set.pattern(0),
                             ordered_choice_return.indent(2),
+                            syntax_error_message(&[])
                         )
                         .indent(level)
                         .as_bytes(),
@@ -1157,7 +1179,7 @@ impl RustOutput {
                        \n    }}\
                        \n}}\n",
                         ordered_choice_return.indent(2),
-                        sema.predict_sets[&regex.syntax()].error(5, token_symbols),
+                        sema.predict_sets[&regex.syntax()].error(token_symbols),
                     )
                     .indent(level)
                     .as_bytes(),

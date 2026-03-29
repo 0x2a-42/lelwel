@@ -1,37 +1,6 @@
-macro_rules! syntax_error_message {{
-    [] => {{
-        "invalid syntax".to_string()
-    }};
-    [$($tk:literal),+] => {{
-        {{
-            let expected = [$($tk),*];
-            let mut msg = "invalid syntax, expected".to_string();
-            if expected.len() > 1 {{
-                msg.push_str(" one of: ");
-            }} else {{
-                msg.push_str(": ");
-            }}
-            let mut count = 0;
-            for e in expected {{
-                count += 1;
-                let s = format!("{{}}", e);
-                let s = if s.starts_with('<') && s.ends_with('>') && s.len() > 2 {{
-                    s
-                }} else {{
-                    format!("'{{}}'", s)
-                }};
-                msg.push_str(&s);
-                if count < expected.len() {{
-                    msg.push_str(", ");
-                }}
-            }}
-            msg
-        }}
-    }}
-}}
 macro_rules! err {{
-    [$self:expr, $($tk:literal),*] => {{
-        $self.create_diagnostic($self.span(), syntax_error_message!($($tk),*))
+    [$self:expr, $msg:literal] => {{
+        $self.create_diagnostic($self.span(), String::from($msg))
     }}
 }}
 
@@ -373,24 +342,24 @@ impl std::fmt::Debug for Rule {{
 }}
 
 macro_rules! expect {{
-    ($token:ident, $sym:literal, $self:expr, $diags:expr) => {{
+    ($token:ident, $msg:literal, $self:expr, $diags:expr) => {{
         if let Token::$token = $self.current {{
             $self.advance(false, $diags);
         }} else {{
-            $self.error($diags, err![$self, $sym]);
+            $self.error($diags, err![$self, $msg]);
         }}
     }};
 }}
 #[allow(unused_macros)]
 macro_rules! try_expect {{
-    ($token:ident, $sym:literal, $self:expr, $diags:expr) => {{
+    ($token:ident, $msg:literal, $self:expr, $diags:expr) => {{
         if let Token::$token = $self.current {{
             $self.advance(false, $diags);
         }} else {{
             if $self.in_ordered_choice {{
                 return None;
             }}
-            $self.error($diags, err![$self, $sym]);
+            $self.error($diags, err![$self, $msg]);
         }}
     }};
 }}
@@ -616,7 +585,7 @@ impl<'a> Parser<'a> {{
 
         self.close_error_node(diags);
         if self.pos != token_count {{
-            self.error(diags, err![self, "<end of file>"]);
+            self.error(diags, err![self, "invalid syntax, expected: <end of file>"]);
             let error_tree = self.open(diags);
             while self.pos < token_count {{
                 let token = self.tokens[self.pos];
