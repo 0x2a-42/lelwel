@@ -68,20 +68,17 @@ impl Generator for std::collections::BTreeSet<TokenName<'_>> {
         symbols.join(&format!("\n{}| ", "    ".repeat(level)))
     }
     fn error(&self, token_symbols: &FxHashMap<&str, &str>) -> String {
-        let expected = if !self.is_empty() {
-            self.iter()
-                .filter_map(|s| token_symbols.get(s.0.as_ref()))
-                .map(|sym| {
-                    if sym.starts_with('<') && sym.ends_with('>') && sym.len() > 2 {
-                        sym.to_string()
-                    } else {
-                        format!("'{}'", sym)
-                    }
-                })
-                .collect()
-        } else {
-            vec!["'EOF'".to_string()]
-        };
+        let expected = self
+            .iter()
+            .filter_map(|s| token_symbols.get(s.0.as_ref()))
+            .map(|sym| {
+                if sym.starts_with('<') && sym.ends_with('>') && sym.len() > 2 {
+                    sym.to_string()
+                } else {
+                    format!("'{}'", sym)
+                }
+            })
+            .collect::<Vec<_>>();
         syntax_error_message(&expected)
     }
 }
