@@ -87,14 +87,14 @@ impl Generator for std::collections::BTreeSet<TokenName<'_>> {
 }
 
 fn syntax_error_message(expected: &[String]) -> String {
-    let mut msg = String::new();
-    if expected.len() == 0 {
-        msg.push_str("invalid syntax");
+    let mut msg = if expected.is_empty() {
+        "invalid syntax"
     } else if expected.len() == 1 {
-        msg.push_str("invalid syntax, expected: ");
+        "invalid syntax, expected: "
     } else {
-        msg.push_str("invalid syntax, expected one of: ");
+        "invalid syntax, expected one of: "
     }
+    .to_string();
     msg.push_str(&expected.join(", "));
     format!("\"{}\"", escape(&msg))
 }
