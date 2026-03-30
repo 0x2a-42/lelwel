@@ -497,6 +497,14 @@ impl<'a> Parser<'a> {{
         self.close_error_node(diags);
         self.cst.data.open_before(mark)
     }}
+    fn close(&mut self, mark: MarkOpened, rule: Rule, diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>) -> MarkClosed {{
+        self.close_error_node(diags);
+        self.cst.data.close(mark, rule)
+    }}
+    fn close_root(&mut self, mark: MarkOpened, rule: Rule, diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>) -> MarkClosed {{
+        self.close_error_node(diags);
+        self.cst.data.close_root(mark, rule)
+    }}
     fn mark(&mut self, diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>) -> MarkClosed {{
         self.close_error_node(diags);
         self.cst.data.mark()
