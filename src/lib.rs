@@ -18,7 +18,7 @@ pub mod backend;
 pub mod frontend;
 pub mod ide;
 
-const VERSION: &str = "0.10.2";
+const VERSION: &str = "0.10.3";
 
 pub fn build(path: &str) {
     let res = compile(
