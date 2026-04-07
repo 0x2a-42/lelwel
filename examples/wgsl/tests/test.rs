@@ -43,3 +43,7 @@ fn invalid_for() {
 fn incomplete_let() {
     check!("incomplete_let");
 }
+#[test]
+fn missing_semicolon() {
+    check!("missing_semicolon");
+}
