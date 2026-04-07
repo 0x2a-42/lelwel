@@ -1281,7 +1281,7 @@ impl RustOutput {
                 output.write_all(
                     format!(
                         "if let Some(diag) = {parser_name}.assertion_{rule_name}_{}() {{{}\
-                       \n    {parser_name}.last_error_span = {parser_name}.span();\
+                       \n    {parser_name}.error_since_advance = true;\
                        \n    diags.push(diag);\
                        \n}}\n",
                         &assertion.value(cst).unwrap().0[1..],

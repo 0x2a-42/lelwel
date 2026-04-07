@@ -440,18 +440,18 @@ pub struct Parser<'a> {
     pos: usize,
     current: Token,
     end_of_input: Token,
-    last_error_span: Span,
     max_offset: usize,
     #[allow(dead_code)]
     context: <Self as ParserCallbacks<'a>>::Context,
     error_node: Option<MarkOpened>,
     #[allow(dead_code)]
     in_ordered_choice: bool,
+    error_since_advance: bool,
 }
 #[allow(clippy::while_let_loop, dead_code, unused_parens)]
 impl<'a> Parser<'a> {
     fn active_error(&self) -> bool {
-        self.error_node.is_some() || self.last_error_span == self.span()
+        self.error_node.is_some() || self.error_since_advance
     }
     fn error(
         &mut self,
@@ -461,12 +461,13 @@ impl<'a> Parser<'a> {
         if self.active_error() {
             return;
         }
-        self.last_error_span = self.span();
+        self.error_since_advance = true;
         diags.push(diag);
     }
     fn advance(&mut self, error: bool, diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>) {
         if !error {
             self.close_error_node(diags);
+            self.error_since_advance = false;
         }
         self.cst.data.advance(self.current, false);
         loop {
@@ -692,11 +693,11 @@ impl<'a> Parser<'a> {
             },
             tokens,
             pos: 0,
-            last_error_span: Span::default(),
             max_offset,
             context,
             error_node: None,
             in_ordered_choice: false,
+            error_since_advance: false,
         }
     }
     pub fn new(
