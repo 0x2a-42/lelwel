@@ -1024,7 +1024,7 @@ impl<'a> LL1Validator {
                         let op_first = sema.first_sets[&op.syntax()].clone();
                         use_next = op_first.contains(&TokenName::EPSILON);
                         let first = sema.first_sets.get_mut(&regex.syntax()).unwrap();
-                        first.extend(op_first.into_iter());
+                        first.extend(op_first);
                         first.remove(&TokenName::EPSILON);
                     }
                 }
@@ -1042,7 +1042,7 @@ impl<'a> LL1Validator {
                     sema.first_sets
                         .get_mut(&regex.syntax())
                         .unwrap()
-                        .extend(op_first.into_iter());
+                        .extend(op_first);
                 }
             }
             Regex::Alternation(alt) => {
@@ -1052,7 +1052,7 @@ impl<'a> LL1Validator {
                     sema.first_sets
                         .get_mut(&regex.syntax())
                         .unwrap()
-                        .extend(op_first.into_iter());
+                        .extend(op_first);
                 }
             }
             Regex::Star(star) => {
