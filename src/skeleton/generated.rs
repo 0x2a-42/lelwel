@@ -575,7 +575,7 @@ impl<'a> Parser<'a> {{
         diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>,
     ) -> Parser<'a>
     where
-        <Self as ParserCallbacks<'a>>::Context: Default,
+        for<'trivial_bound> <Self as ParserCallbacks<'a>>::Context: Default,
     {{
         #[allow(clippy::unit_arg)]
         Self::new_with_context(source, diags, <Self as ParserCallbacks<'a>>::Context::default())
