@@ -11,6 +11,7 @@ fn main() {
         .arg(arg!(-f --format "Format the grammar file, exits with 1 if check mode is used and there were changes"))
         .arg(arg!(-g --graph "Output a graphviz file for the grammar"))
         .arg(arg!(-s --short "Use short diagnostics"))
+        .arg(arg!(-S --stacksafe "Use stacksafe attribute"))
         .arg(arg!(-v --verbose "Sets the level of verbosity").action(ArgAction::Count))
         .arg(
             arg!(-o --output <FILE> "Sets the output directory")
@@ -32,6 +33,7 @@ fn main() {
         matches.get_count("verbose"),
         matches.get_flag("graph"),
         matches.get_flag("short"),
+        matches.get_flag("stacksafe"),
     ) {
         Ok(success) => std::process::exit(if success { 0 } else { 1 }),
         Err(e) => cmd.error(ErrorKind::InvalidValue, format!("{e}")).exit(),
