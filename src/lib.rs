@@ -29,7 +29,33 @@ pub fn build(path: &str) {
         0,
         false,
         false,
+        false,
     );
+    check_result(res);
+    output_rerun(path);
+}
+
+pub fn build_stacksafe(path: &str) {
+    let res = compile(
+        path,
+        &std::env::var("OUT_DIR").unwrap(),
+        false,
+        false,
+        0,
+        false,
+        false,
+        true,
+    );
+    check_result(res);
+    output_rerun(path);
+}
+
+fn output_rerun(path: &str) {
+    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed={path}");
+}
+
+fn check_result(res: std::io::Result<bool>) {
     match res {
         Err(err) => {
             eprintln!("{err}");
@@ -38,10 +64,9 @@ pub fn build(path: &str) {
         Ok(false) => std::process::exit(1),
         Ok(true) => {}
     }
-    println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed={path}");
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn compile(
     input: &str,
     output: &str,
@@ -50,6 +75,7 @@ pub fn compile(
     verbose: u8,
     graph: bool,
     short: bool,
+    stacksafe: bool,
 ) -> std::io::Result<bool> {
     let input_path = Path::new(input);
     input_path.try_exists()?;
@@ -81,7 +107,7 @@ pub fn compile(
             GraphvizOutput::run(&cst, &sema)?;
         }
         if !check {
-            RustOutput::run(&cst, &sema, input_path, Path::new(output))?;
+            RustOutput::run(&cst, &sema, input_path, Path::new(output), stacksafe)?;
         }
     }
 
