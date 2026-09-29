@@ -10,6 +10,7 @@
 * [Error Resilience](#error-resilience)
 * [Grammar Examples](#grammar-examples)
 * [Quickstart](#quickstart)
+* [Stack Overflow](#stack-overflow)
 * [Error Recovery](#error-recovery)
 * [Grammar Specification](#grammar-specification)
 * [License](#license)
@@ -184,6 +185,25 @@ expr:
 expr_literal: Int | 'true' | 'false';
 arg_list: '(' [expr (?1 ',' expr)* [',']] ')';
 ```
+
+## Stack Overflow
+Recursive descent parsers are prone to overflowing the call stack. In Rust, this typically results in the process being aborted, with no way to handle the error.
+
+In many production-grade compilers, such as `rustc`, `gcc`, and `clang`, this is acceptable behavior because a compiler is not usually expected to parse adversarial input.
+
+One way to avoid a stack overflow for valid use cases is simply to allocate more stack memory for the process or thread, since the default stack size on most platforms is relatively small.
+
+For some languages, such as JSON, nested rules are always surrounded by delimiting tokens. In such cases the lexer can be used to limit the maximum recursion depth to a value small enough to prevent a stack overflow.
+
+However, if you want to avoid this problem for arbitrary input, you can use [`lelwel::build_stacksafe`](https://github.com/0x2a-42/lelwel/blob/28fd998eac02d679289a3fe06520b8e9e50d333c/src/lib.rs#L38) in your `build.rs` file, which annotates the generated functions with the [`stacksafe`](https://crates.io/crates/stacksafe) attribute.
+
+> [!WARNING]
+> Using the `stacksafe` attribute introduces a runtime check. The overhead varies depending on the complexity of your grammar rules.
+> In the JSON example, which has relatively simple rules, parsing `canada.json` is around 20% slower.
+> In parsers for grammars with more complex rules, the overhead may be lower.
+
+> [!NOTE]
+> Remember to also annotate any function that recursively operates on the resulting CST.
 
 ## Quickstart
 1. Write a grammar file and place it in the `src` directory of your crate.
