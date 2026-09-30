@@ -611,8 +611,12 @@ The operator cannot be used in the start rule.
 
 > **Example**
 > ```antlr
+> if_stmt: 'if' expr block;
 > block: '{' & stmts* '}'; // only parse a block if the opening brace exists
 > ```
+
+> [!TIP]
+> The return operator can be useful to improve error recovery for block-like rules, when such a rule is used in a concatenation.
 
 ## License
 Lelwel, its examples, and its generated code are licensed under either of
