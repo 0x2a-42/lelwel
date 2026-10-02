@@ -8,7 +8,7 @@ license = "MIT OR Apache-2.0"
 edition = "2024"
 keywords = ["parser", "generator", "LL", "grammar"]
 categories = ["parsing"]
-exclude = ["/scripts", "/tests/generate.sh", "/.github/", "/.gitignore"]
+exclude = ["/scripts", "/tests/generate.sh", "/.github/", "/.gitignore", "/.gitattributes"]
 
 [lints.rust]
 rust-2018-idioms = { level = "deny" }
