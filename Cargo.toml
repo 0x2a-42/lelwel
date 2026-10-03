@@ -11,7 +11,7 @@ categories = ["parsing"]
 exclude = ["/scripts", "/tests/generate.sh", "/.github/", "/.gitignore", "/.gitattributes"]
 
 [lints.rust]
-rust-2018-idioms = { level = "deny" }
+rust_2018_idioms = { level = "deny" }
 
 [dependencies]
 logos = "0.16"
