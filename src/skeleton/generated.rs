@@ -342,9 +342,9 @@ impl std::fmt::Debug for Rule {{
 }}
 
 macro_rules! expect {{
-    ($token:ident, $msg:literal, $self:expr, $diags:expr) => {{
+    ($token:ident, $msg:literal, $self:expr, $diags:expr{7}) => {{
         if let Token::$token = $self.current {{
-            $self.advance(false, $diags);
+            $self.advance(false, $diags{8});
         }} else {{
             $self.error($diags, err![$self, $msg]);
         }}
@@ -352,9 +352,9 @@ macro_rules! expect {{
 }}
 #[allow(unused_macros)]
 macro_rules! try_expect {{
-    ($token:ident, $msg:literal, $self:expr, $diags:expr) => {{
+    ($token:ident, $msg:literal, $self:expr, $diags:expr{7}) => {{
         if let Token::$token = $self.current {{
-            $self.advance(false, $diags);
+            $self.advance(false, $diags{8});
         }} else {{
             if $self.in_ordered_choice {{
                 return None;
@@ -400,7 +400,7 @@ impl<'a> Parser<'a> {{
         self.error_since_advance = true;
         diags.push(diag);
     }}
-    fn advance(&mut self, error: bool, diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>) {{
+    fn advance(&mut self, error: bool, diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>{9}) {{
         if !error {{
             self.close_error_node(diags);
             self.error_since_advance = false;
@@ -409,7 +409,7 @@ impl<'a> Parser<'a> {{
         loop {{
             self.pos += 1;
             match self.tokens.get(self.pos) {{
-                Some(token @ (Token::Error{1})) => {{
+                Some(token @ (Token::Error{1})){10} => {{
                     self.cst.data.advance(*token, true);
                     continue;
                 }}
@@ -464,7 +464,7 @@ impl<'a> Parser<'a> {{
         if self.error_node.is_none() {{
             self.error_node = Some(self.cst.data.open());
         }}
-        self.advance(true, diags);
+        self.advance(true, diags{11});
     }}
     fn peek(&self, lookahead: usize) -> Token {{
         self.tokens

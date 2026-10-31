@@ -59,6 +59,7 @@ impl Indent for String {
 
 trait Generator {
     fn pattern(&self, level: usize) -> String;
+    fn unskip(&self) -> String;
     fn error(&self, token_symbols: &FxHashMap<&str, &str>) -> String;
 }
 
@@ -66,6 +67,10 @@ impl Generator for std::collections::BTreeSet<TokenName<'_>> {
     fn pattern(&self, level: usize) -> String {
         let symbols: Vec<_> = self.iter().map(|s| format!("Token::{}", s.0)).collect();
         symbols.join(&format!("\n{}| ", "    ".repeat(level)))
+    }
+    fn unskip(&self) -> String {
+        let symbols: Vec<_> = self.iter().map(|s| format!("Token::{}", s.0)).collect();
+        symbols.join(",")
     }
     fn error(&self, token_symbols: &FxHashMap<&str, &str>) -> String {
         let expected = self
@@ -950,6 +955,18 @@ impl RustOutput {
         } else {
             "".to_string()
         };
+        let unskip = if sema.used_skipped {
+            format!(
+                ", &[{}]",
+                sema.follow_sets[&regex.syntax()]
+                    .intersection(&sema.skipped_names)
+                    .cloned()
+                    .collect::<BTreeSet<_>>()
+                    .unskip()
+            )
+        } else {
+            String::new()
+        };
         match regex {
             Regex::Name(name) => {
                 let decl = sema.decl_bindings[&name.syntax()];
@@ -971,8 +988,8 @@ impl RustOutput {
                         .map_or(name, |(sym, _)| &sym[1..sym.len() - 1]);
                     output.write_all(
                         format!(
-                            "{expect_macro}({name}, {}, {parser_name}, diags);\n",
-                            syntax_error_message(&[sym.to_string()])
+                            "{expect_macro}({name}, {}, {parser_name}, diags{unskip});\n",
+                            syntax_error_message(&[sym.to_string()]),
                         )
                         .indent(level)
                         .as_bytes(),
@@ -986,7 +1003,7 @@ impl RustOutput {
                     let sym = token.symbol(cst).unwrap().0;
                     output.write_all(
                         format!(
-                            "{expect_macro}({name}, {}, {parser_name}, diags);\n",
+                            "{expect_macro}({name}, {}, {parser_name}, diags{unskip});\n",
                             syntax_error_message(&[sym.to_string()])
                         )
                         .indent(level)
@@ -1483,6 +1500,19 @@ impl RustOutput {
         let start_rule = sema.start_rule.unwrap().name(cst).unwrap().0;
         let start_rule_pascal_case = snake_to_pascal_case(start_rule);
 
+        let (unskip_expect_par, unskip_expect_arg, unskip_advance_par, unskip_guard, unskip_error) =
+            if sema.used_skipped {
+                (
+                    ", $unskip:expr",
+                    ", $unskip",
+                    ", unskip: &[Token]",
+                    " if !unskip.contains(token)",
+                    ", &[]",
+                )
+            } else {
+                ("", "", "", "", "")
+            };
+
         output.write_all(
             format!(
                 include_str!("../skeleton/generated.rs"),
@@ -1493,6 +1523,11 @@ impl RustOutput {
                 rules_fmt,
                 rules_create,
                 rules_delete,
+                unskip_expect_par,
+                unskip_expect_arg,
+                unskip_advance_par,
+                unskip_guard,
+                unskip_error
             )
             .as_bytes(),
         )?;
