@@ -905,7 +905,6 @@ impl RustOutput {
         let unskip = if sema.used_skipped {
             let set = recovery
                 .intersection(&sema.skipped_names)
-                .into_iter()
                 .cloned()
                 .collect::<BTreeSet<_>>();
             if !set.is_empty() {

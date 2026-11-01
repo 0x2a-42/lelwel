@@ -216,15 +216,16 @@ impl CstData {
     }
     fn unskip(&mut self, unskip: &[Token]) -> Option<Token> {
         if self.nodes.len() > self.non_skip_len
-            && let Some((pos, tok)) = self.nodes[self.non_skip_len..]
-                .into_iter()
-                .enumerate()
-                .find_map(|(pos, tok)| {
-                    if let Node::Token(tok, _) = tok {
-                        return unskip.contains(tok).then_some((pos, *tok));
-                    }
-                    unreachable!()
-                })
+            && let Some((pos, tok)) =
+                self.nodes[self.non_skip_len..]
+                    .iter()
+                    .enumerate()
+                    .find_map(|(pos, tok)| {
+                        if let Node::Token(tok, _) = tok {
+                            return unskip.contains(tok).then_some((pos, *tok));
+                        }
+                        unreachable!()
+                    })
         {
             let offset = self.non_skip_len + pos;
             self.token_count -= self.nodes.len() - offset;

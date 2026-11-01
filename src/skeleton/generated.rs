@@ -185,7 +185,7 @@ impl CstData {{
     fn unskip(&mut self, unskip: &[Token]) -> Option<Token> {{
         if self.nodes.len() > self.non_skip_len
             && let Some((pos, tok)) = self.nodes[self.non_skip_len..]
-                .into_iter()
+                .iter()
                 .enumerate()
                 .find_map(|(pos, tok)| {{
                     if let Node::Token(tok, _) = tok {{
