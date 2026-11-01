@@ -182,6 +182,27 @@ impl CstData {{
         self.token_count = mark.token_count;
         self.non_skip_len = mark.non_skip_len;
     }}
+    fn unskip(&mut self, unskip: &[Token]) -> Option<Token> {{
+        if self.nodes.len() > self.non_skip_len
+            && let Some((pos, tok)) = self.nodes[self.non_skip_len..]
+                .iter()
+                .enumerate()
+                .find_map(|(pos, tok)| {{
+                    if let Node::Token(tok, _) = tok {{
+                        return unskip.contains(tok).then_some((pos, *tok));
+                    }}
+                    unreachable!()
+                }})
+        {{
+            let offset = self.non_skip_len + pos;
+            self.token_count -= self.nodes.len() - offset;
+            self.nodes.truncate(offset);
+            self.non_skip_len = offset;
+            Some(tok)
+        }} else {{
+            None
+        }}
+    }}
     pub fn children(&self, node_ref: NodeRef) -> CstChildren<'_> {{
         let iter = if let Node::Rule(_, end_offset) = self.nodes[node_ref.0] {{
             self.nodes[node_ref.0 + 1..node_ref.0 + usize::from(end_offset) + 1].iter()
@@ -342,9 +363,9 @@ impl std::fmt::Debug for Rule {{
 }}
 
 macro_rules! expect {{
-    ($token:ident, $msg:literal, $self:expr, $diags:expr) => {{
+    ($token:ident, $msg:literal, $self:expr, $diags:expr{7}) => {{
         if let Token::$token = $self.current {{
-            $self.advance(false, $diags);
+            $self.advance(false, $diags{8});
         }} else {{
             $self.error($diags, err![$self, $msg]);
         }}
@@ -352,9 +373,9 @@ macro_rules! expect {{
 }}
 #[allow(unused_macros)]
 macro_rules! try_expect {{
-    ($token:ident, $msg:literal, $self:expr, $diags:expr) => {{
+    ($token:ident, $msg:literal, $self:expr, $diags:expr{7}) => {{
         if let Token::$token = $self.current {{
-            $self.advance(false, $diags);
+            $self.advance(false, $diags{8});
         }} else {{
             if $self.in_ordered_choice {{
                 return None;
@@ -400,7 +421,7 @@ impl<'a> Parser<'a> {{
         self.error_since_advance = true;
         diags.push(diag);
     }}
-    fn advance(&mut self, error: bool, diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>) {{
+    fn advance(&mut self, error: bool, diags: &mut Vec<<Self as ParserCallbacks<'a>>::Diagnostic>{9}) {{
         if !error {{
             self.close_error_node(diags);
             self.error_since_advance = false;
@@ -409,7 +430,7 @@ impl<'a> Parser<'a> {{
         loop {{
             self.pos += 1;
             match self.tokens.get(self.pos) {{
-                Some(token @ (Token::Error{1})) => {{
+                Some(token @ (Token::Error{1})){10} => {{
                     self.cst.data.advance(*token, true);
                     continue;
                 }}
@@ -464,7 +485,7 @@ impl<'a> Parser<'a> {{
         if self.error_node.is_none() {{
             self.error_node = Some(self.cst.data.open());
         }}
-        self.advance(true, diags);
+        self.advance(true, diags{11});
     }}
     fn peek(&self, lookahead: usize) -> Token {{
         self.tokens

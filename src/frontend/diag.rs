@@ -18,7 +18,6 @@ pub const LL1_CONFLICT_REP: &str = "E013";
 pub const LL1_CONFLICT_OPT: &str = "E014";
 pub const CONSUME_TOKENS: &str = "E015";
 pub const REDEFINE_AS_SKIPPED: &str = "E016";
-pub const USED_SKIPPED: &str = "E017";
 pub const EXPECTED_TOKEN: &str = "E018";
 pub const REDEFINE_AS_RIGHT: &str = "E019";
 pub const MIXED_ASSOC: &str = "E020";
@@ -64,7 +63,6 @@ pub trait LanguageErrors {
     fn ll1_conflict_opt(span: &Span, conflicting: String) -> Self;
     fn consume_tokens(span: &Span) -> Self;
     fn redefine_as_skipped(span: &Span) -> Self;
-    fn used_skipped(span: &Span) -> Self;
     fn expected_token(span: &Span) -> Self;
     fn redefine_as_right(span: &Span) -> Self;
     fn mixed_assoc(span: &Span) -> Self;
@@ -245,13 +243,6 @@ impl LanguageErrors for Diagnostic {
         Diagnostic::error()
             .with_code(REDEFINE_AS_SKIPPED)
             .with_message("token is already skipped")
-            .with_label(Label::primary((), span.clone()))
-    }
-
-    fn used_skipped(span: &Span) -> Self {
-        Diagnostic::error()
-            .with_code(USED_SKIPPED)
-            .with_message("skipped token cannot be used in regex")
             .with_label(Label::primary((), span.clone()))
     }
 

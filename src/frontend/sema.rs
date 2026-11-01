@@ -139,6 +139,8 @@ pub struct SemanticData<'a> {
     pub elision: FxHashMap<NodeRef, RuleNodeElision>,
     pub right_associative: FxHashSet<&'a str>,
     pub skipped: BTreeSet<TokenDecl>,
+    pub skipped_names: BTreeSet<TokenName<'a>>,
+    pub used_skipped: bool,
     pub parts: BTreeSet<RuleDecl>,
     pub start_decl: Option<StartDecl>,
     pub start_rule: Option<RuleDecl>,
@@ -362,6 +364,9 @@ impl<'a> GeneralCheck<'a> {
                         diags.push(Diagnostic::redefine_as_skipped(&name_span));
                     } else {
                         sema.skipped.insert(token_decl);
+                        if let Some((name, _)) = token_decl.name(cst) {
+                            sema.skipped_names.insert(TokenName(Cow::Borrowed(name)));
+                        }
                     }
                 } else {
                     diags.push(Diagnostic::expected_token(&name_span));
@@ -463,7 +468,7 @@ impl<'a> GeneralCheck<'a> {
                         if let Some(token) = TokenDecl::cast(cst, decl)
                             && sema.skipped.contains(&token)
                         {
-                            diags.push(Diagnostic::used_skipped(&name_span));
+                            sema.used_skipped = true;
                         }
                         sema.decl_bindings.insert(regex.syntax(), decl);
                     }
@@ -478,7 +483,7 @@ impl<'a> GeneralCheck<'a> {
                     if let Some(token) = TokenDecl::cast(cst, decl)
                         && sema.skipped.contains(&token)
                     {
-                        diags.push(Diagnostic::used_skipped(&name_span));
+                        sema.used_skipped = true;
                     }
                     sema.decl_bindings.insert(regex.syntax(), decl);
                 }
