@@ -901,11 +901,35 @@ impl RustOutput {
             sema.predict_sets[&regex.syntax()].error(token_symbols)
         };
         let recovery = &sema.recovery_sets[&regex.syntax()];
+
+        let unskip = if sema.used_skipped {
+            let set = recovery
+                .intersection(&sema.skipped_names)
+                .into_iter()
+                .cloned()
+                .collect::<BTreeSet<_>>();
+            if !set.is_empty() {
+                format!(
+                    "\n            if let Some(tok) = self.cst.data.unskip(&[{}]) {{\
+                     \n                self.current = tok;\
+                     \n                self.pos = self.cst.data.token_count;\
+                     \n                {parser_name}.error(diags, err![{parser_name}, {expected}]);\
+                     \n                break;\
+                     \n            }}",
+                    set.unskip()
+                )
+            } else {
+                String::new()
+            }
+        } else {
+            String::new()
+        };
+
         let recovery = if recovery.is_empty() {
             "".to_string()
         } else {
             format!(
-                "\n        | {} => {{{ordered_choice_return}\
+                "\n        | {} => {{{ordered_choice_return}{unskip}\
                  \n            {parser_name}.error(diags, err![{parser_name}, {expected}]);\
                  \n            break;\
                  \n        }}",
@@ -919,7 +943,7 @@ impl RustOutput {
             format!(
                 "        }}\
                \n        {follow} => break,{recovery}\
-               \n        _ => {{{ordered_choice_return}\
+               \n        _ => {{{ordered_choice_return}{unskip}\
                \n            {parser_name}.advance_with_error(diags, err![{parser_name}, {expected}]);\
                \n        }}\
                \n    }}\
