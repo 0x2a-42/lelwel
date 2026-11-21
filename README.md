@@ -321,6 +321,15 @@ In a regex a token can be referenced by its name or symbol.
 ### Skip
 A `skip` definition allows to specify a list of tokens, which are ignored by the parser.
 These tokens will however still be part of the syntax tree.
+
+> [!NOTE]
+> Skipped tokens can still be used in the grammar.
+> This is useful for languages where a token is only significant in a few places (e.g. newlines that terminate a statement).
+
+> [!NOTE]
+> There is also the `predicate_skip` method of the `ParserCallbacks` trait, which allows to skip regular tokens based on the context.
+> This is useful for languages where a token is only skipped in a few places.
+
 > **Example**
 > ```antlr
 > skip Whitespace Comment;

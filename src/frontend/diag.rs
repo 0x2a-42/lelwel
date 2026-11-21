@@ -1,6 +1,7 @@
 use codespan_reporting::diagnostic::Label;
 
 use super::parser::{Diagnostic, Span};
+use super::sema::TokenName;
 
 pub const INVALID_BINDING_POS: &str = "E001";
 pub const INVALID_PREDICATE_POS: &str = "E002";
@@ -18,7 +19,6 @@ pub const LL1_CONFLICT_REP: &str = "E013";
 pub const LL1_CONFLICT_OPT: &str = "E014";
 pub const CONSUME_TOKENS: &str = "E015";
 pub const REDEFINE_AS_SKIPPED: &str = "E016";
-pub const USED_SKIPPED: &str = "E017";
 pub const EXPECTED_TOKEN: &str = "E018";
 pub const REDEFINE_AS_RIGHT: &str = "E019";
 pub const MIXED_ASSOC: &str = "E020";
@@ -36,6 +36,7 @@ pub const MULTIPLE_START_RULES: &str = "E031";
 pub const ELISION_IN_START_RULE: &str = "E032";
 pub const REDEFINE_AS_PART: &str = "E033";
 pub const START_AS_PART: &str = "E034";
+pub const FOLLOW_SKIP_MISMATCH: &str = "E035";
 
 pub const UNUSED_RULE: &str = "W001";
 pub const UNUSED_TOKEN: &str = "W002";
@@ -64,7 +65,6 @@ pub trait LanguageErrors {
     fn ll1_conflict_opt(span: &Span, conflicting: String) -> Self;
     fn consume_tokens(span: &Span) -> Self;
     fn redefine_as_skipped(span: &Span) -> Self;
-    fn used_skipped(span: &Span) -> Self;
     fn expected_token(span: &Span) -> Self;
     fn redefine_as_right(span: &Span) -> Self;
     fn mixed_assoc(span: &Span) -> Self;
@@ -87,6 +87,7 @@ pub trait LanguageErrors {
     fn elision_in_start_rule(span: &Span) -> Self;
     fn redefine_as_part(span: &Span) -> Self;
     fn start_as_part(span: &Span) -> Self;
+    fn follow_skip_mismatch(span: &Span, missing: Vec<&TokenName<'_>>) -> Self;
 }
 
 impl LanguageErrors for Diagnostic {
@@ -245,13 +246,6 @@ impl LanguageErrors for Diagnostic {
         Diagnostic::error()
             .with_code(REDEFINE_AS_SKIPPED)
             .with_message("token is already skipped")
-            .with_label(Label::primary((), span.clone()))
-    }
-
-    fn used_skipped(span: &Span) -> Self {
-        Diagnostic::error()
-            .with_code(USED_SKIPPED)
-            .with_message("skipped token cannot be used in regex")
             .with_label(Label::primary((), span.clone()))
     }
 
@@ -435,5 +429,19 @@ impl LanguageErrors for Diagnostic {
             .with_code(START_AS_PART)
             .with_message("start rule cannot be defined as part")
             .with_label(Label::primary((), span.clone()))
+    }
+
+    fn follow_skip_mismatch(span: &Span, missing: Vec<&TokenName<'_>>) -> Self {
+        let mut missing_msg = "missing: ".to_string();
+        for (i, tok) in missing.iter().enumerate() {
+            missing_msg.push_str(&tok.0);
+            if i + 1 < missing.len() {
+                missing_msg.push_str(", ");
+            }
+        }
+        Diagnostic::error()
+            .with_code(FOLLOW_SKIP_MISMATCH)
+            .with_message("local follow set is missing skipped token from global follow set")
+            .with_label(Label::primary((), span.clone()).with_message(missing_msg))
     }
 }

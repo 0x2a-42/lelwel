@@ -214,6 +214,28 @@ impl CstData {
         self.token_count = mark.token_count;
         self.non_skip_len = mark.non_skip_len;
     }
+    fn unskip(&mut self, unskip: &[Token]) -> Option<Token> {
+        if self.nodes.len() > self.non_skip_len
+            && let Some((pos, tok)) =
+                self.nodes[self.non_skip_len..]
+                    .iter()
+                    .enumerate()
+                    .find_map(|(pos, tok)| {
+                        if let Node::Token(tok, _) = tok {
+                            return unskip.contains(tok).then_some((pos, *tok));
+                        }
+                        unreachable!()
+                    })
+        {
+            let offset = self.non_skip_len + pos;
+            self.token_count -= self.nodes.len() - offset;
+            self.nodes.truncate(offset);
+            self.non_skip_len = offset;
+            Some(tok)
+        } else {
+            None
+        }
+    }
     pub fn children(&self, node_ref: NodeRef) -> CstChildren<'_> {
         let iter = if let Node::Rule(_, end_offset) = self.nodes[node_ref.0] {
             self.nodes[node_ref.0 + 1..node_ref.0 + usize::from(end_offset) + 1].iter()
@@ -855,11 +877,23 @@ impl<'a> Parser<'a> {
                 | Token::Skip
                 | Token::Start
                 | Token::Token => {
-                    self.error(diags, err![self, "invalid syntax, expected one of: <identifier>, \';\', <string literal>"]);
+                    self.error(
+                        diags,
+                        err![
+                            self,
+                            "invalid syntax, expected one of: <identifier>, \';\', <string literal>"
+                        ],
+                    );
                     break;
                 }
                 _ => {
-                    self.advance_with_error(diags, err![self, "invalid syntax, expected one of: <identifier>, \';\', <string literal>"]);
+                    self.advance_with_error(
+                        diags,
+                        err![
+                            self,
+                            "invalid syntax, expected one of: <identifier>, \';\', <string literal>"
+                        ],
+                    );
                 }
             }
         }
@@ -919,11 +953,23 @@ impl<'a> Parser<'a> {
                 | Token::Skip
                 | Token::Start
                 | Token::Token => {
-                    self.error(diags, err![self, "invalid syntax, expected one of: <identifier>, \';\', <string literal>"]);
+                    self.error(
+                        diags,
+                        err![
+                            self,
+                            "invalid syntax, expected one of: <identifier>, \';\', <string literal>"
+                        ],
+                    );
                     break;
                 }
                 _ => {
-                    self.advance_with_error(diags, err![self, "invalid syntax, expected one of: <identifier>, \';\', <string literal>"]);
+                    self.advance_with_error(
+                        diags,
+                        err![
+                            self,
+                            "invalid syntax, expected one of: <identifier>, \';\', <string literal>"
+                        ],
+                    );
                 }
             }
         }
@@ -1281,7 +1327,7 @@ impl<'a> Parser<'a> {
                                 self.rule_postfix(diags);
                             }
                             Token::Or | Token::RBrak | Token::RPar | Token::Semi | Token::Slash => {
-                                break
+                                break;
                             }
                             Token::EOF
                             | Token::Part
