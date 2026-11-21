@@ -17,6 +17,7 @@ impl SemanticPass {
         if !diags.iter().any(|d| d.severity == Severity::Error) {
             OrderedChoiceValidator::run(cst, diags, &mut sema);
             LL1Validator::run(cst, diags, &mut sema);
+            SkipValidator::run(cst, diags, &mut sema);
             UsageValidator::run(cst, diags, &mut sema);
             OperatorValidator::run(cst, diags, &mut sema);
             if !diags.iter().any(|d| d.severity == Severity::Error) {
@@ -1844,5 +1845,99 @@ impl OperatorValidator {
                 }
             }
         }
+    }
+}
+
+struct SkipValidator;
+
+impl SkipValidator {
+    fn run(cst: &Cst<'_>, diags: &mut Vec<Diagnostic>, sema: &mut SemanticData<'_>) {
+        if let Some(file) = File::cast(cst, NodeRef::ROOT) {
+            for rule in file.rule_decls(cst) {
+                if let Some(regex) = rule.regex(cst) {
+                    Self::check_local_follow(cst, sema, regex, diags);
+                }
+            }
+        }
+    }
+
+    fn check_local_follow(
+        cst: &Cst<'_>,
+        sema: &mut SemanticData<'_>,
+        regex: Regex,
+        diags: &mut Vec<Diagnostic>,
+    ) {
+        match regex {
+            Regex::Name(name) => {
+                if let Some(global_follow) = sema
+                    .decl_bindings
+                    .get(&name.syntax())
+                    .and_then(|n| RuleDecl::cast(cst, *n))
+                    .and_then(|rule| rule.regex(cst))
+                    .and_then(|rule_regex| sema.follow_sets.get(&rule_regex.syntax()))
+                {
+                    let Some(local_follow) = sema.follow_sets.get(&name.syntax()) else {
+                        return;
+                    };
+                    let mut missing = vec![];
+                    for global_skipped in global_follow
+                        .iter()
+                        .filter(|tok| sema.skipped_names.contains(tok))
+                    {
+                        if !local_follow.contains(global_skipped) {
+                            missing.push(global_skipped);
+                        }
+                    }
+                    if !missing.is_empty() {
+                        diags.push(Diagnostic::follow_skip_mismatch(&regex.span(cst), missing));
+                    }
+                }
+            }
+            Regex::Concat(concat) => {
+                for op in concat.operands(cst) {
+                    Self::check_local_follow(cst, sema, op, diags);
+                }
+            }
+            Regex::OrderedChoice(choice) => {
+                for op in choice.operands(cst) {
+                    Self::check_local_follow(cst, sema, op, diags);
+                }
+            }
+            Regex::Alternation(alt) => {
+                for op in alt.operands(cst) {
+                    Self::check_local_follow(cst, sema, op, diags);
+                }
+            }
+            Regex::Star(star) => {
+                if let Some(op) = star.operand(cst) {
+                    Self::check_local_follow(cst, sema, op, diags);
+                }
+            }
+            Regex::Optional(opt) => {
+                if let Some(op) = opt.operand(cst) {
+                    Self::check_local_follow(cst, sema, op, diags);
+                }
+            }
+            Regex::Plus(plus) => {
+                if let Some(op) = plus.operand(cst) {
+                    Self::check_local_follow(cst, sema, op, diags);
+                }
+            }
+            Regex::Paren(paren) => {
+                if let Some(op) = paren.inner(cst) {
+                    Self::check_local_follow(cst, sema, op, diags);
+                }
+            }
+            Regex::Symbol(_)
+            | Regex::Predicate(_)
+            | Regex::Action(_)
+            | Regex::Assertion(_)
+            | Regex::NodeRename(_)
+            | Regex::NodeElision(_)
+            | Regex::NodeMarker(_)
+            | Regex::NodeCreation(_)
+            | Regex::Commit(_)
+            | Regex::Return(_) => {}
+        };
     }
 }

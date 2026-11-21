@@ -1,6 +1,7 @@
 use codespan_reporting::diagnostic::Label;
 
 use super::parser::{Diagnostic, Span};
+use super::sema::TokenName;
 
 pub const INVALID_BINDING_POS: &str = "E001";
 pub const INVALID_PREDICATE_POS: &str = "E002";
@@ -35,6 +36,7 @@ pub const MULTIPLE_START_RULES: &str = "E031";
 pub const ELISION_IN_START_RULE: &str = "E032";
 pub const REDEFINE_AS_PART: &str = "E033";
 pub const START_AS_PART: &str = "E034";
+pub const FOLLOW_SKIP_MISMATCH: &str = "E035";
 
 pub const UNUSED_RULE: &str = "W001";
 pub const UNUSED_TOKEN: &str = "W002";
@@ -85,6 +87,7 @@ pub trait LanguageErrors {
     fn elision_in_start_rule(span: &Span) -> Self;
     fn redefine_as_part(span: &Span) -> Self;
     fn start_as_part(span: &Span) -> Self;
+    fn follow_skip_mismatch(span: &Span, missing: Vec<&TokenName<'_>>) -> Self;
 }
 
 impl LanguageErrors for Diagnostic {
@@ -426,5 +429,19 @@ impl LanguageErrors for Diagnostic {
             .with_code(START_AS_PART)
             .with_message("start rule cannot be defined as part")
             .with_label(Label::primary((), span.clone()))
+    }
+
+    fn follow_skip_mismatch(span: &Span, missing: Vec<&TokenName<'_>>) -> Self {
+        let mut missing_msg = "missing: ".to_string();
+        for (i, tok) in missing.iter().enumerate() {
+            missing_msg.push_str(&tok.0);
+            if i + 1 < missing.len() {
+                missing_msg.push_str(", ");
+            }
+        }
+        Diagnostic::error()
+            .with_code(FOLLOW_SKIP_MISMATCH)
+            .with_message("local follow set is missing skipped token from global follow set")
+            .with_label(Label::primary((), span.clone()).with_message(missing_msg))
     }
 }
