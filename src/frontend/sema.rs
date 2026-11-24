@@ -77,11 +77,11 @@ impl RuleNodeElision {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Recursion {
     Left(usize),
-    Right(usize),
-    LeftRight(usize, usize),
+    Right(FxHashSet<Regex>),
+    LeftRight(usize, FxHashSet<Regex>),
 }
 
 #[derive(Default)]
@@ -109,10 +109,10 @@ impl RecursiveBranches {
     pub fn contains(&self, regex: Regex) -> bool {
         self.binding_power.contains_key(&regex.syntax())
     }
-    pub fn get_recursion(&self, regex: Regex) -> Option<Recursion> {
+    pub fn get_recursion(&self, regex: Regex) -> Option<&Recursion> {
         self.regex_map
             .get(&regex.syntax())
-            .map(|index| self.branches[*index].1)
+            .map(|index| &self.branches[*index].1)
     }
     pub fn branches(&self) -> &[(Regex, Recursion)] {
         &self.branches
@@ -158,6 +158,7 @@ impl<'a> GeneralCheck<'a> {
     pub fn new() -> Self {
         Self::default()
     }
+
     fn bind_symbol(
         &mut self,
         cst: &'a Cst<'_>,
@@ -172,6 +173,7 @@ impl<'a> GeneralCheck<'a> {
             diags.push(Diagnostic::redefinition(&span, binding, &old_span));
         }
     }
+
     fn get_symbol_binding(
         &mut self,
         name: &'a str,
@@ -194,6 +196,7 @@ impl<'a> GeneralCheck<'a> {
             })
             .copied()
     }
+
     fn run(&mut self, cst: &'a Cst<'_>, diags: &mut Vec<Diagnostic>, sema: &mut SemanticData<'a>) {
         if let Some(file) = File::cast(cst, NodeRef::ROOT) {
             file.rule_decls(cst)
@@ -222,6 +225,7 @@ impl<'a> GeneralCheck<'a> {
             diags.push(Diagnostic::missing_start_rule());
         }
     }
+
     fn check_token_decl(&mut self, cst: &'a Cst<'_>, decl: TokenDecl, diags: &mut Vec<Diagnostic>) {
         if let Some((name, name_span)) = decl.name(cst) {
             if matches!(name, "Error") || name.starts_with("EOF") {
@@ -236,6 +240,7 @@ impl<'a> GeneralCheck<'a> {
             self.bind_symbol(cst, name, "token", decl.syntax(), diags);
         }
     }
+
     fn bind_rule_decl(&mut self, cst: &'a Cst<'_>, decl: RuleDecl, diags: &mut Vec<Diagnostic>) {
         if let Some((name, name_span)) = decl.name(cst) {
             if matches!(name, "error") {
@@ -247,6 +252,7 @@ impl<'a> GeneralCheck<'a> {
             }
         }
     }
+
     fn check_rule_decl(
         &mut self,
         cst: &'a Cst<'_>,
@@ -290,6 +296,7 @@ impl<'a> GeneralCheck<'a> {
             }
         }
     }
+
     fn check_start_decl(
         &mut self,
         cst: &'a Cst<'_>,
@@ -315,6 +322,7 @@ impl<'a> GeneralCheck<'a> {
             }
         }
     }
+
     fn check_right_decl(
         &mut self,
         cst: &'a Cst<'_>,
@@ -338,6 +346,7 @@ impl<'a> GeneralCheck<'a> {
             }
         });
     }
+
     fn check_skip_decl(
         &mut self,
         cst: &'a Cst<'_>,
@@ -359,6 +368,7 @@ impl<'a> GeneralCheck<'a> {
             }
         });
     }
+
     fn check_part_decl(
         &mut self,
         cst: &'a Cst<'_>,
@@ -382,6 +392,7 @@ impl<'a> GeneralCheck<'a> {
             }
         });
     }
+
     #[allow(clippy::too_many_arguments)]
     fn check_regex(
         &mut self,
@@ -559,6 +570,7 @@ impl<'a> GeneralCheck<'a> {
         sema.elision.insert(regex.syntax(), elision);
         elision
     }
+
     fn name_references_rule(
         &self,
         cst: &'a Cst<'_>,
@@ -576,6 +588,52 @@ impl<'a> GeneralCheck<'a> {
             false
         }
     }
+
+    fn check_right_rec(
+        &self,
+        cst: &'a Cst<'_>,
+        sema: &mut SemanticData<'_>,
+        rule: RuleDecl,
+        regex: Regex,
+        right_rec: &mut FxHashSet<Regex>,
+    ) {
+        match regex {
+            Regex::Alternation(alt) => {
+                for alt_op in alt.operands(cst) {
+                    self.check_right_rec(cst, sema, rule, alt_op, right_rec)
+                }
+            }
+            Regex::OrderedChoice(choice) => {
+                for choice_op in choice.operands(cst) {
+                    self.check_right_rec(cst, sema, rule, choice_op, right_rec)
+                }
+            }
+            Regex::Paren(paren) => {
+                if let Some(inner) = paren.inner(cst) {
+                    self.check_right_rec(cst, sema, rule, inner, right_rec)
+                }
+            }
+            Regex::Concat(concat) => {
+                let concat_ops = concat.operands(cst).filter(|op| {
+                    !matches!(
+                        op,
+                        Regex::Predicate(_)
+                            | Regex::NodeRename(_)
+                            | Regex::NodeElision(_)
+                            | Regex::Action(_)
+                    )
+                });
+                if let Some(last) = concat_ops.last() {
+                    self.check_right_rec(cst, sema, rule, last, right_rec);
+                }
+            }
+            Regex::Name(_) if self.name_references_rule(cst, sema, rule, regex) => {
+                right_rec.insert(regex);
+            }
+            _ => {}
+        }
+    }
+
     fn check_recursive(
         &self,
         cst: &'a Cst<'_>,
@@ -597,10 +655,17 @@ impl<'a> GeneralCheck<'a> {
                         )
                     });
 
-                    let check_rec =
+                    let check_left_rec =
                         |(i, op)| self.name_references_rule(cst, sema, rule, op).then_some(i);
-                    let left_rec = concat_ops.next().and_then(check_rec);
-                    let right_rec = concat_ops.last().and_then(check_rec);
+                    let left_rec = concat_ops.next().and_then(check_left_rec);
+
+                    let right_rec = if let Some((_, last)) = concat_ops.last() {
+                        let mut right_rec = FxHashSet::default();
+                        self.check_right_rec(cst, sema, rule, last, &mut right_rec);
+                        Some(right_rec)
+                    } else {
+                        None
+                    };
 
                     if left_rec.is_some()
                         && (sema
@@ -632,6 +697,7 @@ impl<'a> GeneralCheck<'a> {
                 .insert(rule, RecursiveBranches::new(branches));
         }
     }
+
     fn check_node_creation(
         cst: &'a Cst<'_>,
         regex: Regex,
@@ -864,6 +930,7 @@ impl<'a> OrderedChoiceValidator {
             | Regex::Return(_) => {}
         };
     }
+
     fn check_containment(
         cst: &'a Cst<'_>,
         sema: &mut SemanticData<'a>,
@@ -1140,6 +1207,7 @@ impl<'a> LL1Validator {
             }
         }
     }
+
     /// Calculates the follow set for each regular expression within a rule.
     fn calc_follow_regex(
         cst: &Cst<'_>,
@@ -1563,6 +1631,7 @@ impl UsageValidator {
             }
         }
     }
+
     fn set_regex(cst: &Cst<'_>, sema: &mut SemanticData<'_>, regex: Regex) {
         match regex {
             Regex::OrderedChoice(choice) => choice
@@ -1626,6 +1695,7 @@ impl RecoverySetGenerator {
     fn new() -> Self {
         Self::default()
     }
+
     fn run(&mut self, cst: &Cst<'_>, sema: &mut SemanticData<'_>) {
         let file = if let Some(file) = File::cast(cst, NodeRef::ROOT) {
             file
