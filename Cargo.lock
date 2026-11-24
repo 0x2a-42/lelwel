@@ -440,6 +440,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lelwel-cs-cast"
+version = "0.0.0"
+dependencies = [
+ "codespan-reporting",
+ "lelwel",
+ "logos",
+]
+
+[[package]]
 name = "lelwel-json"
 version = "0.0.0"
 dependencies = [
