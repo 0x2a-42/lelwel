@@ -470,7 +470,7 @@ impl RustOutput {
             && recursive
                 .branches()
                 .iter()
-                .any(|branch| matches!(branch, Recursion::Right(..) | Recursion::LeftRight(..)));
+                .any(|(_, rec)| matches!(rec, Recursion::Right(..) | Recursion::LeftRight(..)));
         output.write_all(
             format!(
                 "        fn rec<'a>(\
@@ -511,8 +511,8 @@ impl RustOutput {
         };
         let mut advance_error_set = BTreeSet::new();
         for alt_op in ops {
-            let branch = recursive.get_branch(alt_op);
-            if !matches!(branch, None | Some(Recursion::Right(..))) {
+            let rec = recursive.get_recursion(alt_op);
+            if !matches!(rec, None | Some(Recursion::Right(..))) {
                 continue;
             }
             let predict = &sema.predict_sets[&alt_op.syntax()];
@@ -531,7 +531,7 @@ impl RustOutput {
             let elision = *sema.elision.get(&alt_op.syntax()).unwrap();
             Self::output_elision_init(output, 5, false, "parser", false, elision)?;
 
-            if let Some(Recursion::Right(_, index)) = branch {
+            if let Some(Recursion::Right(index)) = rec {
                 let binding_power = recursive.binding_power(alt_op).0;
                 let Regex::Concat(concat) = alt_op else {
                     unreachable!()
@@ -610,15 +610,16 @@ impl RustOutput {
         output.write_all(b"            loop {\n")?;
         Self::output_node_kind_decl(output, has_rule_rename, name, 4, false)?;
         output.write_all(b"                match parser.current {\n")?;
-        for branch in recursive.branches() {
-            let (concat, left_index, right_index) = match branch {
-                Recursion::Left(Regex::Concat(concat), index) => (concat, *index, None),
-                Recursion::LeftRight(Regex::Concat(concat), left_index, right_index) => {
-                    (concat, *left_index, Some(*right_index))
-                }
+        for (branch, rec) in recursive.branches() {
+            let (left_index, right_index) = match rec {
+                Recursion::Left(index) => (*index, None),
+                Recursion::LeftRight(left_index, right_index) => (*left_index, Some(*right_index)),
                 _ => continue,
             };
-            let binding_power = recursive.binding_power(branch.regex());
+            let Regex::Concat(concat) = branch else {
+                continue;
+            };
+            let binding_power = recursive.binding_power(*branch);
             let mut is_first = true;
             for (i, concat_op) in concat.operands(cst).enumerate() {
                 if let Regex::Predicate(..) = concat_op {
@@ -633,7 +634,7 @@ impl RustOutput {
                         format!(
                             "{}{} => {{\n",
                             sema.predict_sets[&concat_op.syntax()].pattern(0),
-                            Self::get_predicate(cst, name, branch.regex(), "parser")
+                            Self::get_predicate(cst, name, *branch, "parser")
                         )
                         .indent(5)
                         .as_bytes(),
@@ -774,7 +775,7 @@ impl RustOutput {
                 recursive
                     .branches()
                     .iter()
-                    .any(|rec| matches!(rec, Recursion::Left(..) | Recursion::LeftRight(..)))
+                    .any(|(_, rec)| matches!(rec, Recursion::Left(..) | Recursion::LeftRight(..)))
             }) {
                 Self::output_left_recursive_rule(
                     cst,

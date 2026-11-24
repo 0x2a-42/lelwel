@@ -79,36 +79,26 @@ impl RuleNodeElision {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Recursion {
-    Left(Regex, usize),
-    Right(Regex, usize),
-    LeftRight(Regex, usize, usize),
+    Left(usize),
+    Right(usize),
+    LeftRight(usize, usize),
 }
-impl Recursion {
-    pub fn regex(&self) -> Regex {
-        match self {
-            Recursion::Left(regex, ..) => *regex,
-            Recursion::Right(regex, ..) => *regex,
-            Recursion::LeftRight(regex, ..) => *regex,
-        }
-    }
-}
+
 #[derive(Default)]
 pub struct RecursiveBranches {
-    branches: Vec<Recursion>,
+    branches: Vec<(Regex, Recursion)>,
     binding_power: FxHashMap<NodeRef, (usize, usize)>,
     regex_map: FxHashMap<NodeRef, usize>,
 }
+
 impl RecursiveBranches {
-    fn new(branches: Vec<Recursion>) -> Self {
+    fn new(branches: Vec<(Regex, Recursion)>) -> Self {
         let mut binding_power = FxHashMap::default();
         let mut regex_map = FxHashMap::default();
         let max_bp = branches.len() * 2;
         for (i, branch) in branches.iter().enumerate() {
-            regex_map.insert(branch.regex().syntax(), i);
-            binding_power.insert(
-                branch.regex().syntax(),
-                (max_bp - i * 2, max_bp - i * 2 + 1),
-            );
+            regex_map.insert(branch.0.syntax(), i);
+            binding_power.insert(branch.0.syntax(), (max_bp - i * 2, max_bp - i * 2 + 1));
         }
         Self {
             branches,
@@ -119,12 +109,12 @@ impl RecursiveBranches {
     pub fn contains(&self, regex: Regex) -> bool {
         self.binding_power.contains_key(&regex.syntax())
     }
-    pub fn get_branch(&self, regex: Regex) -> Option<Recursion> {
+    pub fn get_recursion(&self, regex: Regex) -> Option<Recursion> {
         self.regex_map
             .get(&regex.syntax())
-            .map(|index| self.branches[*index])
+            .map(|index| self.branches[*index].1)
     }
-    pub fn branches(&self) -> &[Recursion] {
+    pub fn branches(&self) -> &[(Regex, Recursion)] {
         &self.branches
     }
     pub fn binding_power(&self, regex: Regex) -> (usize, usize) {
@@ -282,7 +272,7 @@ impl<'a> GeneralCheck<'a> {
             let left_rec = sema.recursive.get(&rule).is_some_and(|rec| {
                 rec.branches()
                     .iter()
-                    .any(|branch| matches!(branch, Recursion::Left(..) | Recursion::LeftRight(..)))
+                    .any(|(_, rec)| matches!(rec, Recursion::Left(..) | Recursion::LeftRight(..)))
             });
             Self::check_node_creation(
                 cst,
@@ -624,11 +614,13 @@ impl<'a> GeneralCheck<'a> {
 
                     match (left_rec, right_rec) {
                         (Some(left_rec), Some(right_rec)) => {
-                            branches.push(Recursion::LeftRight(alt_op, left_rec, right_rec))
+                            branches.push((alt_op, Recursion::LeftRight(left_rec, right_rec)))
                         }
-                        (Some(left_rec), None) => branches.push(Recursion::Left(alt_op, left_rec)),
+                        (Some(left_rec), None) => {
+                            branches.push((alt_op, Recursion::Left(left_rec)))
+                        }
                         (None, Some(right_rec)) => {
-                            branches.push(Recursion::Right(alt_op, right_rec))
+                            branches.push((alt_op, Recursion::Right(right_rec)))
                         }
                         _ => {}
                     }
@@ -1375,8 +1367,8 @@ impl<'a> LL1Validator {
                 for (i, branch) in recursive
                     .branches
                     .iter()
-                    .filter_map(|rec| match rec {
-                        Recursion::Left(op, ..) | Recursion::LeftRight(op, ..) => Some(op),
+                    .filter_map(|(op, rec)| match rec {
+                        Recursion::Left(..) | Recursion::LeftRight(..) => Some(op),
                         _ => None,
                     })
                     .enumerate()
@@ -1407,10 +1399,8 @@ impl<'a> LL1Validator {
                             recursive
                                 .branches
                                 .iter()
-                                .filter_map(|rec| match rec {
-                                    Recursion::Left(op, ..) | Recursion::LeftRight(op, ..) => {
-                                        Some(op)
-                                    }
+                                .filter_map(|(op, rec)| match rec {
+                                    Recursion::Left(..) | Recursion::LeftRight(..) => Some(op),
                                     _ => None,
                                 })
                                 .copied(),
@@ -1422,7 +1412,10 @@ impl<'a> LL1Validator {
                 }
                 let non_left_recursive_branches = || {
                     alt.operands(cst).filter(|op| {
-                        matches!(recursive.get_branch(*op), None | Some(Recursion::Right(..)))
+                        matches!(
+                            recursive.get_recursion(*op),
+                            None | Some(Recursion::Right(..))
+                        )
                     })
                 };
 
@@ -1815,8 +1808,9 @@ struct OperatorValidator;
 impl OperatorValidator {
     fn run(cst: &Cst<'_>, diags: &mut Vec<Diagnostic>, sema: &mut SemanticData<'_>) {
         for recursive in sema.recursive.values_mut() {
-            for branch in recursive.branches.iter() {
-                if let Recursion::LeftRight(regex @ Regex::Concat(concat), left_index, ..) = branch
+            for (branch, rec) in recursive.branches.iter() {
+                if let Recursion::LeftRight(left_index, ..) = rec
+                    && let Regex::Concat(concat) = branch
                 {
                     let mut ops = concat.operands(cst);
                     let operand = ops.nth(left_index + 1).unwrap();
@@ -1827,7 +1821,7 @@ impl OperatorValidator {
                             right_assoc = true;
                             recursive
                                 .binding_power
-                                .entry(regex.syntax())
+                                .entry(branch.syntax())
                                 .and_modify(|e| *e = (e.1, e.0));
                         } else {
                             left_assoc = true;
