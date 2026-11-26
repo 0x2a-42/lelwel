@@ -47,6 +47,7 @@ crate-type = ["lib", "cdylib"]
 members = [
     "examples/c",
     "examples/calc",
+    "examples/cs_cast",
     "examples/json",
     "examples/l",
     "examples/lua",

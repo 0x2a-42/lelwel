@@ -1,0 +1,26 @@
+mod lexer;
+mod parser;
+
+use std::io::BufWriter;
+
+use codespan_reporting::files::SimpleFile;
+use codespan_reporting::term::termcolor::NoColor;
+use codespan_reporting::term::{self, Config};
+use parser::*;
+
+pub fn generate_syntax_tree(source: &str) -> Vec<String> {
+    let mut diags = vec![];
+    let cst = Parser::new(source, &mut diags).parse(&mut diags);
+
+    let mut writer = NoColor::new(BufWriter::new(Vec::new()));
+    let config = Config::default();
+    let file = SimpleFile::new("<input>", source);
+    for diag in diags.iter() {
+        term::emit_to_write_style(&mut writer, &config, &file, diag).unwrap();
+    }
+
+    vec![
+        format!("{cst}"),
+        String::from_utf8(writer.into_inner().into_inner().unwrap()).unwrap(),
+    ]
+}

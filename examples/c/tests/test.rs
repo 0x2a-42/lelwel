@@ -24,3 +24,13 @@ fn incomplete() {
 fn incomplete_call() {
     check!("incomplete_call");
 }
+
+#[test]
+fn simple_prec() {
+    check!("simple_prec");
+}
+
+#[test]
+fn prec() {
+    check!("prec");
+}

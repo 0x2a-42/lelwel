@@ -448,8 +448,28 @@ impl RustOutput {
             elision,
             "self",
             has_rule_rename,
+            None,
         )?;
         Self::output_elision_check(output, 2, has_rule_rename, name, "self", is_start, elision)
+    }
+
+    fn call_rec(
+        parser: &str,
+        binding_power: Option<usize>,
+        marker: &str,
+        in_choice: bool,
+    ) -> String {
+        if let Some(binding_power) = binding_power {
+            format!(
+                "rec({parser}, diags, {binding_power}, {marker}){};\n",
+                if in_choice { "?" } else { "" }
+            )
+        } else {
+            format!(
+                "rec({parser}, diags, {marker}){};\n",
+                if in_choice { "?" } else { "" }
+            )
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -470,7 +490,7 @@ impl RustOutput {
             && recursive
                 .branches()
                 .iter()
-                .any(|branch| matches!(branch, Recursion::Right(..) | Recursion::LeftRight(..)));
+                .any(|(_, rec)| matches!(rec, Recursion::Right(..) | Recursion::LeftRight(..)));
         output.write_all(
             format!(
                 "        fn rec<'a>(\
@@ -487,19 +507,6 @@ impl RustOutput {
             )
             .as_bytes(),
         )?;
-        let call_rec = |parser, binding_power, marker| {
-            if requires_bp {
-                format!(
-                    "rec({parser}, diags, {binding_power}, {marker}){};\n",
-                    if in_choice { "?" } else { "" }
-                )
-            } else {
-                format!(
-                    "rec({parser}, diags, {marker}){};\n",
-                    if in_choice { "?" } else { "" }
-                )
-            }
-        };
 
         // right recursive or non-recursive branches
         Self::output_node_kind_decl(output, has_rule_rename, name, 3, true)?;
@@ -511,8 +518,8 @@ impl RustOutput {
         };
         let mut advance_error_set = BTreeSet::new();
         for alt_op in ops {
-            let branch = recursive.get_branch(alt_op);
-            if !matches!(branch, None | Some(Recursion::Right(..))) {
+            let rec = recursive.get_recursion(alt_op);
+            if !matches!(rec, None | Some(Recursion::Right(..))) {
                 continue;
             }
             let predict = &sema.predict_sets[&alt_op.syntax()];
@@ -531,52 +538,26 @@ impl RustOutput {
             let elision = *sema.elision.get(&alt_op.syntax()).unwrap();
             Self::output_elision_init(output, 5, false, "parser", false, elision)?;
 
-            if let Some(Recursion::Right(_, index)) = branch {
-                let binding_power = recursive.binding_power(alt_op).0;
-                let Regex::Concat(concat) = alt_op else {
-                    unreachable!()
-                };
-                for (i, concat_op) in concat.operands(cst).enumerate() {
-                    if i == index {
-                        output.write_all(
-                            format!(
-                                "let lhs = parser.mark(diags);\n{}",
-                                call_rec("parser", binding_power, "lhs")
-                            )
-                            .indent(5)
-                            .as_bytes(),
-                        )?;
-                    } else {
-                        Self::output_regex(
-                            cst,
-                            sema,
-                            concat_op,
-                            output,
-                            5,
-                            token_symbols,
-                            false,
-                            name,
-                            elision,
-                            "parser",
-                            has_rule_rename,
-                        )?;
-                    }
-                }
+            let right_rec = if let Some(Recursion::Right(right_rec)) = rec {
+                let left_binding_power = requires_bp.then_some(recursive.binding_power(alt_op).0);
+                Some((right_rec, left_binding_power))
             } else {
-                Self::output_regex(
-                    cst,
-                    sema,
-                    alt_op,
-                    output,
-                    5,
-                    token_symbols,
-                    false,
-                    name,
-                    elision,
-                    "parser",
-                    has_rule_rename,
-                )?;
-            }
+                None
+            };
+            Self::output_regex(
+                cst,
+                sema,
+                alt_op,
+                output,
+                5,
+                token_symbols,
+                false,
+                name,
+                elision,
+                "parser",
+                has_rule_rename,
+                right_rec,
+            )?;
 
             Self::output_elision_check(output, 5, has_rule_rename, name, "parser", false, elision)?;
             output.write_all("}\n".indent(4).as_bytes())?;
@@ -610,15 +591,17 @@ impl RustOutput {
         output.write_all(b"            loop {\n")?;
         Self::output_node_kind_decl(output, has_rule_rename, name, 4, false)?;
         output.write_all(b"                match parser.current {\n")?;
-        for branch in recursive.branches() {
-            let (concat, left_index, right_index) = match branch {
-                Recursion::Left(Regex::Concat(concat), index) => (concat, *index, None),
-                Recursion::LeftRight(Regex::Concat(concat), left_index, right_index) => {
-                    (concat, *left_index, Some(*right_index))
-                }
+        for (branch, rec) in recursive.branches() {
+            let (left_index, right_rec) = match rec {
+                Recursion::Left(index) => (*index, None),
+                Recursion::LeftRight(left_index, right_rec) => (*left_index, Some(right_rec)),
                 _ => continue,
             };
-            let binding_power = recursive.binding_power(branch.regex());
+            let Regex::Concat(concat) = branch else {
+                continue;
+            };
+            let binding_power = recursive.binding_power(*branch);
+            let right_binding_power = requires_bp.then_some(binding_power.1);
             let mut is_first = true;
             for (i, concat_op) in concat.operands(cst).enumerate() {
                 if let Regex::Predicate(..) = concat_op {
@@ -633,16 +616,16 @@ impl RustOutput {
                         format!(
                             "{}{} => {{\n",
                             sema.predict_sets[&concat_op.syntax()].pattern(0),
-                            Self::get_predicate(cst, name, branch.regex(), "parser")
+                            Self::get_predicate(cst, name, *branch, "parser")
                         )
                         .indent(5)
                         .as_bytes(),
                     )?;
                     if requires_bp {
-                        let binding_power = binding_power.0;
+                        let left_binding_power = binding_power.0;
                         output.write_all(
                             format!(
-                                "if {binding_power} < min_bp {{\
+                                "if {left_binding_power} < min_bp {{\
                                \n    break;\
                                \n}}\n"
                             )
@@ -656,31 +639,20 @@ impl RustOutput {
                             .as_bytes(),
                     )?;
                 }
-                if right_index == Some(i) {
-                    let binding_power = binding_power.1;
-                    output.write_all(
-                        format!(
-                            "let rhs = parser.mark(diags);\n{}",
-                            call_rec("parser", binding_power, "rhs")
-                        )
-                        .indent(6)
-                        .as_bytes(),
-                    )?;
-                } else {
-                    Self::output_regex(
-                        cst,
-                        sema,
-                        concat_op,
-                        output,
-                        6,
-                        token_symbols,
-                        false,
-                        name,
-                        RuleNodeElision::None,
-                        "parser",
-                        has_rule_rename,
-                    )?;
-                }
+                Self::output_regex(
+                    cst,
+                    sema,
+                    concat_op,
+                    output,
+                    6,
+                    token_symbols,
+                    false,
+                    name,
+                    RuleNodeElision::None,
+                    "parser",
+                    has_rule_rename,
+                    right_rec.map(|right_rec| (right_rec, right_binding_power)),
+                )?;
             }
             Self::output_cst_close(output, has_rule_rename, name, 6, true, "parser", false)?;
             output.write_all(b"                        continue;\n")?;
@@ -700,7 +672,7 @@ impl RustOutput {
                \n}}\
                \nlet lhs = self.mark(diags);\n{}",
                 if in_choice { "\n    Some(())" } else { "" },
-                call_rec("self", 0, "lhs")
+                Self::call_rec("self", requires_bp.then_some(0), "lhs", in_choice)
             )
             .indent(2)
             .as_bytes(),
@@ -774,7 +746,7 @@ impl RustOutput {
                 recursive
                     .branches()
                     .iter()
-                    .any(|rec| matches!(rec, Recursion::Left(..) | Recursion::LeftRight(..)))
+                    .any(|(_, rec)| matches!(rec, Recursion::Left(..) | Recursion::LeftRight(..)))
             }) {
                 Self::output_left_recursive_rule(
                     cst,
@@ -851,6 +823,7 @@ impl RustOutput {
         op: Regex,
         ordered_choice_return: &str,
         is_loop: bool,
+        right_rec: Option<(&FxHashSet<Regex>, Option<usize>)>,
     ) -> std::io::Result<()> {
         output.write_all(
             format!(
@@ -886,6 +859,7 @@ impl RustOutput {
             rule_elision,
             parser_name,
             has_rule_rename,
+            right_rec,
         )?;
 
         let ordered_choice_return = ordered_choice_return.indent(3);
@@ -938,6 +912,7 @@ impl RustOutput {
         rule_elision: RuleNodeElision,
         parser_name: &str,
         has_rule_rename: bool,
+        right_rec: Option<(&FxHashSet<Regex>, Option<usize>)>,
     ) -> std::io::Result<()> {
         let in_choice = sema.used_in_ordered_choice.contains(&regex.syntax());
         let expect_macro = if in_choice { "try_expect!" } else { "expect!" };
@@ -952,31 +927,44 @@ impl RustOutput {
         };
         match regex {
             Regex::Name(name) => {
-                let decl = sema.decl_bindings[&name.syntax()];
-                if let Some(rule) = RuleDecl::cast(cst, decl) {
-                    let name = rule.name(cst).unwrap().0;
-                    let rule_in_choice = sema.used_in_ordered_choice.contains(&rule.syntax());
+                if let Some((right_rec, binding_power)) = right_rec
+                    && right_rec.contains(&regex)
+                {
                     output.write_all(
                         format!(
-                            "{parser_name}.rule_{name}(diags){};\n",
-                            if rule_in_choice && in_choice { "?" } else { "" }
+                            "let rhs = parser.mark(diags);\n{}",
+                            Self::call_rec("parser", binding_power, "rhs", in_choice)
                         )
-                        .indent(level)
+                        .indent(5)
                         .as_bytes(),
                     )?;
-                } else if let Some(token) = TokenDecl::cast(cst, decl) {
-                    let name = token.name(cst).unwrap().0;
-                    let sym = token
-                        .symbol(cst)
-                        .map_or(name, |(sym, _)| &sym[1..sym.len() - 1]);
-                    output.write_all(
-                        format!(
-                            "{expect_macro}({name}, {}, {parser_name}, diags);\n",
-                            syntax_error_message(&[sym.to_string()])
-                        )
-                        .indent(level)
-                        .as_bytes(),
-                    )?;
+                } else {
+                    let decl = sema.decl_bindings[&name.syntax()];
+                    if let Some(rule) = RuleDecl::cast(cst, decl) {
+                        let name = rule.name(cst).unwrap().0;
+                        let rule_in_choice = sema.used_in_ordered_choice.contains(&rule.syntax());
+                        output.write_all(
+                            format!(
+                                "{parser_name}.rule_{name}(diags){};\n",
+                                if rule_in_choice && in_choice { "?" } else { "" }
+                            )
+                            .indent(level)
+                            .as_bytes(),
+                        )?;
+                    } else if let Some(token) = TokenDecl::cast(cst, decl) {
+                        let name = token.name(cst).unwrap().0;
+                        let sym = token
+                            .symbol(cst)
+                            .map_or(name, |(sym, _)| &sym[1..sym.len() - 1]);
+                        output.write_all(
+                            format!(
+                                "{expect_macro}({name}, {}, {parser_name}, diags);\n",
+                                syntax_error_message(&[sym.to_string()])
+                            )
+                            .indent(level)
+                            .as_bytes(),
+                        )?;
+                    }
                 }
             }
             Regex::Symbol(sym) => {
@@ -1042,6 +1030,7 @@ impl RustOutput {
                         rule_elision,
                         parser_name,
                         has_rule_rename,
+                        right_rec,
                     )?;
                     output.write_all(
                         "    Some(())\
@@ -1097,6 +1086,7 @@ impl RustOutput {
                     rule_elision,
                     parser_name,
                     has_rule_rename,
+                    right_rec,
                 )?;
                 output.write_all("} else {\n".indent(level + 1).as_bytes())?;
                 output.write_all(
@@ -1124,6 +1114,7 @@ impl RustOutput {
                         rule_elision,
                         parser_name,
                         has_rule_rename,
+                        right_rec,
                     )?;
                 }
             }
@@ -1159,6 +1150,7 @@ impl RustOutput {
                         rule_elision,
                         parser_name,
                         has_rule_rename,
+                        right_rec,
                     )?;
                     output.write_all("}\n".indent(level + 1).as_bytes())?;
                 }
@@ -1205,6 +1197,7 @@ impl RustOutput {
                     star.operand(cst).unwrap(),
                     &ordered_choice_return,
                     true,
+                    right_rec,
                 )?;
             }
             Regex::Plus(plus) => {
@@ -1221,6 +1214,7 @@ impl RustOutput {
                     rule_elision,
                     parser_name,
                     has_rule_rename,
+                    right_rec,
                 )?;
                 Self::output_recovering_operation(
                     cst,
@@ -1237,6 +1231,7 @@ impl RustOutput {
                     op,
                     &ordered_choice_return,
                     true,
+                    right_rec,
                 )?;
             }
             Regex::Optional(opt) => {
@@ -1255,6 +1250,7 @@ impl RustOutput {
                     opt.operand(cst).unwrap(),
                     &ordered_choice_return,
                     false,
+                    right_rec,
                 )?;
             }
             Regex::Paren(paren) => {
@@ -1271,6 +1267,7 @@ impl RustOutput {
                         rule_elision,
                         parser_name,
                         has_rule_rename,
+                        right_rec,
                     )?;
                 }
             }

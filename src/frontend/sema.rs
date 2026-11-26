@@ -77,38 +77,28 @@ impl RuleNodeElision {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Recursion {
-    Left(Regex, usize),
-    Right(Regex, usize),
-    LeftRight(Regex, usize, usize),
+    Left(usize),
+    Right(FxHashSet<Regex>),
+    LeftRight(usize, FxHashSet<Regex>),
 }
-impl Recursion {
-    pub fn regex(&self) -> Regex {
-        match self {
-            Recursion::Left(regex, ..) => *regex,
-            Recursion::Right(regex, ..) => *regex,
-            Recursion::LeftRight(regex, ..) => *regex,
-        }
-    }
-}
+
 #[derive(Default)]
 pub struct RecursiveBranches {
-    branches: Vec<Recursion>,
+    branches: Vec<(Regex, Recursion)>,
     binding_power: FxHashMap<NodeRef, (usize, usize)>,
     regex_map: FxHashMap<NodeRef, usize>,
 }
+
 impl RecursiveBranches {
-    fn new(branches: Vec<Recursion>) -> Self {
+    fn new(branches: Vec<(Regex, Recursion)>) -> Self {
         let mut binding_power = FxHashMap::default();
         let mut regex_map = FxHashMap::default();
         let max_bp = branches.len() * 2;
         for (i, branch) in branches.iter().enumerate() {
-            regex_map.insert(branch.regex().syntax(), i);
-            binding_power.insert(
-                branch.regex().syntax(),
-                (max_bp - i * 2, max_bp - i * 2 + 1),
-            );
+            regex_map.insert(branch.0.syntax(), i);
+            binding_power.insert(branch.0.syntax(), (max_bp - i * 2, max_bp - i * 2 + 1));
         }
         Self {
             branches,
@@ -119,12 +109,12 @@ impl RecursiveBranches {
     pub fn contains(&self, regex: Regex) -> bool {
         self.binding_power.contains_key(&regex.syntax())
     }
-    pub fn get_branch(&self, regex: Regex) -> Option<Recursion> {
+    pub fn get_recursion(&self, regex: Regex) -> Option<&Recursion> {
         self.regex_map
             .get(&regex.syntax())
-            .map(|index| self.branches[*index])
+            .map(|index| &self.branches[*index].1)
     }
-    pub fn branches(&self) -> &[Recursion] {
+    pub fn branches(&self) -> &[(Regex, Recursion)] {
         &self.branches
     }
     pub fn binding_power(&self, regex: Regex) -> (usize, usize) {
@@ -168,6 +158,7 @@ impl<'a> GeneralCheck<'a> {
     pub fn new() -> Self {
         Self::default()
     }
+
     fn bind_symbol(
         &mut self,
         cst: &'a Cst<'_>,
@@ -182,6 +173,7 @@ impl<'a> GeneralCheck<'a> {
             diags.push(Diagnostic::redefinition(&span, binding, &old_span));
         }
     }
+
     fn get_symbol_binding(
         &mut self,
         name: &'a str,
@@ -204,6 +196,7 @@ impl<'a> GeneralCheck<'a> {
             })
             .copied()
     }
+
     fn run(&mut self, cst: &'a Cst<'_>, diags: &mut Vec<Diagnostic>, sema: &mut SemanticData<'a>) {
         if let Some(file) = File::cast(cst, NodeRef::ROOT) {
             file.rule_decls(cst)
@@ -232,6 +225,7 @@ impl<'a> GeneralCheck<'a> {
             diags.push(Diagnostic::missing_start_rule());
         }
     }
+
     fn check_token_decl(&mut self, cst: &'a Cst<'_>, decl: TokenDecl, diags: &mut Vec<Diagnostic>) {
         if let Some((name, name_span)) = decl.name(cst) {
             if matches!(name, "Error") || name.starts_with("EOF") {
@@ -246,6 +240,7 @@ impl<'a> GeneralCheck<'a> {
             self.bind_symbol(cst, name, "token", decl.syntax(), diags);
         }
     }
+
     fn bind_rule_decl(&mut self, cst: &'a Cst<'_>, decl: RuleDecl, diags: &mut Vec<Diagnostic>) {
         if let Some((name, name_span)) = decl.name(cst) {
             if matches!(name, "error") {
@@ -257,6 +252,7 @@ impl<'a> GeneralCheck<'a> {
             }
         }
     }
+
     fn check_rule_decl(
         &mut self,
         cst: &'a Cst<'_>,
@@ -282,7 +278,7 @@ impl<'a> GeneralCheck<'a> {
             let left_rec = sema.recursive.get(&rule).is_some_and(|rec| {
                 rec.branches()
                     .iter()
-                    .any(|branch| matches!(branch, Recursion::Left(..) | Recursion::LeftRight(..)))
+                    .any(|(_, rec)| matches!(rec, Recursion::Left(..) | Recursion::LeftRight(..)))
             });
             Self::check_node_creation(
                 cst,
@@ -300,6 +296,7 @@ impl<'a> GeneralCheck<'a> {
             }
         }
     }
+
     fn check_start_decl(
         &mut self,
         cst: &'a Cst<'_>,
@@ -325,6 +322,7 @@ impl<'a> GeneralCheck<'a> {
             }
         }
     }
+
     fn check_right_decl(
         &mut self,
         cst: &'a Cst<'_>,
@@ -348,6 +346,7 @@ impl<'a> GeneralCheck<'a> {
             }
         });
     }
+
     fn check_skip_decl(
         &mut self,
         cst: &'a Cst<'_>,
@@ -369,6 +368,7 @@ impl<'a> GeneralCheck<'a> {
             }
         });
     }
+
     fn check_part_decl(
         &mut self,
         cst: &'a Cst<'_>,
@@ -392,6 +392,7 @@ impl<'a> GeneralCheck<'a> {
             }
         });
     }
+
     #[allow(clippy::too_many_arguments)]
     fn check_regex(
         &mut self,
@@ -569,6 +570,7 @@ impl<'a> GeneralCheck<'a> {
         sema.elision.insert(regex.syntax(), elision);
         elision
     }
+
     fn name_references_rule(
         &self,
         cst: &'a Cst<'_>,
@@ -586,6 +588,52 @@ impl<'a> GeneralCheck<'a> {
             false
         }
     }
+
+    fn check_right_rec(
+        &self,
+        cst: &'a Cst<'_>,
+        sema: &mut SemanticData<'_>,
+        rule: RuleDecl,
+        regex: Regex,
+        right_rec: &mut FxHashSet<Regex>,
+    ) {
+        match regex {
+            Regex::Alternation(alt) => {
+                for alt_op in alt.operands(cst) {
+                    self.check_right_rec(cst, sema, rule, alt_op, right_rec)
+                }
+            }
+            Regex::OrderedChoice(choice) => {
+                for choice_op in choice.operands(cst) {
+                    self.check_right_rec(cst, sema, rule, choice_op, right_rec)
+                }
+            }
+            Regex::Paren(paren) => {
+                if let Some(inner) = paren.inner(cst) {
+                    self.check_right_rec(cst, sema, rule, inner, right_rec)
+                }
+            }
+            Regex::Concat(concat) => {
+                let concat_ops = concat.operands(cst).filter(|op| {
+                    !matches!(
+                        op,
+                        Regex::Predicate(_)
+                            | Regex::NodeRename(_)
+                            | Regex::NodeElision(_)
+                            | Regex::Action(_)
+                    )
+                });
+                if let Some(last) = concat_ops.last() {
+                    self.check_right_rec(cst, sema, rule, last, right_rec);
+                }
+            }
+            Regex::Name(_) if self.name_references_rule(cst, sema, rule, regex) => {
+                right_rec.insert(regex);
+            }
+            _ => {}
+        }
+    }
+
     fn check_recursive(
         &self,
         cst: &'a Cst<'_>,
@@ -607,10 +655,17 @@ impl<'a> GeneralCheck<'a> {
                         )
                     });
 
-                    let check_rec =
+                    let check_left_rec =
                         |(i, op)| self.name_references_rule(cst, sema, rule, op).then_some(i);
-                    let left_rec = concat_ops.next().and_then(check_rec);
-                    let right_rec = concat_ops.last().and_then(check_rec);
+                    let left_rec = concat_ops.next().and_then(check_left_rec);
+
+                    let right_rec = if let Some((_, last)) = concat_ops.last() {
+                        let mut right_rec = FxHashSet::default();
+                        self.check_right_rec(cst, sema, rule, last, &mut right_rec);
+                        Some(right_rec)
+                    } else {
+                        None
+                    };
 
                     if left_rec.is_some()
                         && (sema
@@ -624,11 +679,13 @@ impl<'a> GeneralCheck<'a> {
 
                     match (left_rec, right_rec) {
                         (Some(left_rec), Some(right_rec)) => {
-                            branches.push(Recursion::LeftRight(alt_op, left_rec, right_rec))
+                            branches.push((alt_op, Recursion::LeftRight(left_rec, right_rec)))
                         }
-                        (Some(left_rec), None) => branches.push(Recursion::Left(alt_op, left_rec)),
+                        (Some(left_rec), None) => {
+                            branches.push((alt_op, Recursion::Left(left_rec)))
+                        }
                         (None, Some(right_rec)) => {
-                            branches.push(Recursion::Right(alt_op, right_rec))
+                            branches.push((alt_op, Recursion::Right(right_rec)))
                         }
                         _ => {}
                     }
@@ -640,6 +697,7 @@ impl<'a> GeneralCheck<'a> {
                 .insert(rule, RecursiveBranches::new(branches));
         }
     }
+
     fn check_node_creation(
         cst: &'a Cst<'_>,
         regex: Regex,
@@ -872,6 +930,7 @@ impl<'a> OrderedChoiceValidator {
             | Regex::Return(_) => {}
         };
     }
+
     fn check_containment(
         cst: &'a Cst<'_>,
         sema: &mut SemanticData<'a>,
@@ -1148,6 +1207,7 @@ impl<'a> LL1Validator {
             }
         }
     }
+
     /// Calculates the follow set for each regular expression within a rule.
     fn calc_follow_regex(
         cst: &Cst<'_>,
@@ -1375,8 +1435,8 @@ impl<'a> LL1Validator {
                 for (i, branch) in recursive
                     .branches
                     .iter()
-                    .filter_map(|rec| match rec {
-                        Recursion::Left(op, ..) | Recursion::LeftRight(op, ..) => Some(op),
+                    .filter_map(|(op, rec)| match rec {
+                        Recursion::Left(..) | Recursion::LeftRight(..) => Some(op),
                         _ => None,
                     })
                     .enumerate()
@@ -1407,10 +1467,8 @@ impl<'a> LL1Validator {
                             recursive
                                 .branches
                                 .iter()
-                                .filter_map(|rec| match rec {
-                                    Recursion::Left(op, ..) | Recursion::LeftRight(op, ..) => {
-                                        Some(op)
-                                    }
+                                .filter_map(|(op, rec)| match rec {
+                                    Recursion::Left(..) | Recursion::LeftRight(..) => Some(op),
                                     _ => None,
                                 })
                                 .copied(),
@@ -1422,7 +1480,10 @@ impl<'a> LL1Validator {
                 }
                 let non_left_recursive_branches = || {
                     alt.operands(cst).filter(|op| {
-                        matches!(recursive.get_branch(*op), None | Some(Recursion::Right(..)))
+                        matches!(
+                            recursive.get_recursion(*op),
+                            None | Some(Recursion::Right(..))
+                        )
                     })
                 };
 
@@ -1570,6 +1631,7 @@ impl UsageValidator {
             }
         }
     }
+
     fn set_regex(cst: &Cst<'_>, sema: &mut SemanticData<'_>, regex: Regex) {
         match regex {
             Regex::OrderedChoice(choice) => choice
@@ -1633,6 +1695,7 @@ impl RecoverySetGenerator {
     fn new() -> Self {
         Self::default()
     }
+
     fn run(&mut self, cst: &Cst<'_>, sema: &mut SemanticData<'_>) {
         let file = if let Some(file) = File::cast(cst, NodeRef::ROOT) {
             file
@@ -1815,8 +1878,9 @@ struct OperatorValidator;
 impl OperatorValidator {
     fn run(cst: &Cst<'_>, diags: &mut Vec<Diagnostic>, sema: &mut SemanticData<'_>) {
         for recursive in sema.recursive.values_mut() {
-            for branch in recursive.branches.iter() {
-                if let Recursion::LeftRight(regex @ Regex::Concat(concat), left_index, ..) = branch
+            for (branch, rec) in recursive.branches.iter() {
+                if let Recursion::LeftRight(left_index, ..) = rec
+                    && let Regex::Concat(concat) = branch
                 {
                     let mut ops = concat.operands(cst);
                     let operand = ops.nth(left_index + 1).unwrap();
@@ -1827,7 +1891,7 @@ impl OperatorValidator {
                             right_assoc = true;
                             recursive
                                 .binding_power
-                                .entry(regex.syntax())
+                                .entry(branch.syntax())
                                 .and_modify(|e| *e = (e.1, e.0));
                         } else {
                             left_assoc = true;

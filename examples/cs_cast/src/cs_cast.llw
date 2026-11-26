@@ -1,0 +1,31 @@
+token True='true' False='false';
+token LPar='(' RPar=')' Semi=';' Asn='=' Plus='+' Minus='-' Star='*' Slash='/' Plus2='++'
+      Minus2='--';
+token Name='<name>' Int='<int>';
+token Whitespace;
+
+skip Whitespace;
+
+start file;
+
+file: stmt*;
+stmt^:
+  stmt_decl
+/ stmt_expr
+;
+stmt_expr: expr ';';
+stmt_decl: type Name ~ ['=' expr] ';';
+expr:
+  expr ('++' | '--') @expr_inc_dec
+| ('+' | '-') expr @expr_unary
+| '(' (
+    type ')' !1 ~ expr @expr_cast
+  / expr ')' @expr_paren
+  )
+| expr ('*' | '/') expr @expr_binary
+| expr ('+' | '-') expr @expr_binary
+| Name @expr_name
+| expr_literal ^
+;
+expr_literal: Int | 'true' | 'false';
+type: Name;

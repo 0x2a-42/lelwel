@@ -392,22 +392,24 @@ The commit operator `~` commits a parse to a choice, so in case of a failure the
 
 > **Example**
 > ```antlr
-> token Id Num Eq='=' Semi=';' LPar='(' RPar=')';
+> token Id Num Eq='=' Semi=';' LPar='(' RPar=')' Plus='+';
 > start stmt;
 > 
-> stmt^:
->   decl_stmt
-> / expr_stmt
+> stmt:
+>   stmt_decl
+> / stmt_expr
 > ;
-> decl_stmt: type Id ~ ['=' expr] ';';
-> expr_stmt: expr ';';
+> stmt_expr: expr ';';
+> stmt_decl: type Id ~ ['=' expr] ';';
 > expr:
->   Id
-> | Num
+>   '+' expr @expr_unary
 > | '(' (
->     type ')' !1 ~ expr
->   / expr ')'
+>     type ')' !1 ~ expr @expr_cast
+>   / expr ')' @expr_paren
 >   )
+> | expr '+' expr @expr_binary
+> | Id @expr_id
+> | Num @expr_num
 > ;
 > type: Id;
 > ```
