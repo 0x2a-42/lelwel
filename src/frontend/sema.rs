@@ -1894,7 +1894,7 @@ impl SkipValidator {
                 }
             }
             Regex::Concat(concat) => {
-                for op in concat.operands(cst) {
+                if let Some(op) = concat.operands(cst).last() {
                     Self::check_local_follow(cst, sema, op, diags);
                 }
             }
