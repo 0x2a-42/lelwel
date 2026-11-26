@@ -53,6 +53,7 @@ members = [
     "examples/oberon0",
     "examples/python2",
     "examples/toml",
+    "examples/unskip",
     "examples/wgsl",
     "examples/brainfuck"
 ]

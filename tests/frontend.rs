@@ -465,3 +465,13 @@ fn uppercase_rule() {
     assert_eq!(lines.next(), Some("tests/frontend/uppercase_rule.llw:15:1: warning[W005]: empty rule"));
     assert_eq!(lines.next(), None);
 }
+
+#[test]
+#[rustfmt::skip]
+fn unskip_part() {
+    let diags = gen_diags("tests/frontend/unskip.llw");
+    let mut lines = diags.lines();
+
+    assert_eq!(lines.next(), None);  // No warnings
+
+}

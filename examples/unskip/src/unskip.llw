@@ -1,0 +1,24 @@
+token Single='single' Optional='optional' Star='star' Plus='plus'
+      Sequence='sequence' Nested='nested' Multiple='multiple' Normal='normal'
+      End='end' Lines='lines';
+token A='a' B='b' C='c' Comma=',' Newline Whitespace;
+
+skip Newline Whitespace;
+start document;
+
+document: statement*;
+statement: single | optional | zero_or_more | one_or_more
+         | sequence | nested | multiple | normal | lines_block;
+
+terminator: Comma | Newline;
+
+single: 'single' A terminator;
+optional: 'optional' [A] terminator;
+zero_or_more: 'star' A* terminator;
+one_or_more: 'plus' A+ terminator;
+sequence: 'sequence' A B C terminator;
+nested: 'nested' optional_abc terminator;
+optional_abc: [A B C];
+multiple: 'multiple' A (Newline | Whitespace) 'end';
+normal: 'normal' A B C ',';
+lines_block: 'lines' [A (terminator [A])*] End;

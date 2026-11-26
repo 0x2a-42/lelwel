@@ -500,6 +500,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lelwel-unskip"
+version = "0.0.0"
+dependencies = [
+ "codespan-reporting",
+ "lelwel",
+ "logos",
+]
+
+[[package]]
 name = "lelwel-wgsl"
 version = "0.0.0"
 dependencies = [

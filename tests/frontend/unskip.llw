@@ -1,0 +1,22 @@
+token A B C Comma Whitespace Newline;
+
+skip Newline Whitespace;
+
+terminate_stmt: Comma | Newline;
+
+start tests;
+
+tests: test_1 test_2 test_3 test_4 test_5 test_6;
+
+test_1: A terminate_stmt;
+
+test_2: [A] terminate_stmt;
+
+test_3: A* terminate_stmt;
+
+test_4: A+ terminate_stmt;
+
+test_5: A B C terminate_stmt;
+
+test_6: optional_abc terminate_stmt;
+optional_abc: [A B C];

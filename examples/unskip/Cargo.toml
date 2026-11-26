@@ -1,0 +1,13 @@
+[package]
+name = "lelwel-unskip"
+version = "0.0.0"
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+edition = "2024"
+
+[dependencies]
+logos = "0.16"
+codespan-reporting = "0.13"
+
+[build-dependencies]
+lelwel = { path = "../.." }
